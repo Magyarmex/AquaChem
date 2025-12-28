@@ -835,6 +835,7 @@ const DEBUG_STATE = {
   lastChemCumInfo: null,
   lastRecomputeMs: null,
   lastFlagsCount: null,
+  lastFlagsMode: null,
   lastUpdateISO: null,
   missingContainers: [],
   initReadyState: null,
@@ -937,6 +938,9 @@ lines.push(`surface=${p.lenCm}×${p.widCm} cm, blanket=${p.blanketPct}%, ripple=
     lines.push('');
     lines.push('--- Flags rendered (last) ---');
     lines.push(`Cards: ${DEBUG_STATE.lastFlagsCount}`);
+    if(DEBUG_STATE.lastFlagsMode){
+      lines.push(`Mode: ${DEBUG_STATE.lastFlagsMode}`);
+    }
   }
   if(DEBUG_STATE.missingContainers.length){
     lines.push('');
@@ -2851,6 +2855,20 @@ function initCanvasInteractions(){
 /* =========================================================
    Flags + summary
 ========================================================= */
+function fmtVal(value, unit='', decimals=null){
+  if(!Number.isFinite(value)) return unit ? `— ${unit}` : '—';
+  const abs = Math.abs(value);
+  const d = (decimals != null) ? decimals : (abs >= 10 ? 1 : (abs >= 1 ? 2 : 3));
+  return `${value.toFixed(d)}${unit ? ` ${unit}` : ''}`;
+}
+
+function fmtBandLine(mode, good, warn, unit=''){
+  if(mode === 'min'){
+    return `Safe ≥ ${fmtVal(good, unit)} • Watch ${fmtVal(warn, unit)}–${fmtVal(good, unit)} • Risk < ${fmtVal(warn, unit)}`;
+  }
+  return `Safe ≤ ${fmtVal(good, unit)} • Watch ${fmtVal(good, unit)}–${fmtVal(warn, unit)} • Risk > ${fmtVal(warn, unit)}`;
+}
+
 function setFlags(sim, params, mc){
   let flags = el('flags');
   if(!flags){
@@ -2865,7 +2883,19 @@ function setFlags(sim, params, mc){
     host.appendChild(flags);
   }
   flags.innerHTML = '';
+  let tags = el('chemTags');
+  if(!tags){
+    addWarning('Chemistry tag container missing (#chemTags). Creating fallback container.');
+    DEBUG_STATE.missingContainers.push({timeISO: new Date().toISOString(), id:'chemTags', context:'setFlags'});
+    tags = document.createElement('div');
+    tags.id = 'chemTags';
+    tags.className = 'tag-stack';
+    tags.style.marginTop = '10px';
+    flags.parentNode?.insertBefore(tags, flags);
+  }
+  tags.innerHTML = '';
   let flagCount = 0;
+  const tagSummary = [];
 
   const kindAliases = {ok:'ok', warn:'warn', danger:'danger', note:'note', good:'ok'};
   const good = kindAliases.good;
@@ -2946,7 +2976,6 @@ function setFlags(sim, params, mc){
     }else if(p1 > 0.10){
       add('warn', 'High hypoxia risk', `In ${fmtPct(p1)} of runs, DO dips below <b>1 mg/L</b>. Consider reducing input, increasing aeration, or increasing open surface exchange.`);
     }
-    return `Safe ≤ ${fmtVal(good, unit)} • Watch ${fmtVal(good, unit)}–${fmtVal(warn, unit)} • Risk > ${fmtVal(warn, unit)}`;
   };
   const classify = (mode, value, good, warn)=>{
     if(!Number.isFinite(value)){
@@ -2974,6 +3003,7 @@ function setFlags(sim, params, mc){
       <div class="tag-details">${details.map(line=>`<div>${line}</div>`).join('')}</div>
     `;
     tags.appendChild(det);
+    tagSummary.push({label, tone, status, summary});
   };
 
   const isMC = !!mc;
@@ -3016,7 +3046,10 @@ function setFlags(sim, params, mc){
     ]
   });
 
+  if(isMC){
     DEBUG_STATE.lastFlagsCount = flagCount;
+    DEBUG_STATE.lastFlagsMode = 'uncertainty';
+    DEBUG_STATE.lastTagSummary = {mode:'uncertainty', tags: tagSummary};
     return;
   }
 
@@ -3078,6 +3111,8 @@ function setFlags(sim, params, mc){
     add('note', 'Denitrification activity', `Estimated NO₃ → N₂ conversion: ${denitN_mgL.toFixed(2)} mg/L as N. Low-DO windows are driving denitrification.`);
   }
   DEBUG_STATE.lastFlagsCount = flagCount;
+  DEBUG_STATE.lastFlagsMode = 'single';
+  DEBUG_STATE.lastTagSummary = {mode:'single', tags: tagSummary};
 }
 
 /* =========================================================
