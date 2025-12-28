@@ -1294,7 +1294,7 @@ function runSimulation(params){
       c_balance_init:0,
       c_balance_end:0
     },
-    meta: { dt, oxy, kLa, nitCap, denitCap }
+    meta: { dt, oxy, kLa, nitCap, denitCap, feedStart:0, feedEnd:0, maxDemand:0, maxSupply:0 }
   };
 
   // Events sorted
@@ -1330,11 +1330,11 @@ function runSimulation(params){
 
   function fluxPellet(Pmass, k, access){
     // surface-limited intact pellet: ~ M^(2/3)
-    return k * Bhet * access * Math.pow(Math.max(Pmass,0), 2/3);
+    return k * access * Math.pow(Math.max(Pmass,0), 2/3);
   }
   function fluxPowder(Pmass, k){
     // distributed powder: first-order
-    return k * Bhet * Math.max(Pmass,0);
+    return k * Math.max(Pmass,0);
   }
   function capFlux(flux, mass){
     if(mass <= 0) return 0;
@@ -1346,6 +1346,7 @@ function runSimulation(params){
   const initialC = params.pelletMass_g + params.powderMass_g;
   out.audit.n_balance_init = initialN;
   out.audit.c_balance_init = initialC;
+  out.meta.feedStart = initialC;
 
   for(let i=0;i<n;i++){
     const day = i*dt;
@@ -1459,7 +1460,7 @@ function runSimulation(params){
     }
 
     for(const k of ["carb","prot","fat"]){
-      const rel = Math.min(S_slow[k], (0.18 * tempF) * S_slow[k] * dt);
+      const rel = Math.min(S_slow[k], (0.08 * tempF) * S_slow[k] * dt);
       S_slow[k] -= rel;
       S[k] += rel;
     }
@@ -1569,6 +1570,8 @@ function runSimulation(params){
     out.rate.plant[i] = plant_g_day;
     out.rate.total[i] = demand + fish_g_day;
     out.rate.supply[i]= supply_g_day + plant_g_day;
+    out.meta.maxDemand = Math.max(out.meta.maxDemand, out.rate.total[i]);
+    out.meta.maxSupply = Math.max(out.meta.maxSupply, out.rate.supply[i]);
 
     out.DO_mgL[i] = DO;
     out.DO_pct[i] = (Cstar>1e-9) ? (100*DO/Cstar) : 0;
@@ -1630,6 +1633,7 @@ function runSimulation(params){
   out.audit.n_balance_end = NH4 + NO2 + NO3 + N_bio;
   out.audit.c_balance_end = CO2_g + COD_bio + S.carb + S.prot + S.fat + S_slow.carb + S_slow.prot + S_slow.fat
     + pelFloat.carb + pelFloat.prot + pelFloat.fat + pelBot.carb + pelBot.prot + pelBot.fat + powBot.carb + powBot.prot + powBot.fat;
+  out.meta.feedEnd = pelFloat.carb + pelFloat.prot + pelFloat.fat + pelBot.carb + pelBot.prot + pelBot.fat + powBot.carb + powBot.prot + powBot.fat;
   if(initialN > 0 && Math.abs(out.audit.n_balance_end - initialN)/initialN > 0.15){
     addWarning('Nitrogen balance drift exceeds 15% — check kinetics or timestep.');
   }
@@ -3151,6 +3155,8 @@ function recompute(){
       dbg.push(`Base OTR max: ${oxy.OTR_max.toFixed(3)} g/day`);
       dbg.push(`Base kLa inferred: ${oxy.kLa.toFixed(4)} 1/day`);
       dbg.push(`Sim dt: ${baseSim.meta.dt.toFixed(4)} days (~${(baseSim.meta.dt*24).toFixed(2)} h)`);
+      dbg.push(`Feed mass: start ${baseSim.meta.feedStart.toFixed(3)} g → end ${baseSim.meta.feedEnd.toFixed(3)} g`);
+      dbg.push(`Rate peaks: demand ${baseSim.meta.maxDemand.toFixed(3)} g/day • supply ${baseSim.meta.maxSupply.toFixed(3)} g/day`);
       dbg.push(`Biofilm proxy: ${params.biofilmMm} mm • slowFrac ${params.slowFrac}`);
       dbg.push(`Denit: k=${params.kDenit} 1/day • cap=${params.denitCap}`);
       dbg.push(`Fish O2: ${params.fishMass} g @ ${params.fishO2} mg/g/day • Plant O2 peak ${params.plantO2} mg/L/day`);
@@ -3227,6 +3233,8 @@ function recompute(){
       dbg.push(`OTR max: ${oxy.OTR_max.toFixed(3)} g/day`);
       dbg.push(`kLa inferred: ${oxy.kLa.toFixed(4)} 1/day`);
       dbg.push(`Sim dt: ${baseSim.meta.dt.toFixed(4)} days (~${(baseSim.meta.dt*24).toFixed(2)} h)`);
+      dbg.push(`Feed mass: start ${baseSim.meta.feedStart.toFixed(3)} g → end ${baseSim.meta.feedEnd.toFixed(3)} g`);
+      dbg.push(`Rate peaks: demand ${baseSim.meta.maxDemand.toFixed(3)} g/day • supply ${baseSim.meta.maxSupply.toFixed(3)} g/day`);
       dbg.push(`Biofilm proxy: ${params.biofilmMm} mm • slowFrac ${params.slowFrac}`);
       dbg.push(`Denit: k=${params.kDenit} 1/day • cap=${params.denitCap}`);
       dbg.push(`Fish O2: ${params.fishMass} g @ ${params.fishO2} mg/g/day • Plant O2 peak ${params.plantO2} mg/L/day`);
