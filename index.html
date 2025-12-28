@@ -1329,11 +1329,11 @@ function runSimulation(params){
 
   function fluxPellet(Pmass, k, access){
     // surface-limited intact pellet: ~ M^(2/3)
-    return k * Bhet * access * Math.pow(Math.max(Pmass,0), 2/3);
+    return k * access * Math.pow(Math.max(Pmass,0), 2/3);
   }
   function fluxPowder(Pmass, k){
     // distributed powder: first-order
-    return k * Bhet * Math.max(Pmass,0);
+    return k * Math.max(Pmass,0);
   }
   function capFlux(flux, mass){
     if(mass <= 0) return 0;
