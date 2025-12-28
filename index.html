@@ -640,7 +640,7 @@
       </div>
       <div>
         <canvas id="chemCanvas" width="1200" height="360"></canvas>
-        <div class="small" style="margin-top:6px">Chemistry / compounds (mg/L). Toggle NH₄/NO₂/NO₃ units in Advanced.</div>
+        <div class="small" style="margin-top:6px">Chemistry / compounds (mg/L). Instantaneous concentrations from feed + biology; toggle NH₄/NO₂/NO₃ units in Advanced.</div>
       </div>
     </div>
 
@@ -840,6 +840,10 @@ const DEBUG_STATE = {
   lastPhotoModel: null,
   lastFeedProfileId: null,
   lastFeedProfileStoredAt: null,
+  lastRateBandKeys: null,
+  lastChemBandKeys: null,
+  lastOxygenClampCount: null,
+  lastPlantLimitedSteps: null,
   lastUpdateISO: null,
   missingContainers: [],
   initReadyState: null,
@@ -982,6 +986,24 @@ lines.push(`surface=${p.lenCm}×${p.widCm} cm, blanket=${p.blanketPct}%, ripple=
     lines.push(`Profile: ${DEBUG_STATE.lastFeedProfileId}`);
     if(DEBUG_STATE.lastFeedProfileStoredAt){
       lines.push(`Stored: ${DEBUG_STATE.lastFeedProfileStoredAt}`);
+    }
+  }
+  if(DEBUG_STATE.lastRateBandKeys){
+    lines.push('');
+    lines.push('--- Uncertainty bands (rate) ---');
+    lines.push(DEBUG_STATE.lastRateBandKeys.join(', '));
+  }
+  if(DEBUG_STATE.lastChemBandKeys){
+    lines.push('');
+    lines.push('--- Uncertainty bands (chem) ---');
+    lines.push(DEBUG_STATE.lastChemBandKeys.join(', '));
+  }
+  if(Number.isFinite(DEBUG_STATE.lastOxygenClampCount)){
+    lines.push('');
+    lines.push('--- Oxygen saturation clamps ---');
+    lines.push(`DO clamped steps: ${DEBUG_STATE.lastOxygenClampCount}`);
+    if(Number.isFinite(DEBUG_STATE.lastPlantLimitedSteps)){
+      lines.push(`Plant output limited steps: ${DEBUG_STATE.lastPlantLimitedSteps}`);
     }
   }
   if(DEBUG_STATE.missingContainers.length){
@@ -1377,6 +1399,8 @@ function runSimulation(params){
   let CO2_g = 0;   // g CO2 produced
   let macro_g = 0; // g (proxy)
   let micro_g = 0; // g (proxy)
+  let oxygenClampCount = 0;
+  let plantLimitedSteps = 0;
 
   // Activity states (dimensionless 0..1)
   let Bhet = 0.04;
@@ -1751,11 +1775,15 @@ function runSimulation(params){
 
     // DO dynamics (Euler)
     // supply_g_day = kLa*(C* - DO)*V
-    const supply_g_day = (kLa * Math.max(0, (Cstar - DO)) * params.volL) / 1000;
-    const plant_g_day = photoO2_g_day_peak * lightFactor;
+    const satDef = Math.max(0, (Cstar - DO));
+    const satFrac = (Cstar > 1e-9) ? clamp(satDef / Cstar, 0, 1) : 0;
+    const supply_g_day = (kLa * satDef * params.volL) / 1000;
+    const plant_g_day = photoO2_g_day_peak * lightFactor * satFrac;
+    if(plant_g_day < (photoO2_g_day_peak * lightFactor) && lightFactor > 0) plantLimitedSteps++;
     const fish_g_day = (fishMass * fishO2Rate) / 1000;
     const dDO = ((supply_g_day + plant_g_day - demand - fish_g_day) * 1000 / params.volL) * dt; // mg/L
-    DO = clamp(DO + dDO, 0, Cstar*1.2);
+    DO = clamp(DO + dDO, 0, Cstar);
+    if(DO >= Cstar - 1e-6) oxygenClampCount++;
 
     // Record outputs
     out.rate.carb[i]  = O2_carb;
@@ -1835,6 +1863,8 @@ function runSimulation(params){
   out.audit.c_balance_end = CO2_g + COD_bio + S.carb + S.prot + S.fat + S_slow.carb + S_slow.prot + S_slow.fat
     + pelFloat.carb + pelFloat.prot + pelFloat.fat + pelBot.carb + pelBot.prot + pelBot.fat + powBot.carb + powBot.prot + powBot.fat;
   out.meta.feedEnd = pelFloat.carb + pelFloat.prot + pelFloat.fat + pelBot.carb + pelBot.prot + pelBot.fat + powBot.carb + powBot.prot + powBot.fat;
+  out.meta.oxygenClampCount = oxygenClampCount;
+  out.meta.plantLimitedSteps = plantLimitedSteps;
   if(initialN > 0 && Math.abs(out.audit.n_balance_end - initialN)/initialN > 0.15){
     addWarning('Nitrogen balance drift exceeds 15% — check kinetics or timestep.');
   }
@@ -1931,8 +1961,7 @@ function runMonteCarlo(baseParams){
 
   // Store per-run arrays we care about
   const DO_runs = new Array(runs);
-  const tot_runs = new Array(runs);
-  const sup_runs = new Array(runs);
+  const rate_runs = Object.fromEntries(RATE_SERIES.map(s=>[s.key, new Array(runs)]));
   const cum_runs = new Array(runs);
   const chem_runs = Object.fromEntries(CHEM_SERIES.map(s=>[s.key, new Array(runs)]));
 
@@ -1999,11 +2028,12 @@ function runMonteCarlo(baseParams){
 
     const sim = runSimulation(p);
     DO_runs[r]  = sim.DO_mgL;
-    tot_runs[r] = sim.rate.total;
-    sup_runs[r] = sim.rate.supply;
+    for(const s of RATE_SERIES){
+      rate_runs[s.key][r] = sim.rate[s.key];
+    }
     cum_runs[r] = sim.cum.total;
     for(const s of CHEM_SERIES){
-      chem_runs[s.key][r] = (sim.chemCum || sim.chem)[s.key];
+      chem_runs[s.key][r] = sim.chem[s.key];
     }
 
     // scalars
@@ -2047,8 +2077,7 @@ function runMonteCarlo(baseParams){
 
   // Quantile arrays (time series)
   const qDO = {lo:new Float32Array(n), mid:new Float32Array(n), hi:new Float32Array(n)};
-  const qTot= {lo:new Float32Array(n), mid:new Float32Array(n), hi:new Float32Array(n)};
-  const qSup= {lo:new Float32Array(n), mid:new Float32Array(n), hi:new Float32Array(n)};
+  const qRate = Object.fromEntries(RATE_SERIES.map(s=>[s.key, {lo:new Float32Array(n), mid:new Float32Array(n), hi:new Float32Array(n)}]));
   const qCum= {lo:new Float32Array(n), mid:new Float32Array(n), hi:new Float32Array(n)};
   const qChem = Object.fromEntries(CHEM_SERIES.map(s=>[s.key, {lo:new Float32Array(n), mid:new Float32Array(n), hi:new Float32Array(n)}]));
 
@@ -2065,8 +2094,9 @@ function runMonteCarlo(baseParams){
   }
 
   fillQ(DO_runs, qDO);
-  fillQ(tot_runs, qTot);
-  fillQ(sup_runs, qSup);
+  for(const s of RATE_SERIES){
+    fillQ(rate_runs[s.key], qRate[s.key]);
+  }
   fillQ(cum_runs, qCum);
   for(const s of CHEM_SERIES){
     fillQ(chem_runs[s.key], qChem[s.key]);
@@ -2097,7 +2127,14 @@ function runMonteCarlo(baseParams){
 
   return {
     baseSim,
-    q: {DO:qDO, rateTotal:qTot, rateSupply:qSup, cumTotal:qCum, chemBands:qChem},
+    q: {
+      DO:qDO,
+      rateBands:qRate,
+      rateTotal:qRate.total,
+      rateSupply:qRate.supply,
+      cumTotal:qCum,
+      chemBands:qChem
+    },
     scalars: {
       minDO:sMinDO,
       minDO_day:sMinDODay,
@@ -2208,8 +2245,18 @@ function drawPlot(canvas, tArr, seriesDict, opts={}){
     }
   }
   yMax = Math.max(0.0001, yMax);
-  const yTop = niceTop(yMax);
+  const yTop = opts.fitYMax ? yMax : niceTop(yMax);
   const yStep = niceStep(yTop);
+  const fmtAxis = (val)=>{
+    const abs = Math.abs(val);
+    if(abs >= 100) return val.toFixed(0);
+    if(abs >= 10) return val.toFixed(1);
+    if(abs >= 1) return val.toFixed(2);
+    if(abs >= 0.1) return val.toFixed(3);
+    if(abs >= 0.01) return val.toFixed(4);
+    if(abs >= 0.001) return val.toFixed(5);
+    return val.toFixed(6);
+  };
 
   // frame
   ctx.strokeStyle = 'rgba(231,236,255,0.18)';
@@ -2242,8 +2289,7 @@ function drawPlot(canvas, tArr, seriesDict, opts={}){
   ctx.textBaseline = 'middle';
   for(let y=0;y<=yTop+1e-12;y+=yStep){
     const py = m.t + ph - (y/yTop)*ph;
-    const txt = (yTop >= 1) ? y.toFixed(2) : y.toExponential(2);
-    ctx.fillText(txt, m.l-8, py);
+    ctx.fillText(fmtAxis(y), m.l-8, py);
   }
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
@@ -2265,9 +2311,29 @@ function drawPlot(canvas, tArr, seriesDict, opts={}){
   // helper: band fill
   const drawBand = (lo, hi, alpha, color)=>{
     if(!lo || !hi) return;
+    const pattern = (()=>{
+      if(!opts.bandPattern) return null;
+      const size = Math.max(6, Math.round(10 * devicePixelRatio));
+      const pat = document.createElement('canvas');
+      pat.width = size;
+      pat.height = size;
+      const pctx = pat.getContext('2d');
+      pctx.strokeStyle = color;
+      pctx.globalAlpha = 0.25;
+      pctx.lineWidth = Math.max(1, Math.round(1 * devicePixelRatio));
+      pctx.beginPath();
+      pctx.moveTo(0, size);
+      pctx.lineTo(size, 0);
+      pctx.stroke();
+      pctx.beginPath();
+      pctx.moveTo(-size * 0.25, size);
+      pctx.lineTo(size, -size * 0.25);
+      pctx.stroke();
+      return ctx.createPattern(pat, 'repeat');
+    })();
     ctx.save();
     ctx.globalAlpha = alpha ?? 0.15;
-    ctx.fillStyle = color;
+    ctx.fillStyle = pattern || color;
     ctx.beginPath();
     // upper
     for(let i=0;i<tArr.length;i++){
@@ -2481,9 +2547,29 @@ function drawDOPlot(canvas, sim, overlay=null){
 
   // DO band
   if(overlay && overlay.DO && overlay.DO.lo && overlay.DO.hi){
+    const makePattern = ()=>{
+      const size = Math.max(6, Math.round(10 * devicePixelRatio));
+      const pat = document.createElement('canvas');
+      pat.width = size;
+      pat.height = size;
+      const pctx = pat.getContext('2d');
+      pctx.strokeStyle = 'rgba(118,178,255,1)';
+      pctx.globalAlpha = 0.25;
+      pctx.lineWidth = Math.max(1, Math.round(1 * devicePixelRatio));
+      pctx.beginPath();
+      pctx.moveTo(0, size);
+      pctx.lineTo(size, 0);
+      pctx.stroke();
+      pctx.beginPath();
+      pctx.moveTo(-size * 0.25, size);
+      pctx.lineTo(size, -size * 0.25);
+      pctx.stroke();
+      return ctx.createPattern(pat, 'repeat');
+    };
+    const bandPattern = makePattern();
     ctx.save();
     ctx.globalAlpha = overlay.DO.alpha ?? 0.16;
-    ctx.fillStyle = 'rgba(118,178,255,1)';
+    ctx.fillStyle = bandPattern || 'rgba(118,178,255,1)';
     ctx.beginPath();
     for(let i=0;i<tArr.length;i++){
       const x = m.l + (tArr[i]/xMax)*pw;
@@ -2903,7 +2989,7 @@ function initCanvasInteractions(){
         lines.push(`<div><b>Day ${day.toFixed(2)}</b></div>`);
         for(const s of CHEM_SERIES){
           if(!visibleChem[s.key]) continue;
-          const v = lastSim.chemCum?.[s.key]?.[idx];
+          const v = lastSim.chem?.[s.key]?.[idx];
           if(v === undefined) continue;
           lines.push(`<div style="margin-top:4px"><span style="color:${s.color}">●</span> ${s.name}: <b class="mono">${v.toFixed(3)}</b></div>`);
         }
@@ -3429,6 +3515,8 @@ function recompute(){
     DEBUG_STATE.lastChemCumInfo = baseSim.meta.chemCumInfo || null;
     DEBUG_STATE.lastPhotoModel = baseSim.meta.photoModel || null;
     DEBUG_STATE.lastFeedProfileId = baseSim.meta.feedProfileId || FEED_PROFILE.id;
+    DEBUG_STATE.lastOxygenClampCount = baseSim.meta.oxygenClampCount ?? null;
+    DEBUG_STATE.lastPlantLimitedSteps = baseSim.meta.plantLimitedSteps ?? null;
     if(baseSim.meta.chemCumInfo?.invalidCount){
       addWarning(`Chemistry cumulative series had ${baseSim.meta.chemCumInfo.invalidCount} non-finite samples; treated as 0 in the cumulative plot.`);
     }
@@ -3465,12 +3553,21 @@ function recompute(){
 
       // Plots with bands
       setStage('Plots', 'rate');
+      const rateBands = Object.fromEntries(RATE_SERIES.map(s=>[
+        s.key,
+        {lo:mc.q.rateBands[s.key].lo, hi:mc.q.rateBands[s.key].hi, mid:mc.q.rateBands[s.key].mid, alpha:(s.key === 'total' ? 0.18 : (s.key === 'supply' ? 0.14 : 0.08))}
+      ]));
+      DEBUG_STATE.lastRateBandKeys = Object.keys(rateBands);
+      const missingRateBands = RATE_SERIES.filter(s=>!rateBands[s.key] || !rateBands[s.key].hi).map(s=>s.key);
+      if(missingRateBands.length){
+        addWarning(`Missing rate uncertainty bands for: ${missingRateBands.join(', ')}`);
+      }
       rateGeom = drawPlot(el('rateCanvas'), baseSim.t, baseSim.rate, {
         title:"Oxygen RATE (g O₂/day)",
-        bands:{
-          total:{lo:mc.q.rateTotal.lo, hi:mc.q.rateTotal.hi, mid:mc.q.rateTotal.mid, alpha:0.18},
-          supply:{lo:mc.q.rateSupply.lo, hi:mc.q.rateSupply.hi, mid:mc.q.rateSupply.mid, alpha:0.14}
-        }
+        bands: rateBands,
+        bandColors: Object.fromEntries(RATE_SERIES.map(s=>[s.key, s.color])),
+        fitYMax: true,
+        bandPattern: true
       });
 
       setStage('Plots', 'dissolved oxygen');
@@ -3481,7 +3578,12 @@ function recompute(){
 
       setStage('Plots', 'chemistry');
       const chemBands = mc.q.chemBands;
-      chemGeom = drawPlot(el('chemCanvas'), baseSim.t, baseSim.chemCum, {
+      DEBUG_STATE.lastChemBandKeys = Object.keys(chemBands);
+      const missingChemBands = CHEM_SERIES.filter(s=>!chemBands[s.key] || !chemBands[s.key].hi).map(s=>s.key);
+      if(missingChemBands.length){
+        addWarning(`Missing chemistry uncertainty bands for: ${missingChemBands.join(', ')}`);
+      }
+      chemGeom = drawPlot(el('chemCanvas'), baseSim.t, baseSim.chem, {
         title:"Chemistry / Compounds (mg/L)",
         series: CHEM_SERIES,
         visible: visibleChem,
@@ -3489,7 +3591,8 @@ function recompute(){
           s.key,
           {lo:chemBands[s.key].lo, hi:chemBands[s.key].hi, mid:chemBands[s.key].mid, alpha:0.12}
         ])),
-        bandColors: Object.fromEntries(CHEM_SERIES.map(s=>[s.key, s.color]))
+        bandColors: Object.fromEntries(CHEM_SERIES.map(s=>[s.key, s.color])),
+        bandPattern: true
       });
 
       setStage('Flags', 'evaluate');
@@ -3563,12 +3666,14 @@ function recompute(){
       // Draw plots
       setStage('Plots', 'rate');
       rateGeom = drawPlot(el('rateCanvas'), baseSim.t, baseSim.rate, {
-        title:"Oxygen RATE (g O₂/day)"
+        title:"Oxygen RATE (g O₂/day)",
+        fitYMax: true,
+        bandPattern: false
       });
       setStage('Plots', 'dissolved oxygen');
       doGeom   = drawDOPlot(el('doCanvas'), baseSim);
       setStage('Plots', 'chemistry');
-      chemGeom  = drawPlot(el('chemCanvas'),  baseSim.t, baseSim.chemCum,  {
+      chemGeom  = drawPlot(el('chemCanvas'),  baseSim.t, baseSim.chem,  {
         title:"Chemistry / Compounds (mg/L)",
         series: CHEM_SERIES,
         visible: visibleChem
