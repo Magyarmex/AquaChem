@@ -714,6 +714,28 @@ function updateChemSeriesLabels(nUnits){
   }
 }
 
+function buildCumulativeSeries(seriesDict, dt){
+  const series = {};
+  const totals = {};
+  let invalidCount = 0;
+  for(const [key, arr] of Object.entries(seriesDict || {})){
+    const cum = new Array(arr.length);
+    let sum = 0;
+    let bad = 0;
+    for(let i=0;i<arr.length;i++){
+      const v = arr[i];
+      const safe = Number.isFinite(v) ? v : 0;
+      if(!Number.isFinite(v)) bad++;
+      sum += safe * dt;
+      cum[i] = sum;
+    }
+    series[key] = cum;
+    totals[key] = sum;
+    invalidCount += bad;
+  }
+  return {series, info:{invalidCount, totals, dt}};
+}
+
 /* =========================================================
    DOM helpers + error plumbing
 ========================================================= */
@@ -793,6 +815,7 @@ const DEBUG_STATE = {
   lastMode: null,
   lastSimMeta: null,
   lastScalars: null,
+  lastChemCumInfo: null,
   lastUpdateISO: null,
   errors: [],  // newest last
   warnings: []
@@ -883,6 +906,11 @@ lines.push(`surface=${p.lenCm}×${p.widCm} cm, blanket=${p.blanketPct}%, ripple=
     lines.push('');
     lines.push('--- Uncertainty scalars (last) ---');
     lines.push(compactJSON(DEBUG_STATE.lastScalars, 1200));
+  }
+  if(DEBUG_STATE.lastChemCumInfo){
+    lines.push('');
+    lines.push('--- Chemistry cumulative (last) ---');
+    lines.push(compactJSON(DEBUG_STATE.lastChemCumInfo, 900));
   }
   if(extraLines && extraLines.length){
     lines.push('');
@@ -1628,6 +1656,9 @@ function runSimulation(params){
     for(let i=0;i<n;i++){ s += arr[i]*dt; cum[i] = s; }
     out.cum[k] = cum;
   }
+  const chemCumResult = buildCumulativeSeries(out.chem, dt);
+  out.chemCum = chemCumResult.series;
+  out.meta.chemCumInfo = chemCumResult.info;
 
   out.audit.n_balance_end = NH4 + NO2 + NO3 + N_bio;
   out.audit.c_balance_end = CO2_g + COD_bio + S.carb + S.prot + S.fat + S_slow.carb + S_slow.prot + S_slow.fat
@@ -1801,7 +1832,7 @@ function runMonteCarlo(baseParams){
     sup_runs[r] = sim.rate.supply;
     cum_runs[r] = sim.cum.total;
     for(const s of CHEM_SERIES){
-      chem_runs[s.key][r] = sim.chem[s.key];
+      chem_runs[s.key][r] = (sim.chemCum || sim.chem)[s.key];
     }
 
     // scalars
@@ -2696,7 +2727,7 @@ function initCanvasInteractions(){
         lines.push(`<div><b>Day ${day.toFixed(2)}</b></div>`);
         for(const s of CHEM_SERIES){
           if(!visibleChem[s.key]) continue;
-          const v = lastSim.chem?.[s.key]?.[idx];
+          const v = lastSim.chemCum?.[s.key]?.[idx];
           if(v === undefined) continue;
           lines.push(`<div style="margin-top:4px"><span style="color:${s.color}">●</span> ${s.name}: <b class="mono">${v.toFixed(3)}</b></div>`);
         }
@@ -2779,6 +2810,9 @@ function setFlags(sim, params, mc){
   const eventTotal = (params.events || []).reduce((acc, e)=>acc + (Number(e.pellets) || 0), 0);
   if(eventTotal > pelCount + 1){
     add('warn', 'Pop events exceed pellets', `Total pops (${eventTotal.toFixed(0)}) exceed estimated pellet count (${pelCount.toFixed(0)}). The model caps pops automatically, but the schedule is probably too aggressive.`);
+  }
+  if(sim.meta?.chemCumInfo?.invalidCount){
+    add('warn', 'Chemistry cumulative data gap', `Detected ${sim.meta.chemCumInfo.invalidCount} non-finite chemistry samples. Cumulative plot replaces them with 0 so the chart remains readable.`);
   }
 
   const rate = sim.rate.total;
@@ -3076,6 +3110,10 @@ function recompute(){
     const oxy = baseSim.meta.oxy;
     DEBUG_STATE.lastOxy = oxy;
     DEBUG_STATE.lastSimMeta = baseSim.meta;
+    DEBUG_STATE.lastChemCumInfo = baseSim.meta.chemCumInfo || null;
+    if(baseSim.meta.chemCumInfo?.invalidCount){
+      addWarning(`Chemistry cumulative series had ${baseSim.meta.chemCumInfo.invalidCount} non-finite samples; treated as 0 in the cumulative plot.`);
+    }
 
     // If uncertainty mode: run MC overlay
     if(params.runMode === 'uncertainty'){
@@ -3125,7 +3163,7 @@ function recompute(){
 
       setStage('Plots', 'chemistry');
       const chemBands = mc.q.chemBands;
-      chemGeom = drawPlot(el('chemCanvas'), baseSim.t, baseSim.chem, {
+      chemGeom = drawPlot(el('chemCanvas'), baseSim.t, baseSim.chemCum, {
         title:"Chemistry / Compounds (mg/L)",
         series: CHEM_SERIES,
         visible: visibleChem,
@@ -3210,7 +3248,7 @@ function recompute(){
       setStage('Plots', 'dissolved oxygen');
       doGeom   = drawDOPlot(el('doCanvas'), baseSim);
       setStage('Plots', 'chemistry');
-      chemGeom  = drawPlot(el('chemCanvas'),  baseSim.t, baseSim.chem,  {
+      chemGeom  = drawPlot(el('chemCanvas'),  baseSim.t, baseSim.chemCum,  {
         title:"Chemistry / Compounds (mg/L)",
         series: CHEM_SERIES,
         visible: visibleChem
