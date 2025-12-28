@@ -714,6 +714,28 @@ function updateChemSeriesLabels(nUnits){
   }
 }
 
+function buildCumulativeSeries(seriesDict, dt){
+  const series = {};
+  const totals = {};
+  let invalidCount = 0;
+  for(const [key, arr] of Object.entries(seriesDict || {})){
+    const cum = new Array(arr.length);
+    let sum = 0;
+    let bad = 0;
+    for(let i=0;i<arr.length;i++){
+      const v = arr[i];
+      const safe = Number.isFinite(v) ? v : 0;
+      if(!Number.isFinite(v)) bad++;
+      sum += safe * dt;
+      cum[i] = sum;
+    }
+    series[key] = cum;
+    totals[key] = sum;
+    invalidCount += bad;
+  }
+  return {series, info:{invalidCount, totals, dt}};
+}
+
 /* =========================================================
    DOM helpers + error plumbing
 ========================================================= */
@@ -793,6 +815,9 @@ const DEBUG_STATE = {
   lastMode: null,
   lastSimMeta: null,
   lastScalars: null,
+  lastChemCumInfo: null,
+  lastRecomputeMs: null,
+  lastFlagsCount: null,
   lastUpdateISO: null,
   errors: [],  // newest last
   warnings: []
@@ -883,6 +908,21 @@ lines.push(`surface=${p.lenCm}×${p.widCm} cm, blanket=${p.blanketPct}%, ripple=
     lines.push('');
     lines.push('--- Uncertainty scalars (last) ---');
     lines.push(compactJSON(DEBUG_STATE.lastScalars, 1200));
+  }
+  if(Number.isFinite(DEBUG_STATE.lastFlagsCount)){
+    lines.push('');
+    lines.push('--- Flags rendered (last) ---');
+    lines.push(`Cards: ${DEBUG_STATE.lastFlagsCount}`);
+  }
+  if(Number.isFinite(DEBUG_STATE.lastRecomputeMs)){
+    lines.push('');
+    lines.push('--- Recompute timing (last) ---');
+    lines.push(`Total recompute: ${DEBUG_STATE.lastRecomputeMs.toFixed(1)} ms`);
+  }
+  if(DEBUG_STATE.lastChemCumInfo){
+    lines.push('');
+    lines.push('--- Chemistry cumulative (last) ---');
+    lines.push(compactJSON(DEBUG_STATE.lastChemCumInfo, 900));
   }
   if(extraLines && extraLines.length){
     lines.push('');
@@ -1628,6 +1668,9 @@ function runSimulation(params){
     for(let i=0;i<n;i++){ s += arr[i]*dt; cum[i] = s; }
     out.cum[k] = cum;
   }
+  const chemCumResult = buildCumulativeSeries(out.chem, dt);
+  out.chemCum = chemCumResult.series;
+  out.meta.chemCumInfo = chemCumResult.info;
 
   out.audit.n_balance_end = NH4 + NO2 + NO3 + N_bio;
   out.audit.c_balance_end = CO2_g + COD_bio + S.carb + S.prot + S.fat + S_slow.carb + S_slow.prot + S_slow.fat
@@ -1801,7 +1844,7 @@ function runMonteCarlo(baseParams){
     sup_runs[r] = sim.rate.supply;
     cum_runs[r] = sim.cum.total;
     for(const s of CHEM_SERIES){
-      chem_runs[s.key][r] = sim.chem[s.key];
+      chem_runs[s.key][r] = (sim.chemCum || sim.chem)[s.key];
     }
 
     // scalars
@@ -2696,7 +2739,7 @@ function initCanvasInteractions(){
         lines.push(`<div><b>Day ${day.toFixed(2)}</b></div>`);
         for(const s of CHEM_SERIES){
           if(!visibleChem[s.key]) continue;
-          const v = lastSim.chem?.[s.key]?.[idx];
+          const v = lastSim.chemCum?.[s.key]?.[idx];
           if(v === undefined) continue;
           lines.push(`<div style="margin-top:4px"><span style="color:${s.color}">●</span> ${s.name}: <b class="mono">${v.toFixed(3)}</b></div>`);
         }
@@ -2762,16 +2805,34 @@ function initCanvasInteractions(){
 ========================================================= */
 function setFlags(sim, params, mc){
   const flags = el('flags');
+  if(!flags){
+    addWarning('Flags container missing (#flags). Skipping flag rendering.');
+    return;
+  }
   flags.innerHTML = '';
+  let flagCount = 0;
+
+  const kindAliases = {ok:'ok', warn:'warn', danger:'danger', note:'note', good:'ok'};
+  const good = kindAliases.good;
+  const normalizeKind = (kind)=>{
+    if(typeof kind !== 'string') return 'note';
+    const norm = kindAliases[kind] || 'note';
+    if(norm !== kind){
+      addWarning(`Unknown flag kind "${kind}" normalized to "${norm}".`);
+    }
+    return norm;
+  };
 
   const add = (kind, title, msg)=>{
     const div = document.createElement('div');
+    const safeKind = normalizeKind(kind);
     div.className = 'flag-card';
     div.innerHTML = `
-      <div class="flag-tag ${kind}">${title}<span>${kind.toUpperCase()}</span></div>
+      <div class="flag-tag ${safeKind}">${title}<span>${safeKind.toUpperCase()}</span></div>
       <div class="flag-body"><div class="small">${msg}</div></div>
     `;
     flags.appendChild(div);
+    flagCount++;
   };
 
   const estPellets = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
@@ -2779,6 +2840,9 @@ function setFlags(sim, params, mc){
   const eventTotal = (params.events || []).reduce((acc, e)=>acc + (Number(e.pellets) || 0), 0);
   if(eventTotal > pelCount + 1){
     add('warn', 'Pop events exceed pellets', `Total pops (${eventTotal.toFixed(0)}) exceed estimated pellet count (${pelCount.toFixed(0)}). The model caps pops automatically, but the schedule is probably too aggressive.`);
+  }
+  if(sim.meta?.chemCumInfo?.invalidCount){
+    add('warn', 'Chemistry cumulative data gap', `Detected ${sim.meta.chemCumInfo.invalidCount} non-finite chemistry samples. Cumulative plot replaces them with 0 so the chart remains readable.`);
   }
 
   const rate = sim.rate.total;
@@ -2798,20 +2862,20 @@ function setFlags(sim, params, mc){
   for(let i=0;i<rate.length;i++) baseArea += Math.max(0, rate[i]-supply[i]) * sim.meta.dt;
 
   // Base DO min
-  let doMin = {v:Infinity, day:0, idx:0};
+  let doMinStats = {v:Infinity, day:0, idx:0};
   let tUnder2 = 0, tUnder1 = 0;
   for(let i=0;i<sim.DO_mgL.length;i++){
     const v = sim.DO_mgL[i];
-    if(v < doMin.v) doMin = {v, day:sim.t[i], idx:i};
+    if(v < doMinStats.v) doMinStats = {v, day:sim.t[i], idx:i};
     if(v < 2.0) tUnder2 += sim.meta.dt;
     if(v < 1.0) tUnder1 += sim.meta.dt;
   }
 
-  let nh4Peak = 0, no2Peak = 0, no3Peak = 0, nh3Peak = 0;
-  for(let i=0;i<sim.NH4_mgL.length;i++) if(sim.NH4_mgL[i] > nh4Peak) nh4Peak = sim.NH4_mgL[i];
-  for(let i=0;i<sim.NO2_mgL.length;i++) if(sim.NO2_mgL[i] > no2Peak) no2Peak = sim.NO2_mgL[i];
-  for(let i=0;i<sim.NO3_mgL.length;i++) if(sim.NO3_mgL[i] > no3Peak) no3Peak = sim.NO3_mgL[i];
-  for(let i=0;i<sim.NH3_mgL.length;i++) if(sim.NH3_mgL[i] > nh3Peak) nh3Peak = sim.NH3_mgL[i];
+  let nh4PeakValue = 0, no2PeakValue = 0, no3PeakValue = 0, nh3PeakValue = 0;
+  for(let i=0;i<sim.NH4_mgL.length;i++) if(sim.NH4_mgL[i] > nh4PeakValue) nh4PeakValue = sim.NH4_mgL[i];
+  for(let i=0;i<sim.NO2_mgL.length;i++) if(sim.NO2_mgL[i] > no2PeakValue) no2PeakValue = sim.NO2_mgL[i];
+  for(let i=0;i<sim.NO3_mgL.length;i++) if(sim.NO3_mgL[i] > no3PeakValue) no3PeakValue = sim.NO3_mgL[i];
+  for(let i=0;i<sim.NH3_mgL.length;i++) if(sim.NH3_mgL[i] > nh3PeakValue) nh3PeakValue = sim.NH3_mgL[i];
   const denitN_mgL = (sim.audit.no3_to_n2 * 1000) / params.volL;
 
   // --------------------------
@@ -2855,20 +2919,21 @@ function setFlags(sim, params, mc){
       add('note','NH₃ looks low (model)','Median unionized NH₃ peak is ' + fmtBand(mc.scalars.nh3pk,'mg/L',3) + '.');
     }
 
+    DEBUG_STATE.lastFlagsCount = flagCount;
     return;
   }
 
   // --------------------------
   // Single-run flags
   // --------------------------
-  if(doMin.v < 1.0){
-    add('danger', 'DO crash', `Min DO is <b>${doMin.v.toFixed(2)} mg/L</b> at day ${doMin.day.toFixed(2)}. That’s a crash risk.`);
-  }else if(doMin.v < 2.0){
-    add('warn', 'Low DO window', `Min DO is <b>${doMin.v.toFixed(2)} mg/L</b> at day ${doMin.day.toFixed(2)}. Many animals get stressed below ~2 mg/L.`);
-  }else if(doMin.v < 4.0){
-    add('note', 'Moderate DO dip', `Min DO is ${doMin.v.toFixed(2)} mg/L at day ${doMin.day.toFixed(2)}. Probably fine for hardier stock, but still worth watching.`);
+  if(doMinStats.v < 1.0){
+    add('danger', 'DO crash', `Min DO is <b>${doMinStats.v.toFixed(2)} mg/L</b> at day ${doMinStats.day.toFixed(2)}. That’s a crash risk.`);
+  }else if(doMinStats.v < 2.0){
+    add('warn', 'Low DO window', `Min DO is <b>${doMinStats.v.toFixed(2)} mg/L</b> at day ${doMinStats.day.toFixed(2)}. Many animals get stressed below ~2 mg/L.`);
+  }else if(doMinStats.v < 4.0){
+    add('note', 'Moderate DO dip', `Min DO is ${doMinStats.v.toFixed(2)} mg/L at day ${doMinStats.day.toFixed(2)}. Probably fine for hardier stock, but still worth watching.`);
   }else{
-    add('note', 'DO looks comfortable', `Min DO is ${doMin.v.toFixed(2)} mg/L at day ${doMin.day.toFixed(2)}.`);
+    add('note', 'DO looks comfortable', `Min DO is ${doMinStats.v.toFixed(2)} mg/L at day ${doMinStats.day.toFixed(2)}.`);
   }
 
   if(peakDef.v > 0.1){
@@ -2888,18 +2953,19 @@ function setFlags(sim, params, mc){
     add('danger', 'Time under 1 mg/L', `Time under 1 mg/L: ${(tUnder1*24).toFixed(1)} h (single run).`);
   }
 
-  if(nh3Peak > 0.10){
-    add('danger', 'NH₃ toxicity risk', `Unionized NH₃ peaks near ${nh3Peak.toFixed(3)} mg/L. Consider lower pH, reduced load, or more nitrification capacity.`);
-  }else if(nh3Peak > 0.05){
-    add('warn', 'NH₃ watch zone', `Unionized NH₃ peaks near ${nh3Peak.toFixed(3)} mg/L. Keep an eye on sensitive stock.`);
+  if(nh3PeakValue > 0.10){
+    add('danger', 'NH₃ toxicity risk', `Unionized NH₃ peaks near ${nh3PeakValue.toFixed(3)} mg/L. Consider lower pH, reduced load, or more nitrification capacity.`);
+  }else if(nh3PeakValue > 0.05){
+    add('warn', 'NH₃ watch zone', `Unionized NH₃ peaks near ${nh3PeakValue.toFixed(3)} mg/L. Keep an eye on sensitive stock.`);
   }else{
-    add('note', 'NH₃ stays low', `Unionized NH₃ peaks near ${nh3Peak.toFixed(3)} mg/L.`);
+    add('note', 'NH₃ stays low', `Unionized NH₃ peaks near ${nh3PeakValue.toFixed(3)} mg/L.`);
   }
 
-  add('note', 'Nitrogen peaks (single run)', `NH₄: ${nh4Peak.toFixed(3)} mg/L • NO₂: ${no2Peak.toFixed(3)} mg/L • NO₃: ${no3Peak.toFixed(3)} mg/L.`);
+  add('note', 'Nitrogen peaks (single run)', `NH₄: ${nh4PeakValue.toFixed(3)} mg/L • NO₂: ${no2PeakValue.toFixed(3)} mg/L • NO₃: ${no3PeakValue.toFixed(3)} mg/L.`);
   if(denitN_mgL > 0.2){
     add('note', 'Denitrification activity', `Estimated NO₃ → N₂ conversion: ${denitN_mgL.toFixed(2)} mg/L as N. Low-DO windows are driving denitrification.`);
   }
+  DEBUG_STATE.lastFlagsCount = flagCount;
 }
 
 /* =========================================================
@@ -3029,6 +3095,7 @@ function recompute(){
   clearError();
   setStage('recompute', 'start');
   DEBUG_STATE.warnings = [];
+  const recomputeStart = performance.now();
 
   try{
     setStage('UI', 'apply presets');
@@ -3076,6 +3143,10 @@ function recompute(){
     const oxy = baseSim.meta.oxy;
     DEBUG_STATE.lastOxy = oxy;
     DEBUG_STATE.lastSimMeta = baseSim.meta;
+    DEBUG_STATE.lastChemCumInfo = baseSim.meta.chemCumInfo || null;
+    if(baseSim.meta.chemCumInfo?.invalidCount){
+      addWarning(`Chemistry cumulative series had ${baseSim.meta.chemCumInfo.invalidCount} non-finite samples; treated as 0 in the cumulative plot.`);
+    }
 
     // If uncertainty mode: run MC overlay
     if(params.runMode === 'uncertainty'){
@@ -3125,7 +3196,7 @@ function recompute(){
 
       setStage('Plots', 'chemistry');
       const chemBands = mc.q.chemBands;
-      chemGeom = drawPlot(el('chemCanvas'), baseSim.t, baseSim.chem, {
+      chemGeom = drawPlot(el('chemCanvas'), baseSim.t, baseSim.chemCum, {
         title:"Chemistry / Compounds (mg/L)",
         series: CHEM_SERIES,
         visible: visibleChem,
@@ -3176,12 +3247,12 @@ function recompute(){
       el('klaOut').textContent   = `${oxy.kLa.toFixed(3)} 1/day`;
 
       // Min DO display
-      let doMin = Infinity;
+      let doMinValue = Infinity;
       let doMinDay = 0;
       for(let i=0;i<baseSim.DO_mgL.length;i++){
-        if(baseSim.DO_mgL[i] < doMin){ doMin = baseSim.DO_mgL[i]; doMinDay = baseSim.t[i]; }
+        if(baseSim.DO_mgL[i] < doMinValue){ doMinValue = baseSim.DO_mgL[i]; doMinDay = baseSim.t[i]; }
       }
-      el('doMinOut').textContent = `${doMin.toFixed(2)} mg/L @ day ${doMinDay.toFixed(2)}`;
+      el('doMinOut').textContent = `${doMinValue.toFixed(2)} mg/L @ day ${doMinDay.toFixed(2)}`;
       el('pUnder2Out').textContent = '—';
       el('pUnder1Out').textContent = '—';
 
@@ -3210,7 +3281,7 @@ function recompute(){
       setStage('Plots', 'dissolved oxygen');
       doGeom   = drawDOPlot(el('doCanvas'), baseSim);
       setStage('Plots', 'chemistry');
-      chemGeom  = drawPlot(el('chemCanvas'),  baseSim.t, baseSim.chem,  {
+      chemGeom  = drawPlot(el('chemCanvas'),  baseSim.t, baseSim.chemCum,  {
         title:"Chemistry / Compounds (mg/L)",
         series: CHEM_SERIES,
         visible: visibleChem
@@ -3279,6 +3350,10 @@ function recompute(){
     initCanvasInteractions();
 
     setStage('recompute', 'done');
+    DEBUG_STATE.lastRecomputeMs = performance.now() - recomputeStart;
+    if(DEBUG_STATE.lastRecomputeMs > 800){
+      addWarning(`Recompute took ${DEBUG_STATE.lastRecomputeMs.toFixed(0)} ms. Consider reducing Monte Carlo runs or disabling live recompute.`);
+    }
 
   }catch(err){
     showError(err);
