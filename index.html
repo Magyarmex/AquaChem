@@ -2852,11 +2852,11 @@ function setFlags(sim, params, mc){
   for(let i=0;i<rate.length;i++) baseArea += Math.max(0, rate[i]-supply[i]) * sim.meta.dt;
 
   // Base DO min
-  let doMin = {v:Infinity, day:0, idx:0};
+  let doMinStats = {v:Infinity, day:0, idx:0};
   let tUnder2 = 0, tUnder1 = 0;
   for(let i=0;i<sim.DO_mgL.length;i++){
     const v = sim.DO_mgL[i];
-    if(v < doMin.v) doMin = {v, day:sim.t[i], idx:i};
+    if(v < doMinStats.v) doMinStats = {v, day:sim.t[i], idx:i};
     if(v < 2.0) tUnder2 += sim.meta.dt;
     if(v < 1.0) tUnder1 += sim.meta.dt;
   }
@@ -2967,21 +2967,18 @@ function setFlags(sim, params, mc){
     ]
   });
 
-  const no2Label = params.nUnits === 'asIon' ? 'NO₂⁻ (nitrite)' : 'NO₂-N (nitrite)';
-  const no2Good = 0.2 * nFactorNO2;
-  const no2Warn = 0.5 * nFactorNO2;
-  const no2Class = classify('max', no2Peak, no2Good, no2Warn);
-  addTag({
-    label: no2Label,
-    tone: no2Class.tone,
-    status: no2Class.label,
-    summary:`peak ${fmtVal(no2Peak, 'mg/L')}`,
-    details:[
-      `Modeled ${isMC ? 'median peak' : 'peak'}: ${fmtVal(no2Peak, 'mg/L')}.`,
-      fmtBandLine('max', no2Good, no2Warn, 'mg/L'),
-      `Nitrite spikes are usually short-lived; watch for oxidation capacity.`
-    ]
-  });
+  // --------------------------
+  // Single-run flags
+  // --------------------------
+  if(doMinStats.v < 1.0){
+    add('danger', 'DO crash', `Min DO is <b>${doMinStats.v.toFixed(2)} mg/L</b> at day ${doMinStats.day.toFixed(2)}. That’s a crash risk.`);
+  }else if(doMinStats.v < 2.0){
+    add('warn', 'Low DO window', `Min DO is <b>${doMinStats.v.toFixed(2)} mg/L</b> at day ${doMinStats.day.toFixed(2)}. Many animals get stressed below ~2 mg/L.`);
+  }else if(doMinStats.v < 4.0){
+    add('note', 'Moderate DO dip', `Min DO is ${doMinStats.v.toFixed(2)} mg/L at day ${doMinStats.day.toFixed(2)}. Probably fine for hardier stock, but still worth watching.`);
+  }else{
+    add('note', 'DO looks comfortable', `Min DO is ${doMinStats.v.toFixed(2)} mg/L at day ${doMinStats.day.toFixed(2)}.`);
+  }
 
   const no3Label = params.nUnits === 'asIon' ? 'NO₃⁻ (nitrate)' : 'NO₃-N (nitrate)';
   const no3Good = 20 * nFactorNO3;
@@ -3320,14 +3317,14 @@ function recompute(){
       setText('klaOut', `${oxy.kLa.toFixed(3)} 1/day`);
 
       // Min DO display
-      let doMin = Infinity;
+      let doMinValue = Infinity;
       let doMinDay = 0;
       for(let i=0;i<baseSim.DO_mgL.length;i++){
-        if(baseSim.DO_mgL[i] < doMin){ doMin = baseSim.DO_mgL[i]; doMinDay = baseSim.t[i]; }
+        if(baseSim.DO_mgL[i] < doMinValue){ doMinValue = baseSim.DO_mgL[i]; doMinDay = baseSim.t[i]; }
       }
-      setText('doMinOut', `${doMin.toFixed(2)} mg/L @ day ${doMinDay.toFixed(2)}`);
-      setText('pUnder2Out', '—');
-      setText('pUnder1Out', '—');
+      el('doMinOut').textContent = `${doMinValue.toFixed(2)} mg/L @ day ${doMinDay.toFixed(2)}`;
+      el('pUnder2Out').textContent = '—';
+      el('pUnder1Out').textContent = '—';
 
       const nFactorNH4 = params.nUnits === 'asIon' ? CHEM.NH4_ion_per_N : 1;
       const nFactorNO2 = params.nUnits === 'asIon' ? CHEM.NO2_ion_per_N : 1;
