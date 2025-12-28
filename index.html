@@ -1227,16 +1227,15 @@ function runSimulation(params){
   const denitCap = clamp(Number(params.denitCap ?? 1), 0, 1);
   const kNH4_g = (Number(params.kNH4Nit ?? 0) * params.volL) / 1000;
   const kNO2_g = (Number(params.kNO2Nit ?? 0) * params.volL) / 1000;
-  const kDoHet = Math.max(0.01, Number(params.kDoHet ?? 0.8));
-  const slowFrac = clamp(Number(params.slowFrac ?? 0.25), 0, 0.9);
-  const biofilmMm = Math.max(0, Number(params.biofilmMm ?? 0));
-  const biofilmMult = 1 / (1 + biofilmMm * 0.7);
-  const kDenit = Math.max(0, Number(params.kDenit ?? 0));
-  const fishMass = Math.max(0, Number(params.fishMass ?? 0));
-  const fishO2 = Math.max(0, Number(params.fishO2 ?? 0));
-  const plantO2 = Math.max(0, Number(params.plantO2 ?? 0));
-  const tempAmp = Math.max(0, Number(params.tempAmp ?? 0));
-  const lightHour = clamp(Number(params.lightHour ?? 8), 0, 23);
+  const kDoHet = 0; // legacy metabolism: disable heterotroph O2 limitation
+  const slowFrac = 0; // legacy metabolism: no refractory split
+  const biofilmMult = 1; // legacy metabolism: no biofilm diffusion penalty
+  const kDenit = 0; // legacy metabolism: denitrification off
+  const fishMass = 0; // legacy metabolism: ignore fish respiration
+  const fishO2 = 0;
+  const plantO2 = 0; // legacy metabolism: ignore plant O2
+  const tempAmp = 0; // legacy metabolism: no diurnal temperature swing
+  const lightHour = 0;
   const macroRelease = Number(params.macroRelease ?? 0);
   const microRelease = Number(params.microRelease ?? 0);
   const macroUptake = Number(params.macroUptake ?? 0);
@@ -3157,6 +3156,7 @@ function recompute(){
       dbg.push(`Sim dt: ${baseSim.meta.dt.toFixed(4)} days (~${(baseSim.meta.dt*24).toFixed(2)} h)`);
       dbg.push(`Feed mass: start ${baseSim.meta.feedStart.toFixed(3)} g → end ${baseSim.meta.feedEnd.toFixed(3)} g`);
       dbg.push(`Rate peaks: demand ${baseSim.meta.maxDemand.toFixed(3)} g/day • supply ${baseSim.meta.maxSupply.toFixed(3)} g/day`);
+      dbg.push('Metabolism mode: legacy (denit/diurnal/plant/fish/slow COD disabled)');
       dbg.push(`Biofilm proxy: ${params.biofilmMm} mm • slowFrac ${params.slowFrac}`);
       dbg.push(`Denit: k=${params.kDenit} 1/day • cap=${params.denitCap}`);
       dbg.push(`Fish O2: ${params.fishMass} g @ ${params.fishO2} mg/g/day • Plant O2 peak ${params.plantO2} mg/L/day`);
@@ -3235,6 +3235,7 @@ function recompute(){
       dbg.push(`Sim dt: ${baseSim.meta.dt.toFixed(4)} days (~${(baseSim.meta.dt*24).toFixed(2)} h)`);
       dbg.push(`Feed mass: start ${baseSim.meta.feedStart.toFixed(3)} g → end ${baseSim.meta.feedEnd.toFixed(3)} g`);
       dbg.push(`Rate peaks: demand ${baseSim.meta.maxDemand.toFixed(3)} g/day • supply ${baseSim.meta.maxSupply.toFixed(3)} g/day`);
+      dbg.push('Metabolism mode: legacy (denit/diurnal/plant/fish/slow COD disabled)');
       dbg.push(`Biofilm proxy: ${params.biofilmMm} mm • slowFrac ${params.slowFrac}`);
       dbg.push(`Denit: k=${params.kDenit} 1/day • cap=${params.denitCap}`);
       dbg.push(`Fish O2: ${params.fishMass} g @ ${params.fishO2} mg/g/day • Plant O2 peak ${params.plantO2} mg/L/day`);
