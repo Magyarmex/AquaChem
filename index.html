@@ -498,6 +498,46 @@
           <input id="nitQ10" type="number" step="0.05" value="2.0"/>
         </div>
         <div class="row">
+          <label>Heterotroph DO half-saturation K (mg/L)</label>
+          <input id="kDoHet" type="number" step="0.05" value="0.80"/>
+        </div>
+        <div class="row">
+          <label>Refractory fraction (slow COD)</label>
+          <input id="slowFrac" type="number" step="0.05" min="0" max="0.9" value="0.25"/>
+        </div>
+        <div class="row">
+          <label>Biofilm thickness proxy (mm)</label>
+          <input id="biofilmMm" type="number" step="0.1" min="0" value="0.6"/>
+        </div>
+        <div class="row">
+          <label>Denitrification rate (1/day)</label>
+          <input id="kDenit" type="number" step="0.05" value="0.15"/>
+        </div>
+        <div class="row">
+          <label>Denitrifier capacity (0–1)</label>
+          <input id="denitCap" type="number" step="0.05" min="0" max="1" value="0.60"/>
+        </div>
+        <div class="row">
+          <label>Fish biomass (g)</label>
+          <input id="fishMass" type="number" step="1" min="0" value="25"/>
+        </div>
+        <div class="row">
+          <label>Fish respiration (mg O₂/g/day)</label>
+          <input id="fishO2" type="number" step="1" min="0" value="150"/>
+        </div>
+        <div class="row">
+          <label>Plant O₂ peak (mg/L/day)</label>
+          <input id="plantO2" type="number" step="0.1" min="0" value="1.0"/>
+        </div>
+        <div class="row">
+          <label>Diurnal temp amplitude (°C)</label>
+          <input id="tempAmp" type="number" step="0.1" min="0" value="0.6"/>
+        </div>
+        <div class="row">
+          <label>Lights on (hour 0–23)</label>
+          <input id="lightHour" type="number" step="1" min="0" max="23" value="9"/>
+        </div>
+        <div class="row">
           <label>Nitrogen display units</label>
           <select id="nUnits">
             <option value="asN" selected>as N (mg/L)</option>
@@ -742,12 +782,23 @@ const DEBUG_STATE = {
   lastSimMeta: null,
   lastScalars: null,
   lastUpdateISO: null,
-  errors: []  // newest last
+  errors: [],  // newest last
+  warnings: []
 };
 
 function setStage(stage, extra=null){
   DEBUG_STATE.stage = String(stage || '');
   DEBUG_STATE.stageExtra = extra ? String(extra) : '';
+}
+
+function addWarning(message){
+  if(!message) return;
+  DEBUG_STATE.warnings.push({
+    timeISO: new Date().toISOString(),
+    message: String(message),
+    stage: DEBUG_STATE.stage,
+    stageExtra: DEBUG_STATE.stageExtra
+  });
 }
 
 function setDebugText(lines){
@@ -835,6 +886,15 @@ lines.push(`surface=${p.lenCm}×${p.widCm} cm, blanket=${p.blanketPct}%, ripple=
       lines.push(`#${DEBUG_STATE.errors.length - recent.length + i + 1} ${e.timeISO} — ${e.name}: ${e.message}`);
       if(e.stage) lines.push(`  stage: ${e.stage}${e.stageExtra ? ' — ' + e.stageExtra : ''}`);
       if(e.stack) lines.push('  stack: ' + e.stack.split('\n').slice(0,5).join(' | '));
+    });
+  }
+  if(DEBUG_STATE.warnings.length){
+    lines.push('');
+    lines.push('--- Recent warnings ---');
+    const recent = DEBUG_STATE.warnings.slice(-3);
+    recent.forEach((w, i)=>{
+      lines.push(`#${DEBUG_STATE.warnings.length - recent.length + i + 1} ${w.timeISO} — ${w.message}`);
+      if(w.stage) lines.push(`  stage: ${w.stage}${w.stageExtra ? ' — ' + w.stageExtra : ''}`);
     });
   }
   return lines;
@@ -1024,6 +1084,7 @@ const CHEM = {
   O2_fat: 2.90,
   O2_carb: 1.185,
   CO2_per_gO2: 1.0,
+  N_bio_per_COD: 0.1,
 
   // crude protein nitrogen fraction
   gN_per_g_protein: 1/6.25,
@@ -1072,9 +1133,7 @@ function runSimulation(params){
 
   // temperature factor (this is for biology only, not for physics C*)
   const Q10 = 2.0;
-  const tempF0 = Math.pow(Q10, (oxy.T - 25.0)/10);
   const bioMult = (Number.isFinite(params.bioMult) ? params.bioMult : 1.0);
-  const tempF = clamp(tempF0 * bioMult, 0.25, 6.0);
 
   // Kinetics base (1/day). Pellets slower than powder.
   const k_h_pel = {carb:0.35, prot:0.20, fat:0.08};
@@ -1109,6 +1168,7 @@ function runSimulation(params){
   };
 
   let S = {carb:0, prot:0, fat:0}; // soluble pool (g)
+  let S_slow = {carb:0, prot:0, fat:0}; // refractory pool (g)
   let COD_bio = 0; // g O2-eq stored in heterotroph biomass
   let N_bio = 0;   // g N stored in biomass
   let NH4 = 0;     // g N
@@ -1121,15 +1181,17 @@ function runSimulation(params){
   // Activity states (dimensionless 0..1)
   let Bhet = 0.04;
   let Bnit = 0.02;
+  let Bden = 0.01;
 
   const Ks = 0.006; // g
   const Kn = 0.0012; // g N
-  const rHet = 2.2 * tempF;
-  const dHet = 0.12 * tempF;
+  const rHet_base = 2.2;
+  const dHet_base = 0.12;
   const nitQ10 = Number.isFinite(params.nitQ10) ? params.nitQ10 : 2.0;
-  const tempFNit = Math.pow(nitQ10, (oxy.T - 25.0)/10);
-  const rNit = 1.2 * tempFNit;
-  const dNit = 0.08 * tempFNit;
+  const rNit_base = 1.2;
+  const dNit_base = 0.08;
+  const rDen_base = 0.9;
+  const dDen_base = 0.08;
 
   // DO dynamics
   const Cstar = oxy.Cstar;
@@ -1137,8 +1199,19 @@ function runSimulation(params){
   const kLa = oxy.kLa;
 
   const nitCap = clamp(Number(params.nitCap ?? 1), 0, 1);
+  const denitCap = clamp(Number(params.denitCap ?? 1), 0, 1);
   const kNH4_g = (Number(params.kNH4Nit ?? 0) * params.volL) / 1000;
   const kNO2_g = (Number(params.kNO2Nit ?? 0) * params.volL) / 1000;
+  const kDoHet = Math.max(0.01, Number(params.kDoHet ?? 0.8));
+  const slowFrac = clamp(Number(params.slowFrac ?? 0.25), 0, 0.9);
+  const biofilmMm = Math.max(0, Number(params.biofilmMm ?? 0));
+  const biofilmMult = 1 / (1 + biofilmMm * 0.7);
+  const kDenit = Math.max(0, Number(params.kDenit ?? 0));
+  const fishMass = Math.max(0, Number(params.fishMass ?? 0));
+  const fishO2 = Math.max(0, Number(params.fishO2 ?? 0));
+  const plantO2 = Math.max(0, Number(params.plantO2 ?? 0));
+  const tempAmp = Math.max(0, Number(params.tempAmp ?? 0));
+  const lightHour = clamp(Number(params.lightHour ?? 8), 0, 23);
   const macroRelease = Number(params.macroRelease ?? 0);
   const microRelease = Number(params.microRelease ?? 0);
   const macroUptake = Number(params.macroUptake ?? 0);
@@ -1181,14 +1254,20 @@ function runSimulation(params){
       nh4_from_endog:0,
       nh4_to_no2:0,
       no2_to_no3:0,
+      no3_to_n2:0,
       co2_from_ox:0,
       co2_from_endog:0,
+      co2_from_denit:0,
       macro_release:0,
       macro_uptake:0,
       micro_release:0,
-      micro_uptake:0
+      micro_uptake:0,
+      n_balance_init:0,
+      n_balance_end:0,
+      c_balance_init:0,
+      c_balance_end:0
     },
-    meta: { dt, oxy, tempF, tempFNit, kLa, nitCap }
+    meta: { dt, oxy, kLa, nitCap, denitCap }
   };
 
   // Events sorted
@@ -1235,9 +1314,27 @@ function runSimulation(params){
     return Math.min(flux, mass/dt);
   }
 
+  const initialN = params.pelletMass_g * FRACTIONS.protein * CHEM.gN_per_g_protein
+    + params.powderMass_g * FRACTIONS.protein * CHEM.gN_per_g_protein;
+  const initialC = params.pelletMass_g + params.powderMass_g;
+  out.audit.n_balance_init = initialN;
+  out.audit.c_balance_init = initialC;
+
   for(let i=0;i<n;i++){
     const day = i*dt;
     out.t[i] = day;
+
+    const dielPhase = 2 * Math.PI * ((day + lightHour/24) % 1);
+    const lightFactor = Math.max(0, Math.sin(dielPhase));
+    const tempNow = oxy.T + tempAmp * Math.sin(dielPhase);
+    const tempF = clamp(Math.pow(Q10, (tempNow - 25.0)/10) * bioMult, 0.25, 6.0);
+    const tempFNit = Math.pow(nitQ10, (tempNow - 25.0)/10);
+    const rHet = rHet_base * tempF;
+    const dHet = dHet_base * tempF;
+    const rNit = rNit_base * tempFNit;
+    const dNit = dNit_base * tempFNit;
+    const rDen = rDen_base * tempF;
+    const dDen = dDen_base * tempF;
 
     // Apply pop events at this time slice
     while(evIdx < ev.length && ev[evIdx].day <= day + dt/2){
@@ -1266,6 +1363,12 @@ function runSimulation(params){
       const dM = Math.min(hz * pelFloat[k] * dt, pelFloat[k]);
       pelFloat[k] -= dM;
       pelBot[k]   += dM;
+    }
+    const resus = clamp((params.ripplePct/100) * 0.15 + (params.airFlow/10) * 0.02, 0, 0.25);
+    for(const k of ["carb","prot","fat"]){
+      const up = Math.min(resus * pelBot[k] * dt, pelBot[k]);
+      pelBot[k] -= up;
+      pelFloat[k] += up;
     }
 
     // Blend kinetics based on how much is in powder state
@@ -1321,8 +1424,17 @@ function runSimulation(params){
       pelBot[k]   -= hb*dt;
       powBot[k]   -= hw*dt;
 
-      S[k] += (hf+hb+hw)*dt;
+      const fast = (hf+hb+hw) * (1 - slowFrac) * dt;
+      const slow = (hf+hb+hw) * slowFrac * dt;
+      S[k] += fast;
+      S_slow[k] += slow;
       hydroTot += (hf+hb+hw)*dt;
+    }
+
+    for(const k of ["carb","prot","fat"]){
+      const rel = Math.min(S_slow[k], (0.18 * tempF) * S_slow[k] * dt);
+      S_slow[k] -= rel;
+      S[k] += rel;
     }
 
     // Mixing penalty when hydrolysis happens mostly in bottom pellets
@@ -1343,7 +1455,10 @@ function runSimulation(params){
     // Oxidation of solubles
     const ox = {carb:0, prot:0, fat:0};
     for(const k of ["carb","prot","fat"]){
-      const flux = k_ox[k] * Bhet * mixMult * S[k];
+      const Ks_sub = 0.02;
+      const fS = S[k] / (Ks_sub + S[k]);
+      const fO2 = DO / (kDoHet + DO);
+      const flux = k_ox[k] * Bhet * mixMult * fS * fO2 * S[k];
       ox[k] = Math.min(flux, S[k]/dt);
       S[k] -= ox[k]*dt;
     }
@@ -1363,7 +1478,10 @@ function runSimulation(params){
     const N_rel = (COD_bio > 1e-12) ? (N_bio / COD_bio) * endog : 0;
 
     COD_bio = COD_bio + COD_store*dt - endog*dt;
-    N_bio   = N_bio   + N_store*dt   - N_rel*dt;
+    const N_need = COD_store * CHEM.N_bio_per_COD;
+    const N_assim = Math.min(NH4, Math.max(0, N_need - N_store) * dt);
+    NH4 = NH4 - N_assim;
+    N_bio   = N_bio   + N_store*dt + N_assim - N_rel*dt;
 
     // Nitrification (sequential)
     NH4 = NH4 + (NH4_prod + N_rel)*dt;
@@ -1371,16 +1489,26 @@ function runSimulation(params){
     const fNH4 = (kNH4_g > 0) ? (NH4 / (kNH4_g + NH4)) : 1.0;
     const fNO2 = (kNO2_g > 0) ? (NO2 / (kNO2_g + NO2)) : 1.0;
 
-    const r1 = Math.min(Bnit * k_nit.nh4 * fNH4 * NH4, NH4/dt); // g N/day
+    const r1 = Math.min(Bnit * k_nit.nh4 * fNH4 * biofilmMult * NH4, NH4/dt); // g N/day
     NH4 = NH4 - r1*dt;
     NO2 = NO2 + r1*dt;
 
-    const r2 = Math.min(Bnit * k_nit.no2 * fNO2 * NO2, NO2/dt);
+    const r2 = Math.min(Bnit * k_nit.no2 * fNO2 * biofilmMult * NO2, NO2/dt);
     NO2 = NO2 - r2*dt;
     NO3 = NO3 + r2*dt;
 
     const O2_nh4 = r1 * CHEM.O2_per_gN_NH4_to_NO2;
     const O2_no2 = r2 * CHEM.O2_per_gN_NO2_to_NO3;
+
+    const fAnox = clamp(1 - DO/(kDoHet + DO), 0, 1);
+    const rDen = Math.min(Bden * kDenit * fAnox * NO3, NO3/dt);
+    NO3 = NO3 - rDen*dt;
+    const COD_den = Math.min(COD_bio, rDen * 2.5);
+    COD_bio = Math.max(0, COD_bio - COD_den*dt);
+    const CO2_den = COD_den;
+    CO2_g += CO2_den * dt;
+    out.audit.no3_to_n2 += rDen * dt;
+    out.audit.co2_from_denit += CO2_den * dt;
 
     const demand = O2_carb + O2_prot + O2_fat + O2_endog + O2_nh4 + O2_no2;
 
@@ -1398,7 +1526,9 @@ function runSimulation(params){
     // DO dynamics (Euler)
     // supply_g_day = kLa*(C* - DO)*V
     const supply_g_day = (kLa * Math.max(0, (Cstar - DO)) * params.volL) / 1000;
-    const dDO = ((supply_g_day - demand) * 1000 / params.volL) * dt; // mg/L
+    const plant_g_day = (plantO2 * lightFactor * params.volL) / 1000;
+    const fish_g_day = (fishMass * fishO2) / 1000;
+    const dDO = ((supply_g_day + plant_g_day - demand - fish_g_day) * 1000 / params.volL) * dt; // mg/L
     DO = clamp(DO + dDO, 0, Cstar*1.2);
 
     // Record outputs
@@ -1408,8 +1538,8 @@ function runSimulation(params){
     out.rate.endog[i] = O2_endog;
     out.rate.nh4[i]   = O2_nh4;
     out.rate.no2[i]   = O2_no2;
-    out.rate.total[i] = demand;
-    out.rate.supply[i]= supply_g_day;
+    out.rate.total[i] = demand + fish_g_day;
+    out.rate.supply[i]= supply_g_day + plant_g_day;
 
     out.DO_mgL[i] = DO;
     out.DO_pct[i] = (Cstar>1e-9) ? (100*DO/Cstar) : 0;
@@ -1422,6 +1552,7 @@ function runSimulation(params){
     const nh3AsN = out.NH4_mgL[i] * nh3Frac;
     out.NH3_mgL[i] = nh3AsN * CHEM.NH3_ion_per_N;
 
+    CO2_g = Math.max(0, CO2_g - plant_g_day * CHEM.CO2_per_gO2 * dt);
     out.CO2_mgL[i] = (CO2_g*1000)/params.volL;
 
     const macroUptake_g = Math.min(macro_g, (macroUptake * params.volL / 1000) * dt);
@@ -1453,6 +1584,8 @@ function runSimulation(params){
 
     Bhet = clamp(Bhet + (rHet*fS*(1-Bhet) - dHet*Bhet)*dt, 0.0, 1.0);
     Bnit = clamp(Bnit + (rNit*fN*(nitCap-Bnit) - dNit*Bnit)*dt, 0.0, nitCap);
+    const fDen = NO3 / (Kn + NO3);
+    Bden = clamp(Bden + (rDen*fDen*(denitCap-Bden) - dDen*Bden)*dt, 0.0, denitCap);
   }
 
   // cumulative arrays
@@ -1463,6 +1596,16 @@ function runSimulation(params){
     let s = 0;
     for(let i=0;i<n;i++){ s += arr[i]*dt; cum[i] = s; }
     out.cum[k] = cum;
+  }
+
+  out.audit.n_balance_end = NH4 + NO2 + NO3 + N_bio;
+  out.audit.c_balance_end = CO2_g + COD_bio + S.carb + S.prot + S.fat + S_slow.carb + S_slow.prot + S_slow.fat
+    + pelFloat.carb + pelFloat.prot + pelFloat.fat + pelBot.carb + pelBot.prot + pelBot.fat + powBot.carb + powBot.prot + powBot.fat;
+  if(initialN > 0 && Math.abs(out.audit.n_balance_end - initialN)/initialN > 0.15){
+    addWarning('Nitrogen balance drift exceeds 15% — check kinetics or timestep.');
+  }
+  if(initialC > 0 && Math.abs(out.audit.c_balance_end - initialC)/initialC > 0.25){
+    addWarning('Carbon balance drift exceeds 25% — check hydrolysis/CO2 terms.');
   }
 
   return out;
@@ -2200,10 +2343,42 @@ function buildLegendChem(){
 
 let EVENTS = [];
 
+function maxPelletCountFromInputs(){
+  const mEach = pelletMassEach(Number(el('pelLen')?.value || 1.0), Number(el('pelDia')?.value || 0.2), Number(el('pelRho')?.value || 0.55));
+  const totalMass = Number(el('pelMassN')?.value || 0);
+  return mEach > 0 ? totalMass / mEach : 0;
+}
+
+function normalizeEvents(){
+  const daysMax = Number(el('daysN')?.value);
+  const maxPel = maxPelletCountFromInputs();
+  let remaining = maxPel;
+  let truncated = false;
+  const cleaned = [];
+
+  EVENTS.sort((a,b)=>a.day-b.day);
+  for(const raw of EVENTS){
+    const day = clamp(Number(raw.day || 0), 0, Number.isFinite(daysMax) ? daysMax : raw.day);
+    let pel = Math.max(0, Math.round(Number(raw.pellets || 0)));
+    if(pel > remaining){
+      pel = Math.max(0, Math.floor(remaining));
+      truncated = true;
+    }
+    if(pel > 0){
+      cleaned.push({day, pellets: pel});
+      remaining -= pel;
+    }
+  }
+  if(truncated){
+    addWarning('Pop events truncated to avoid exceeding available pellets.');
+  }
+  EVENTS = cleaned;
+}
+
 function renderEvents(){
   const tb = el('eventsTable').querySelector('tbody');
+  normalizeEvents();
   tb.innerHTML = '';
-  EVENTS.sort((a,b)=>a.day-b.day);
   EVENTS.forEach((e, idx)=>{
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -2220,6 +2395,7 @@ function renderEvents(){
       const k = ev.target.dataset.k;
       EVENTS[i][k] = Number(ev.target.value);
       saveState();
+      renderEvents();
       recompute();
     });
   });
@@ -2284,6 +2460,16 @@ function saveState(){
     // kinetics options
     o2Limit: el('o2Limit').value,
     kDoNit: Number(el('kDoNit').value),
+    kDoHet: Number(el('kDoHet').value),
+    slowFrac: Number(el('slowFrac').value),
+    biofilmMm: Number(el('biofilmMm').value),
+    kDenit: Number(el('kDenit').value),
+    denitCap: Number(el('denitCap').value),
+    fishMass: Number(el('fishMass').value),
+    fishO2: Number(el('fishO2').value),
+    plantO2: Number(el('plantO2').value),
+    tempAmp: Number(el('tempAmp').value),
+    lightHour: Number(el('lightHour').value),
     kNH4Nit: Number(el('kNH4Nit').value),
     kNO2Nit: Number(el('kNO2Nit').value),
     nitCap: Number(el('nitCap').value),
@@ -2339,6 +2525,7 @@ function loadState(){
     // environment + geometry
     ['volL','airFlow','Tnow','pH','altM','tds','ripplePct','lenCm','widCm','tankHCm','waterSurfCm','blanketGapCm','diffDepthCm',
      'heaters','sotePerM','kCalm','kRipple','tight','otrCal','doInitPct','kDoNit','kNH4Nit','kNO2Nit','nitCap','nitQ10',
+     'kDoHet','slowFrac','biofilmMm','kDenit','denitCap','fishMass','fishO2','plantO2','tempAmp','lightHour',
      'pelLen','pelDia','pelRho','macroRelease','microRelease','macroUptake','microUptake'
     ].forEach(k=>set(k, s[k]));
 
@@ -2584,6 +2771,7 @@ function setFlags(sim, params, mc){
   for(let i=0;i<sim.NO2_mgL.length;i++) if(sim.NO2_mgL[i] > no2Peak) no2Peak = sim.NO2_mgL[i];
   for(let i=0;i<sim.NO3_mgL.length;i++) if(sim.NO3_mgL[i] > no3Peak) no3Peak = sim.NO3_mgL[i];
   for(let i=0;i<sim.NH3_mgL.length;i++) if(sim.NH3_mgL[i] > nh3Peak) nh3Peak = sim.NH3_mgL[i];
+  const denitN_mgL = (sim.audit.no3_to_n2 * 1000) / params.volL;
 
   // --------------------------
   // Uncertainty mode flags
@@ -2668,6 +2856,9 @@ function setFlags(sim, params, mc){
   }
 
   add('note', 'Nitrogen peaks (single run)', `NH₄: ${nh4Peak.toFixed(3)} mg/L • NO₂: ${no2Peak.toFixed(3)} mg/L • NO₃: ${no3Peak.toFixed(3)} mg/L.`);
+  if(denitN_mgL > 0.2){
+    add('note', 'Denitrification activity', `Estimated NO₃ → N₂ conversion: ${denitN_mgL.toFixed(2)} mg/L as N. Low-DO windows are driving denitrification.`);
+  }
 }
 
 /* =========================================================
@@ -2723,6 +2914,16 @@ function getParams(){
 
     o2Limit: el('o2Limit').value,
     kDoNit: Number(el('kDoNit').value),
+    kDoHet: Number(el('kDoHet').value),
+    slowFrac: Number(el('slowFrac').value),
+    biofilmMm: Number(el('biofilmMm').value),
+    kDenit: Number(el('kDenit').value),
+    denitCap: Number(el('denitCap').value),
+    fishMass: Number(el('fishMass').value),
+    fishO2: Number(el('fishO2').value),
+    plantO2: Number(el('plantO2').value),
+    tempAmp: Number(el('tempAmp').value),
+    lightHour: Number(el('lightHour').value),
     kNH4Nit: Number(el('kNH4Nit').value),
     kNO2Nit: Number(el('kNO2Nit').value),
     nitCap: Number(el('nitCap').value),
@@ -2762,6 +2963,8 @@ function getParams(){
   p.mcRuns = clamp(Math.round(p.mcRuns || 0), 10, 5000);
   p.pH = clamp(Number.isFinite(p.pH) ? p.pH : 7.0, 5.0, 9.5);
   p.nitCap = clamp(Number.isFinite(p.nitCap) ? p.nitCap : 1.0, 0, 1);
+  p.denitCap = clamp(Number.isFinite(p.denitCap) ? p.denitCap : 1.0, 0, 1);
+  p.lightHour = clamp(Number.isFinite(p.lightHour) ? p.lightHour : 8, 0, 23);
   return p;
 }
 
@@ -2784,6 +2987,7 @@ function fmtPct(p){
 function recompute(){
   clearError();
   setStage('recompute', 'start');
+  DEBUG_STATE.warnings = [];
 
   try{
     setStage('UI', 'apply presets');
@@ -2909,6 +3113,10 @@ function recompute(){
       dbg.push(`Base OTR max: ${oxy.OTR_max.toFixed(3)} g/day`);
       dbg.push(`Base kLa inferred: ${oxy.kLa.toFixed(4)} 1/day`);
       dbg.push(`Sim dt: ${baseSim.meta.dt.toFixed(4)} days (~${(baseSim.meta.dt*24).toFixed(2)} h)`);
+      dbg.push(`Biofilm proxy: ${params.biofilmMm} mm • slowFrac ${params.slowFrac}`);
+      dbg.push(`Denit: k=${params.kDenit} 1/day • cap=${params.denitCap}`);
+      dbg.push(`Fish O2: ${params.fishMass} g @ ${params.fishO2} mg/g/day • Plant O2 peak ${params.plantO2} mg/L/day`);
+      dbg.push(`Diurnal: tempAmp ${params.tempAmp}°C • lights @ ${params.lightHour}:00`);
       dbg.push(`N units: ${params.nUnits} • pH=${params.pH} • NH3 frac=${nh3Fraction(params.pH ?? 7.0, params.Tnow).toFixed(3)}`);
       dbg.push('');
       dbg.push('--- Snapshot ---');
@@ -2981,6 +3189,10 @@ function recompute(){
       dbg.push(`OTR max: ${oxy.OTR_max.toFixed(3)} g/day`);
       dbg.push(`kLa inferred: ${oxy.kLa.toFixed(4)} 1/day`);
       dbg.push(`Sim dt: ${baseSim.meta.dt.toFixed(4)} days (~${(baseSim.meta.dt*24).toFixed(2)} h)`);
+      dbg.push(`Biofilm proxy: ${params.biofilmMm} mm • slowFrac ${params.slowFrac}`);
+      dbg.push(`Denit: k=${params.kDenit} 1/day • cap=${params.denitCap}`);
+      dbg.push(`Fish O2: ${params.fishMass} g @ ${params.fishO2} mg/g/day • Plant O2 peak ${params.plantO2} mg/L/day`);
+      dbg.push(`Diurnal: tempAmp ${params.tempAmp}°C • lights @ ${params.lightHour}:00`);
       dbg.push(`N units: ${params.nUnits} • pH=${params.pH} • NH3 frac=${nh3Fraction(params.pH ?? 7.0, params.Tnow).toFixed(3)}`);
       dbg.push('');
       dbg.push('--- Snapshot ---');
@@ -3001,12 +3213,16 @@ function recompute(){
           `NH₄ from biomass turnover: ${(a.nh4_from_endog*1000/params.volL).toFixed(3)} mg/L as N`,
           `NH₄ → NO₂ consumed: ${(a.nh4_to_no2*1000/params.volL).toFixed(3)} mg/L as N`,
           `NO₂ → NO₃ consumed: ${(a.no2_to_no3*1000/params.volL).toFixed(3)} mg/L as N`,
+          `NO₃ → N₂ (denit): ${(a.no3_to_n2*1000/params.volL).toFixed(3)} mg/L as N`,
           `CO₂ from oxidation: ${(a.co2_from_ox*1000/params.volL).toFixed(2)} mg/L`,
           `CO₂ from endogenous: ${(a.co2_from_endog*1000/params.volL).toFixed(2)} mg/L`,
+          `CO₂ from denit: ${(a.co2_from_denit*1000/params.volL).toFixed(2)} mg/L`,
           `Macros released: ${(a.macro_release*1000/params.volL).toFixed(2)} mg/L`,
           `Macros uptake: ${(a.macro_uptake*1000/params.volL).toFixed(2)} mg/L`,
           `Micros released: ${(a.micro_release*1000/params.volL).toFixed(2)} mg/L`,
-          `Micros uptake: ${(a.micro_uptake*1000/params.volL).toFixed(2)} mg/L`
+          `Micros uptake: ${(a.micro_uptake*1000/params.volL).toFixed(2)} mg/L`,
+          `N balance: ${(a.n_balance_end*1000/params.volL).toFixed(3)} mg/L as N (initial ${(a.n_balance_init*1000/params.volL).toFixed(3)})`,
+          `C balance: ${(a.c_balance_end*1000/params.volL).toFixed(2)} mg/L (initial ${(a.c_balance_init*1000/params.volL).toFixed(2)})`
         ];
         auditEl.textContent = lines.join('\n');
       }
@@ -3171,6 +3387,7 @@ function init(){
     'lenCm','widCm','tankHCm','waterSurfCm','blanketGapCm','diffDepthCm','heaters',
     'sotePerM','kCalm','kRipple','tight','otrCal',
     'doInitPct','kDoNit','kNH4Nit','kNO2Nit','nitCap','nitQ10','nUnits',
+    'kDoHet','slowFrac','biofilmMm','kDenit','denitCap','fishMass','fishO2','plantO2','tempAmp','lightHour',
     'macroRelease','microRelease','macroUptake','microUptake','chemNerd',
     'pelLen','pelDia','pelRho',
     'diffType','surfacePreset','tightPreset','otrPreset','initDOPreset',
@@ -3201,7 +3418,7 @@ function init(){
     const safePel = Math.max(0, Math.round(pellets));
     if(safePel <= 0) return;
     EVENTS.push({day: safeDay, pellets: safePel});
-    EVENTS.sort((a,b)=>a.day-b.day);
+    normalizeEvents();
     saveState();
     renderEvents();
     scheduleRecompute();
