@@ -834,6 +834,7 @@ const DEBUG_STATE = {
   lastScalars: null,
   lastChemCumInfo: null,
   lastRecomputeMs: null,
+  lastFlagsCount: null,
   lastUpdateISO: null,
   errors: [],  // newest last
   warnings: []
@@ -929,6 +930,11 @@ lines.push(`surface=${p.lenCm}×${p.widCm} cm, blanket=${p.blanketPct}%, ripple=
     lines.push('');
     lines.push('--- Uncertainty scalars (last) ---');
     lines.push(compactJSON(DEBUG_STATE.lastScalars, 1200));
+  }
+  if(Number.isFinite(DEBUG_STATE.lastFlagsCount)){
+    lines.push('');
+    lines.push('--- Flags rendered (last) ---');
+    lines.push(`Cards: ${DEBUG_STATE.lastFlagsCount}`);
   }
   if(Number.isFinite(DEBUG_STATE.lastRecomputeMs)){
     lines.push('');
@@ -2821,7 +2827,23 @@ function initCanvasInteractions(){
 ========================================================= */
 function setFlags(sim, params, mc){
   const flags = el('flags');
+  if(!flags){
+    addWarning('Flags container missing (#flags). Skipping flag rendering.');
+    return;
+  }
   flags.innerHTML = '';
+  let flagCount = 0;
+
+  const kindAliases = {ok:'ok', warn:'warn', danger:'danger', note:'note', good:'ok'};
+  const good = kindAliases.good;
+  const normalizeKind = (kind)=>{
+    if(typeof kind !== 'string') return 'note';
+    const norm = kindAliases[kind] || 'note';
+    if(norm !== kind){
+      addWarning(`Unknown flag kind "${kind}" normalized to "${norm}".`);
+    }
+    return norm;
+  };
 
   const kindAliases = {ok:'ok', warn:'warn', danger:'danger', note:'note', good:'ok'};
   const good = kindAliases.good;
@@ -2843,6 +2865,7 @@ function setFlags(sim, params, mc){
       <div class="flag-body"><div class="small">${msg}</div></div>
     `;
     flags.appendChild(div);
+    flagCount++;
   };
 
   const estPellets = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
@@ -2971,21 +2994,9 @@ function setFlags(sim, params, mc){
     ]
   });
 
-  const nh4Label = params.nUnits === 'asIon' ? 'NH₄⁺ (total ammonia)' : 'NH₄-N (total ammonia)';
-  const nh4Good = 0.5 * nFactorNH4;
-  const nh4Warn = 1.0 * nFactorNH4;
-  const nh4Class = classify('max', nh4Peak, nh4Good, nh4Warn);
-  addTag({
-    label: nh4Label,
-    tone: nh4Class.tone,
-    status: nh4Class.label,
-    summary:`peak ${fmtVal(nh4Peak, 'mg/L')}`,
-    details:[
-      `Modeled ${isMC ? 'median peak' : 'peak'}: ${fmtVal(nh4Peak, 'mg/L')}.`,
-      fmtBandLine('max', nh4Good, nh4Warn, 'mg/L'),
-      `Reference assumes ${params.nUnits === 'asIon' ? 'ion' : 'N'} units.`
-    ]
-  });
+    DEBUG_STATE.lastFlagsCount = flagCount;
+    return;
+  }
 
   // --------------------------
   // Single-run flags
@@ -3044,6 +3055,7 @@ function setFlags(sim, params, mc){
   if(denitN_mgL > 0.2){
     add('note', 'Denitrification activity', `Estimated NO₃ → N₂ conversion: ${denitN_mgL.toFixed(2)} mg/L as N. Low-DO windows are driving denitrification.`);
   }
+  DEBUG_STATE.lastFlagsCount = flagCount;
 }
 
 /* =========================================================
