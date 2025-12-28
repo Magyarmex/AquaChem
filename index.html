@@ -833,6 +833,7 @@ const DEBUG_STATE = {
   lastSimMeta: null,
   lastScalars: null,
   lastChemCumInfo: null,
+  lastRecomputeMs: null,
   lastUpdateISO: null,
   errors: [],  // newest last
   warnings: []
@@ -928,6 +929,11 @@ lines.push(`surface=${p.lenCm}×${p.widCm} cm, blanket=${p.blanketPct}%, ripple=
     lines.push('');
     lines.push('--- Uncertainty scalars (last) ---');
     lines.push(compactJSON(DEBUG_STATE.lastScalars, 1200));
+  }
+  if(Number.isFinite(DEBUG_STATE.lastRecomputeMs)){
+    lines.push('');
+    lines.push('--- Recompute timing (last) ---');
+    lines.push(`Total recompute: ${DEBUG_STATE.lastRecomputeMs.toFixed(1)} ms`);
   }
   if(DEBUG_STATE.lastChemCumInfo){
     lines.push('');
@@ -2814,15 +2820,29 @@ function initCanvasInteractions(){
    Flags + summary
 ========================================================= */
 function setFlags(sim, params, mc){
-  const tags = el('chemTags');
-  if(!tags) return;
-  tags.innerHTML = '';
+  const flags = el('flags');
+  flags.innerHTML = '';
 
-  const fmtVal = (value, unit)=>{
-    if(!Number.isFinite(value)) return '—';
-    const abs = Math.abs(value);
-    const decimals = abs < 1 ? 3 : (abs < 10 ? 2 : 1);
-    return `${value.toFixed(decimals)} ${unit}`;
+  const kindAliases = {ok:'ok', warn:'warn', danger:'danger', note:'note', good:'ok'};
+  const good = kindAliases.good;
+  const normalizeKind = (kind)=>{
+    if(typeof kind !== 'string') return 'note';
+    const norm = kindAliases[kind] || 'note';
+    if(norm !== kind){
+      addWarning(`Unknown flag kind "${kind}" normalized to "${norm}".`);
+    }
+    return norm;
+  };
+
+  const add = (kind, title, msg)=>{
+    const div = document.createElement('div');
+    const safeKind = normalizeKind(kind);
+    div.className = 'flag-card';
+    div.innerHTML = `
+      <div class="flag-tag ${safeKind}">${title}<span>${safeKind.toUpperCase()}</span></div>
+      <div class="flag-body"><div class="small">${msg}</div></div>
+    `;
+    flags.appendChild(div);
   };
 
   const estPellets = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
@@ -3153,6 +3173,7 @@ function recompute(){
   clearError();
   setStage('recompute', 'start');
   DEBUG_STATE.warnings = [];
+  const recomputeStart = performance.now();
 
   try{
     setStage('UI', 'apply presets');
@@ -3395,6 +3416,10 @@ function recompute(){
     initCanvasInteractions();
 
     setStage('recompute', 'done');
+    DEBUG_STATE.lastRecomputeMs = performance.now() - recomputeStart;
+    if(DEBUG_STATE.lastRecomputeMs > 800){
+      addWarning(`Recompute took ${DEBUG_STATE.lastRecomputeMs.toFixed(0)} ms. Consider reducing Monte Carlo runs or disabling live recompute.`);
+    }
 
   }catch(err){
     showError(err);
