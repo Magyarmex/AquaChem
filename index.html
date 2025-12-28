@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Aquarium O₂ Demand Planner (DO + oxygenation model)</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop stop-color='%237aa2ff'/%3E%3Cstop offset='1' stop-color='%2363e6be'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='%230b1020'/%3E%3Cpath d='M32 10c9.5 0 17.2 7.7 17.2 17.2S41.5 50 32 50 14.8 42.3 14.8 32 22.5 10 32 10Z' fill='url(%23g)' fill-opacity='.35'/%3E%3Cpath d='M32 17c7.2 0 13 5.8 13 13s-5.8 13-13 13-13-5.8-13-13 5.8-13 13-13Z' fill='url(%23g)'/%3E%3Cpath d='M31.7 23.5c2.7 4 5.3 7.2 5.3 10.2 0 3-2.4 5.4-5.3 5.4s-5.3-2.4-5.3-5.4c0-3 2.6-6.2 5.3-10.2Z' fill='%230b1020' fill-opacity='.85'/%3E%3C/svg%3E" />
   <style>
     :root{
       --bg:#0b1020; --panel:#111a33; --panel2:#0f1730; --text:#e7ecff; --muted:#a9b3d6;
@@ -91,7 +92,29 @@
       border:1px solid rgba(255,255,255,.16); background:rgba(255,255,255,.05); font-size:12px;
     }
     .pill.ok{border-color:rgba(99,230,190,.35);} .pill.warn{border-color:rgba(255,207,90,.45);} .pill.danger{border-color:rgba(255,107,107,.45);}
-    .flags{display:flex;flex-wrap:wrap;gap:8px}
+    .flags{display:grid;gap:12px}
+    .flag-card{
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(255,255,255,.04);
+      overflow:hidden;
+      box-shadow:var(--shadow);
+    }
+    .flag-tag{
+      padding:6px 12px;
+      font-weight:700;
+      font-size:12px;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+    }
+    .flag-tag.ok{background:rgba(99,230,190,.18); color:#d5fff1;}
+    .flag-tag.warn{background:rgba(255,207,90,.22); color:#fff3d1;}
+    .flag-tag.danger{background:rgba(255,107,107,.22); color:#ffd1d1;}
+    .flag-tag.note{background:rgba(122,162,255,.18); color:#dfe6ff;}
+    .flag-body{padding:10px 12px;color:var(--text)}
     .btn{
       background:rgba(122,162,255,.18);
       border:1px solid rgba(122,162,255,.35);
@@ -261,8 +284,20 @@
       Click the <span class="kbd">RATE</span> graph to add an event at that day, or use the table below.
       Each event converts whole pellets into powder at that moment (mass is conserved).
     </div>
-    <div style="margin-top:10px">
-      <button class="btn" id="addEventBtn">Add event</button>
+    <div class="grid3" style="margin-top:10px">
+      <div class="row">
+        <label>Event day</label>
+        <input id="evDay" type="number" min="0" step="0.1" value="3.0"/>
+      </div>
+      <div class="row">
+        <label>Pellets to pop</label>
+        <input id="evPellets" type="number" min="0" step="1" value="10"/>
+      </div>
+      <div class="row" style="justify-content:flex-end">
+        <button class="btn" id="addEventBtn">Add event</button>
+      </div>
+    </div>
+    <div style="margin-top:8px">
       <button class="btn ghost" id="clearEventsBtn">Clear events</button>
     </div>
 
@@ -300,6 +335,10 @@
         <div class="row">
           <label>Water temp (°C) at current blanket setting</label>
           <input id="Tnow" type="number" step="0.1" value="22.0"/>
+        </div>
+        <div class="row">
+          <label>Water pH (for NH₃ fraction)</label>
+          <input id="pH" type="number" step="0.05" value="7.4"/>
         </div>
         <div class="row">
           <label>Altitude (m)</label>
@@ -340,6 +379,10 @@
         <div class="row">
           <label>Diffuser depth below surface (cm)</label>
           <input id="diffDepthCm" type="number" step="0.1" value="17.0"/>
+        </div>
+        <div class="row">
+          <label>Water column heaters (0–2)</label>
+          <input id="heaters" type="number" step="1" min="0" max="2" value="0"/>
         </div>
 
         
@@ -426,7 +469,7 @@
           <label>Initial DO (% of local saturation)</label>
           <input id="doInitPct" type="number" step="1" min="0" max="150" value="95"/>
         </div>
-<div class="row">
+        <div class="row">
           <label>Enable oxygen limitation for nitrification</label>
           <select id="o2Limit">
             <option value="off">Off (demand not reduced when DO is low)</option>
@@ -437,6 +480,89 @@
         <div class="row">
           <label>Nitrifier DO half-saturation K (mg/L)</label>
           <input id="kDoNit" type="number" step="0.05" value="0.50"/>
+        </div>
+        <div class="row">
+          <label>NH₄ half-saturation K (mg/L as N)</label>
+          <input id="kNH4Nit" type="number" step="0.05" value="0.40"/>
+        </div>
+        <div class="row">
+          <label>NO₂ half-saturation K (mg/L as N)</label>
+          <input id="kNO2Nit" type="number" step="0.05" value="0.25"/>
+        </div>
+        <div class="row">
+          <label>Nitrifier capacity (0–1)</label>
+          <input id="nitCap" type="number" step="0.05" min="0" max="1" value="0.80"/>
+        </div>
+        <div class="row">
+          <label>Nitrifier Q10 (temperature response)</label>
+          <input id="nitQ10" type="number" step="0.05" value="2.0"/>
+        </div>
+        <div class="row">
+          <label>Heterotroph DO half-saturation K (mg/L)</label>
+          <input id="kDoHet" type="number" step="0.05" value="0.80"/>
+        </div>
+        <div class="row">
+          <label>Refractory fraction (slow COD)</label>
+          <input id="slowFrac" type="number" step="0.05" min="0" max="0.9" value="0.25"/>
+        </div>
+        <div class="row">
+          <label>Biofilm thickness proxy (mm)</label>
+          <input id="biofilmMm" type="number" step="0.1" min="0" value="0.6"/>
+        </div>
+        <div class="row">
+          <label>Denitrification rate (1/day)</label>
+          <input id="kDenit" type="number" step="0.05" value="0.15"/>
+        </div>
+        <div class="row">
+          <label>Denitrifier capacity (0–1)</label>
+          <input id="denitCap" type="number" step="0.05" min="0" max="1" value="0.60"/>
+        </div>
+        <div class="row">
+          <label>Fish biomass (g)</label>
+          <input id="fishMass" type="number" step="1" min="0" value="25"/>
+        </div>
+        <div class="row">
+          <label>Fish respiration (mg O₂/g/day)</label>
+          <input id="fishO2" type="number" step="1" min="0" value="150"/>
+        </div>
+        <div class="row">
+          <label>Plant O₂ peak (mg/L/day)</label>
+          <input id="plantO2" type="number" step="0.1" min="0" value="1.0"/>
+        </div>
+        <div class="row">
+          <label>Diurnal temp amplitude (°C)</label>
+          <input id="tempAmp" type="number" step="0.1" min="0" value="0.6"/>
+        </div>
+        <div class="row">
+          <label>Lights on (hour 0–23)</label>
+          <input id="lightHour" type="number" step="1" min="0" max="23" value="9"/>
+        </div>
+        <div class="row">
+          <label>Nitrogen display units</label>
+          <select id="nUnits">
+            <option value="asN" selected>as N (mg/L)</option>
+            <option value="asIon">as ion (mg/L)</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>Chemistry audit (nerd mode)</label>
+          <input id="chemNerd" type="checkbox"/>
+        </div>
+        <div class="row">
+          <label>Macro nutrients released (mg/L per g food)</label>
+          <input id="macroRelease" type="number" step="0.1" value="8.0"/>
+        </div>
+        <div class="row">
+          <label>Micro nutrients released (mg/L per g food)</label>
+          <input id="microRelease" type="number" step="0.1" value="1.2"/>
+        </div>
+        <div class="row">
+          <label>Macro uptake (mg/L per day)</label>
+          <input id="macroUptake" type="number" step="0.05" value="0.35"/>
+        </div>
+        <div class="row">
+          <label>Micro uptake (mg/L per day)</label>
+          <input id="microUptake" type="number" step="0.02" value="0.08"/>
         </div>
 
         <div class="row">
@@ -477,12 +603,15 @@
         <div class="small" style="margin-top:6px">Dissolved oxygen (mg/L). Dashed line is local saturation C*.</div>
       </div>
       <div>
-        <canvas id="cumCanvas" width="1200" height="360"></canvas>
-        <div class="small" style="margin-top:6px">Cumulative chart (g O₂). Total oxygen demanded over time.</div>
+        <canvas id="chemCanvas" width="1200" height="360"></canvas>
+        <div class="small" style="margin-top:6px">Chemistry / compounds (mg/L). Toggle NH₄/NO₂/NO₃ units in Advanced.</div>
       </div>
     </div>
 
-    <div class="legend" id="legend"></div>
+    <div class="small" style="margin-top:8px">Rate chart series</div>
+    <div class="legend" id="legendRate"></div>
+    <div class="small" style="margin-top:12px">Chemistry chart series</div>
+    <div class="legend" id="legendChem"></div>
 
     <div class="hr"></div>
 
@@ -501,11 +630,22 @@
         <div class="pill" style="margin-top:8px"><span>Min DO</span> <b class="mono" id="doMinOut">—</b></div>
         <div class="pill" style="margin-top:8px"><span>P(DO &lt; 2 mg/L)</span> <b class="mono" id="pUnder2Out">—</b></div>
         <div class="pill" style="margin-top:8px"><span>P(DO &lt; 1 mg/L)</span> <b class="mono" id="pUnder1Out">—</b></div>
-        <div class="pill" style="margin-top:8px"><span>NH₄-N / NO₂-N peaks</span> <b class="mono" id="nOut">—</b></div>
+        <div class="pill" style="margin-top:8px"><span id="nh4Label">NH₄ peak</span> <b class="mono" id="nh4Out">—</b></div>
+        <div class="pill" style="margin-top:8px"><span id="no2Label">NO₂ peak</span> <b class="mono" id="no2Out">—</b></div>
+        <div class="pill" style="margin-top:8px"><span id="no3Label">NO₃ peak</span> <b class="mono" id="no3Out">—</b></div>
+        <div class="pill" style="margin-top:8px"><span>NH₃ (unionized)</span> <b class="mono" id="nh3Out">—</b></div>
+        <div class="pill" style="margin-top:8px"><span>CO₂ produced (mg/L)</span> <b class="mono" id="co2Out">—</b></div>
+        <div class="pill" style="margin-top:8px"><span>Macros / Micros (mg/L)</span> <b class="mono" id="nutrOut">—</b></div>
       </div>
     </div>
 
     <div class="flags" id="flags" style="margin-top:10px"></div>
+
+    <details id="chemAuditDetails" style="margin-top:10px; display:none;">
+      <summary>Chemistry audit (nerd mode)</summary>
+      <div class="small" style="margin-top:8px">Audit trails for nitrogen + CO₂ + nutrients.</div>
+      <pre id="chemAudit" class="mono" style="white-space:pre-wrap; word-break:break-word; color:rgba(231,236,255,.82)"></pre>
+    </details>
 
     <div class="hr"></div>
 
@@ -534,9 +674,9 @@
 <script>
 
 /* =========================================================
-   Series registry (rate/cumulative charts)
+   Series registry (rate + chemistry charts)
 ========================================================= */
-const SERIES = [
+const RATE_SERIES = [
   {key:"carb",  name:"Carbs → CO₂ (direct)", color:"#54a0ff"},
   {key:"prot",  name:"Protein → CO₂ + NH₄ (direct)", color:"#ff9f43"},
   {key:"fat",   name:"Fat → CO₂ (direct)", color:"#2ecc71"},
@@ -547,7 +687,30 @@ const SERIES = [
   {key:"supply",name:"O₂ transfer into water (dynamic)", color:"#63e6be", dash:true},
 ];
 
-let visible = Object.fromEntries(SERIES.map(s=>[s.key, true]));
+const CHEM_SERIES = [
+  {key:"nh4", name:"NH₄ (total ammonia)", color:"#ffd166"},
+  {key:"nh3", name:"NH₃ (unionized)", color:"#ff8fab"},
+  {key:"no2", name:"NO₂", color:"#a29bfe"},
+  {key:"no3", name:"NO₃", color:"#63e6be"},
+  {key:"co2", name:"CO₂ (produced)", color:"#54a0ff"},
+  {key:"macro", name:"Macros (proxy)", color:"#f4d35e"},
+  {key:"micro", name:"Micros (proxy)", color:"#b8c0ff"},
+];
+
+let visibleRate = Object.fromEntries(RATE_SERIES.map(s=>[s.key, true]));
+let visibleChem = Object.fromEntries(CHEM_SERIES.map(s=>[s.key, true]));
+
+function updateChemSeriesLabels(nUnits){
+  if(nUnits === 'asIon'){
+    CHEM_SERIES.find(s=>s.key==='nh4').name = 'NH₄⁺ (ion)';
+    CHEM_SERIES.find(s=>s.key==='no2').name = 'NO₂⁻ (ion)';
+    CHEM_SERIES.find(s=>s.key==='no3').name = 'NO₃⁻ (ion)';
+  }else{
+    CHEM_SERIES.find(s=>s.key==='nh4').name = 'NH₄-N';
+    CHEM_SERIES.find(s=>s.key==='no2').name = 'NO₂-N';
+    CHEM_SERIES.find(s=>s.key==='no3').name = 'NO₃-N';
+  }
+}
 
 /* =========================================================
    DOM helpers + error plumbing
@@ -568,9 +731,19 @@ function ensureTooltip(){
 function clamp(x,a,b){ return Math.max(a, Math.min(b, x)); }
 
 function showError(err){
-  const box = el('errBox');
-  const txt = el('errText');
+  let box = el('errBox');
+  let txt = el('errText');
   const msg = (err && err.stack) ? err.stack : String(err);
+
+  if(!box || !txt){
+    box = document.createElement('div');
+    box.id = 'errBox';
+    box.className = 'errbox';
+    box.style.display = 'block';
+    box.innerHTML = `<b>Model error</b><pre id="errText"></pre>`;
+    document.body.appendChild(box);
+    txt = el('errText');
+  }
 
   // Visible error banner
   if(box) box.style.display = 'block';
@@ -619,12 +792,23 @@ const DEBUG_STATE = {
   lastSimMeta: null,
   lastScalars: null,
   lastUpdateISO: null,
-  errors: []  // newest last
+  errors: [],  // newest last
+  warnings: []
 };
 
 function setStage(stage, extra=null){
   DEBUG_STATE.stage = String(stage || '');
   DEBUG_STATE.stageExtra = extra ? String(extra) : '';
+}
+
+function addWarning(message){
+  if(!message) return;
+  DEBUG_STATE.warnings.push({
+    timeISO: new Date().toISOString(),
+    message: String(message),
+    stage: DEBUG_STATE.stage,
+    stageExtra: DEBUG_STATE.stageExtra
+  });
 }
 
 function setDebugText(lines){
@@ -672,6 +856,7 @@ function buildDebugSnapshot(extraLines=[]){
     lines.push(`volL=${p.volL}, days=${p.days}, dtHours≈${Number.isFinite(dtHours) ? dtHours.toFixed(2) : 'n/a'}, airFlow=${p.airFlow} L/min @ alt=${p.altM} m`);
 lines.push(`surface=${p.lenCm}×${p.widCm} cm, blanket=${p.blanketPct}%, ripple=${p.ripplePct}%`);
     lines.push(`diffuser=${p.diffType || 'n/a'}, depth=${p.diffDepthCm} cm, tight=${p.tight}`);
+    lines.push(`pH=${p.pH}, heaters=${p.heaters}, nitCap=${p.nitCap}, nUnits=${p.nUnits}`);
     lines.push('');
     lines.push(compactJSON(p, 1600));
   }
@@ -713,11 +898,33 @@ lines.push(`surface=${p.lenCm}×${p.widCm} cm, blanket=${p.blanketPct}%, ripple=
       if(e.stack) lines.push('  stack: ' + e.stack.split('\n').slice(0,5).join(' | '));
     });
   }
+  if(DEBUG_STATE.warnings.length){
+    lines.push('');
+    lines.push('--- Recent warnings ---');
+    const recent = DEBUG_STATE.warnings.slice(-3);
+    recent.forEach((w, i)=>{
+      lines.push(`#${DEBUG_STATE.warnings.length - recent.length + i + 1} ${w.timeISO} — ${w.message}`);
+      if(w.stage) lines.push(`  stage: ${w.stage}${w.stageExtra ? ' — ' + w.stageExtra : ''}`);
+    });
+  }
   return lines;
 }
 function assertFinite(name, v){
   if(!Number.isFinite(v)) throw new Error(`Non-finite value for ${name}: ${v}`);
   return v;
+}
+
+function installGlobalErrorHandlers(){
+  if(window.__o2planner_err_bound) return;
+  window.__o2planner_err_bound = true;
+  window.addEventListener('error', (event)=>{
+    const err = event?.error || new Error(event?.message || 'Unknown error');
+    showError(err);
+  });
+  window.addEventListener('unhandledrejection', (event)=>{
+    const err = event?.reason instanceof Error ? event.reason : new Error(String(event?.reason || 'Unhandled rejection'));
+    showError(err);
+  });
 }
 
 function linkRangeAndNumber(rangeEl, numEl, onChange){
@@ -899,9 +1106,17 @@ const CHEM = {
   O2_protein_C: 1.42,
   O2_fat: 2.90,
   O2_carb: 1.185,
+  CO2_per_gO2: 1.0,
+  N_bio_per_COD: 0.1,
 
   // crude protein nitrogen fraction
   gN_per_g_protein: 1/6.25,
+
+  // ion conversion ratios (mg/L as ion per mg/L as N)
+  NH4_ion_per_N: 18.038/14.007,
+  NO2_ion_per_N: 46.0055/14.007,
+  NO3_ion_per_N: 62.0049/14.007,
+  NH3_ion_per_N: 17.031/14.007,
 
   // nitrification stoich: per g N
   // NH4+ + 1.5 O2 -> NO2- + H2O + 2H+   (48 g O2 per 14 g N)
@@ -914,6 +1129,13 @@ function pelletMassEach(pelLen_cm, pelDia_cm, rho_g_cm3){
   const r = pelDia_cm/2;
   const vol = Math.PI * r*r * pelLen_cm; // cm^3
   return vol * rho_g_cm3; // g
+}
+
+function nh3Fraction(pH, tempC){
+  const T = tempC + 273.15;
+  const pKa = 0.09018 + (2729.92 / T);
+  const frac = 1 / (1 + Math.pow(10, pKa - pH));
+  return clamp(frac, 0, 1);
 }
 
 // crude "sinks over first few days"
@@ -934,9 +1156,7 @@ function runSimulation(params){
 
   // temperature factor (this is for biology only, not for physics C*)
   const Q10 = 2.0;
-  const tempF0 = Math.pow(Q10, (oxy.T - 25.0)/10);
   const bioMult = (Number.isFinite(params.bioMult) ? params.bioMult : 1.0);
-  const tempF = clamp(tempF0 * bioMult, 0.25, 6.0);
 
   // Kinetics base (1/day). Pellets slower than powder.
   const k_h_pel = {carb:0.35, prot:0.20, fat:0.08};
@@ -952,9 +1172,10 @@ function runSimulation(params){
   const k_nit_pow   = {nh4:1.20, no2:1.70};
 
   const accessFloat = 1.00;
-  const accessBottom= 0.30;
+  const heaterLevel = clamp(Math.round(params.heaters || 0), 0, 2);
+  const accessBottom= (heaterLevel === 2) ? 0.55 : (heaterLevel === 1 ? 0.40 : 0.30);
   const oxFloat = 1.00;
-  const oxBottom= 0.45;
+  const oxBottom= (heaterLevel === 2) ? 0.75 : (heaterLevel === 1 ? 0.55 : 0.45);
 
   // Pools (g as-fed broken into components)
   let pelFloat = {
@@ -970,26 +1191,54 @@ function runSimulation(params){
   };
 
   let S = {carb:0, prot:0, fat:0}; // soluble pool (g)
+  let S_slow = {carb:0, prot:0, fat:0}; // refractory pool (g)
   let COD_bio = 0; // g O2-eq stored in heterotroph biomass
   let N_bio = 0;   // g N stored in biomass
   let NH4 = 0;     // g N
   let NO2 = 0;     // g N
+  let NO3 = 0;     // g N
+  let CO2_g = 0;   // g CO2 produced
+  let macro_g = 0; // g (proxy)
+  let micro_g = 0; // g (proxy)
 
   // Activity states (dimensionless 0..1)
   let Bhet = 0.04;
   let Bnit = 0.02;
+  let Bden = 0.01;
 
   const Ks = 0.006; // g
   const Kn = 0.0012; // g N
-  const rHet = 2.2 * tempF;
-  const dHet = 0.12 * tempF;
-  const rNit = 1.2 * tempF;
-  const dNit = 0.08 * tempF;
+  const rHet_base = 2.2;
+  const dHet_base = 0.12;
+  const nitQ10 = Number.isFinite(params.nitQ10) ? params.nitQ10 : 2.0;
+  const rNit_base = 1.2;
+  const dNit_base = 0.08;
+  const rDen_base = 0.9;
+  const dDen_base = 0.08;
 
   // DO dynamics
   const Cstar = oxy.Cstar;
   let DO = clamp(Cstar * (params.doInitPct/100), 0, Cstar*1.2);
   const kLa = oxy.kLa;
+
+  const nitCap = clamp(Number(params.nitCap ?? 1), 0, 1);
+  const denitCap = clamp(Number(params.denitCap ?? 1), 0, 1);
+  const kNH4_g = (Number(params.kNH4Nit ?? 0) * params.volL) / 1000;
+  const kNO2_g = (Number(params.kNO2Nit ?? 0) * params.volL) / 1000;
+  const kDoHet = Math.max(0.01, Number(params.kDoHet ?? 0.8));
+  const slowFrac = clamp(Number(params.slowFrac ?? 0.25), 0, 0.9);
+  const biofilmMm = Math.max(0, Number(params.biofilmMm ?? 0));
+  const biofilmMult = 1 / (1 + biofilmMm * 0.7);
+  const kDenit = Math.max(0, Number(params.kDenit ?? 0));
+  const fishMass = Math.max(0, Number(params.fishMass ?? 0));
+  const fishO2 = Math.max(0, Number(params.fishO2 ?? 0));
+  const plantO2 = Math.max(0, Number(params.plantO2 ?? 0));
+  const tempAmp = Math.max(0, Number(params.tempAmp ?? 0));
+  const lightHour = clamp(Number(params.lightHour ?? 8), 0, 23);
+  const macroRelease = Number(params.macroRelease ?? 0);
+  const microRelease = Number(params.microRelease ?? 0);
+  const macroUptake = Number(params.macroUptake ?? 0);
+  const microUptake = Number(params.microUptake ?? 0);
 
   // Outputs
   const out = {
@@ -1009,7 +1258,39 @@ function runSimulation(params){
     DO_pct: new Array(n).fill(0),
     NH4_mgL: new Array(n).fill(0),
     NO2_mgL: new Array(n).fill(0),
-    meta: { dt, oxy, tempF, kLa }
+    NO3_mgL: new Array(n).fill(0),
+    NH3_mgL: new Array(n).fill(0),
+    CO2_mgL: new Array(n).fill(0),
+    macro_mgL: new Array(n).fill(0),
+    micro_mgL: new Array(n).fill(0),
+    chem: {
+      nh4: new Array(n).fill(0),
+      nh3: new Array(n).fill(0),
+      no2: new Array(n).fill(0),
+      no3: new Array(n).fill(0),
+      co2: new Array(n).fill(0),
+      macro: new Array(n).fill(0),
+      micro: new Array(n).fill(0),
+    },
+    audit: {
+      nh4_from_pro:0,
+      nh4_from_endog:0,
+      nh4_to_no2:0,
+      no2_to_no3:0,
+      no3_to_n2:0,
+      co2_from_ox:0,
+      co2_from_endog:0,
+      co2_from_denit:0,
+      macro_release:0,
+      macro_uptake:0,
+      micro_release:0,
+      micro_uptake:0,
+      n_balance_init:0,
+      n_balance_end:0,
+      c_balance_init:0,
+      c_balance_end:0
+    },
+    meta: { dt, oxy, kLa, nitCap, denitCap }
   };
 
   // Events sorted
@@ -1056,9 +1337,27 @@ function runSimulation(params){
     return Math.min(flux, mass/dt);
   }
 
+  const initialN = params.pelletMass_g * FRACTIONS.protein * CHEM.gN_per_g_protein
+    + params.powderMass_g * FRACTIONS.protein * CHEM.gN_per_g_protein;
+  const initialC = params.pelletMass_g + params.powderMass_g;
+  out.audit.n_balance_init = initialN;
+  out.audit.c_balance_init = initialC;
+
   for(let i=0;i<n;i++){
     const day = i*dt;
     out.t[i] = day;
+
+    const dielPhase = 2 * Math.PI * ((day + lightHour/24) % 1);
+    const lightFactor = Math.max(0, Math.sin(dielPhase));
+    const tempNow = oxy.T + tempAmp * Math.sin(dielPhase);
+    const tempF = clamp(Math.pow(Q10, (tempNow - 25.0)/10) * bioMult, 0.25, 6.0);
+    const tempFNit = Math.pow(nitQ10, (tempNow - 25.0)/10);
+    const rHet = rHet_base * tempF;
+    const dHet = dHet_base * tempF;
+    const rNit = rNit_base * tempFNit;
+    const dNit = dNit_base * tempFNit;
+    const rDen_grow = rDen_base * tempF;
+    const dDen = dDen_base * tempF;
 
     // Apply pop events at this time slice
     while(evIdx < ev.length && ev[evIdx].day <= day + dt/2){
@@ -1088,6 +1387,12 @@ function runSimulation(params){
       pelFloat[k] -= dM;
       pelBot[k]   += dM;
     }
+    const resus = clamp((params.ripplePct/100) * 0.15 + (params.airFlow/10) * 0.02, 0, 0.25);
+    for(const k of ["carb","prot","fat"]){
+      const up = Math.min(resus * pelBot[k] * dt, pelBot[k]);
+      pelBot[k] -= up;
+      pelFloat[k] += up;
+    }
 
     // Blend kinetics based on how much is in powder state
     const pelMassNow = pelFloat.carb+pelFloat.prot+pelFloat.fat + pelBot.carb+pelBot.prot+pelBot.fat;
@@ -1107,8 +1412,8 @@ function runSimulation(params){
     };
     const k_endog = tempF * blend(k_endog_pel, k_endog_pow, wPow);
     const k_nit_base = {
-      nh4: tempF * blend(k_nit_pel.nh4, k_nit_pow.nh4, wPow),
-      no2: tempF * blend(k_nit_pel.no2, k_nit_pow.no2, wPow)
+      nh4: tempFNit * blend(k_nit_pel.nh4, k_nit_pow.nh4, wPow),
+      no2: tempFNit * blend(k_nit_pel.no2, k_nit_pow.no2, wPow)
     };
 
     // Optionally slow nitrification at low DO (a simple Monod term).
@@ -1131,6 +1436,7 @@ function runSimulation(params){
       fat:  tempF * k_h_pow.fat
     };
 
+    let hydroTot = 0;
     // Hydrolysis fluxes per component
     for(const k of ["carb","prot","fat"]){
       const hf = capFlux(fluxPellet(pelFloat[k], k_h_p[k], accessFloat), pelFloat[k]);
@@ -1141,7 +1447,17 @@ function runSimulation(params){
       pelBot[k]   -= hb*dt;
       powBot[k]   -= hw*dt;
 
-      S[k] += (hf+hb+hw)*dt;
+      const fast = (hf+hb+hw) * (1 - slowFrac) * dt;
+      const slow = (hf+hb+hw) * slowFrac * dt;
+      S[k] += fast;
+      S_slow[k] += slow;
+      hydroTot += (hf+hb+hw)*dt;
+    }
+
+    for(const k of ["carb","prot","fat"]){
+      const rel = Math.min(S_slow[k], (0.18 * tempF) * S_slow[k] * dt);
+      S_slow[k] -= rel;
+      S[k] += rel;
     }
 
     // Mixing penalty when hydrolysis happens mostly in bottom pellets
@@ -1151,10 +1467,21 @@ function runSimulation(params){
     const denom = (hPelFloat+hPelBot+hPow) + 1e-12;
     const mixMult = (oxFloat*hPelFloat + oxBottom*hPelBot + 1.0*hPow) / denom;
 
+    // Nutrient release from hydrolyzed food (macro/micro proxy)
+    const macroAdd_g = (macroRelease * hydroTot * params.volL) / 1000;
+    const microAdd_g = (microRelease * hydroTot * params.volL) / 1000;
+    macro_g += macroAdd_g;
+    micro_g += microAdd_g;
+    out.audit.macro_release += macroAdd_g;
+    out.audit.micro_release += microAdd_g;
+
     // Oxidation of solubles
     const ox = {carb:0, prot:0, fat:0};
     for(const k of ["carb","prot","fat"]){
-      const flux = k_ox[k] * Bhet * mixMult * S[k];
+      const Ks_sub = 0.02;
+      const fS = S[k] / (Ks_sub + S[k]);
+      const fO2 = DO / (kDoHet + DO);
+      const flux = k_ox[k] * Bhet * mixMult * fS * fO2 * S[k];
       ox[k] = Math.min(flux, S[k]/dt);
       S[k] -= ox[k]*dt;
     }
@@ -1174,27 +1501,57 @@ function runSimulation(params){
     const N_rel = (COD_bio > 1e-12) ? (N_bio / COD_bio) * endog : 0;
 
     COD_bio = COD_bio + COD_store*dt - endog*dt;
-    N_bio   = N_bio   + N_store*dt   - N_rel*dt;
+    const N_need = COD_store * CHEM.N_bio_per_COD;
+    const N_assim = Math.min(NH4, Math.max(0, N_need - N_store) * dt);
+    NH4 = NH4 - N_assim;
+    N_bio   = N_bio   + N_store*dt + N_assim - N_rel*dt;
 
     // Nitrification (sequential)
     NH4 = NH4 + (NH4_prod + N_rel)*dt;
 
-    const r1 = Math.min(Bnit * k_nit.nh4 * NH4, NH4/dt); // g N/day
+    const fNH4 = (kNH4_g > 0) ? (NH4 / (kNH4_g + NH4)) : 1.0;
+    const fNO2 = (kNO2_g > 0) ? (NO2 / (kNO2_g + NO2)) : 1.0;
+
+    const r1 = Math.min(Bnit * k_nit.nh4 * fNH4 * biofilmMult * NH4, NH4/dt); // g N/day
     NH4 = NH4 - r1*dt;
     NO2 = NO2 + r1*dt;
 
-    const r2 = Math.min(Bnit * k_nit.no2 * NO2, NO2/dt);
+    const r2 = Math.min(Bnit * k_nit.no2 * fNO2 * biofilmMult * NO2, NO2/dt);
     NO2 = NO2 - r2*dt;
+    NO3 = NO3 + r2*dt;
 
     const O2_nh4 = r1 * CHEM.O2_per_gN_NH4_to_NO2;
     const O2_no2 = r2 * CHEM.O2_per_gN_NO2_to_NO3;
 
+    const fAnox = clamp(1 - DO/(kDoHet + DO), 0, 1);
+    const rDen_flux = Math.min(Bden * kDenit * fAnox * NO3, NO3/dt);
+    NO3 = NO3 - rDen_flux*dt;
+    const COD_den = Math.min(COD_bio, rDen_flux * 2.5);
+    COD_bio = Math.max(0, COD_bio - COD_den*dt);
+    const CO2_den = COD_den;
+    CO2_g += CO2_den * dt;
+    out.audit.no3_to_n2 += rDen_flux * dt;
+    out.audit.co2_from_denit += CO2_den * dt;
+
     const demand = O2_carb + O2_prot + O2_fat + O2_endog + O2_nh4 + O2_no2;
+
+    const CO2_from_ox = (O2_carb + O2_prot + O2_fat) * CHEM.CO2_per_gO2;
+    const CO2_from_endog = O2_endog * CHEM.CO2_per_gO2;
+    CO2_g += (CO2_from_ox + CO2_from_endog) * dt;
+    out.audit.co2_from_ox += CO2_from_ox * dt;
+    out.audit.co2_from_endog += CO2_from_endog * dt;
+
+    out.audit.nh4_from_pro += NH4_prod * dt;
+    out.audit.nh4_from_endog += N_rel * dt;
+    out.audit.nh4_to_no2 += r1 * dt;
+    out.audit.no2_to_no3 += r2 * dt;
 
     // DO dynamics (Euler)
     // supply_g_day = kLa*(C* - DO)*V
     const supply_g_day = (kLa * Math.max(0, (Cstar - DO)) * params.volL) / 1000;
-    const dDO = ((supply_g_day - demand) * 1000 / params.volL) * dt; // mg/L
+    const plant_g_day = (plantO2 * lightFactor * params.volL) / 1000;
+    const fish_g_day = (fishMass * fishO2) / 1000;
+    const dDO = ((supply_g_day + plant_g_day - demand - fish_g_day) * 1000 / params.volL) * dt; // mg/L
     DO = clamp(DO + dDO, 0, Cstar*1.2);
 
     // Record outputs
@@ -1204,14 +1561,44 @@ function runSimulation(params){
     out.rate.endog[i] = O2_endog;
     out.rate.nh4[i]   = O2_nh4;
     out.rate.no2[i]   = O2_no2;
-    out.rate.total[i] = demand;
-    out.rate.supply[i]= supply_g_day;
+    out.rate.total[i] = demand + fish_g_day;
+    out.rate.supply[i]= supply_g_day + plant_g_day;
 
     out.DO_mgL[i] = DO;
     out.DO_pct[i] = (Cstar>1e-9) ? (100*DO/Cstar) : 0;
 
     out.NH4_mgL[i] = (NH4*1000)/params.volL;
     out.NO2_mgL[i] = (NO2*1000)/params.volL;
+    out.NO3_mgL[i] = (NO3*1000)/params.volL;
+
+    const nh3Frac = nh3Fraction(params.pH ?? 7.0, oxy.T);
+    const nh3AsN = out.NH4_mgL[i] * nh3Frac;
+    out.NH3_mgL[i] = nh3AsN * CHEM.NH3_ion_per_N;
+
+    CO2_g = Math.max(0, CO2_g - plant_g_day * CHEM.CO2_per_gO2 * dt);
+    out.CO2_mgL[i] = (CO2_g*1000)/params.volL;
+
+    const macroUptake_g = Math.min(macro_g, (macroUptake * params.volL / 1000) * dt);
+    const microUptake_g = Math.min(micro_g, (microUptake * params.volL / 1000) * dt);
+    macro_g = Math.max(0, macro_g - macroUptake_g);
+    micro_g = Math.max(0, micro_g - microUptake_g);
+    out.audit.macro_uptake += macroUptake_g;
+    out.audit.micro_uptake += microUptake_g;
+
+    out.macro_mgL[i] = (macro_g*1000)/params.volL;
+    out.micro_mgL[i] = (micro_g*1000)/params.volL;
+
+    const nh4Disp = params.nUnits === 'asIon' ? out.NH4_mgL[i] * CHEM.NH4_ion_per_N : out.NH4_mgL[i];
+    const no2Disp = params.nUnits === 'asIon' ? out.NO2_mgL[i] * CHEM.NO2_ion_per_N : out.NO2_mgL[i];
+    const no3Disp = params.nUnits === 'asIon' ? out.NO3_mgL[i] * CHEM.NO3_ion_per_N : out.NO3_mgL[i];
+
+    out.chem.nh4[i] = nh4Disp;
+    out.chem.no2[i] = no2Disp;
+    out.chem.no3[i] = no3Disp;
+    out.chem.nh3[i] = out.NH3_mgL[i];
+    out.chem.co2[i] = out.CO2_mgL[i];
+    out.chem.macro[i] = out.macro_mgL[i];
+    out.chem.micro[i] = out.micro_mgL[i];
 
     // Update activity states
     const S_tot = S.carb + S.prot + S.fat;
@@ -1219,7 +1606,9 @@ function runSimulation(params){
     const fN = NH4 / (Kn + NH4);
 
     Bhet = clamp(Bhet + (rHet*fS*(1-Bhet) - dHet*Bhet)*dt, 0.0, 1.0);
-    Bnit = clamp(Bnit + (rNit*fN*(1-Bnit) - dNit*Bnit)*dt, 0.0, 1.0);
+    Bnit = clamp(Bnit + (rNit*fN*(nitCap-Bnit) - dNit*Bnit)*dt, 0.0, nitCap);
+    const fDen = NO3 / (Kn + NO3);
+    Bden = clamp(Bden + (rDen_grow*fDen*(denitCap-Bden) - dDen*Bden)*dt, 0.0, denitCap);
   }
 
   // cumulative arrays
@@ -1230,6 +1619,16 @@ function runSimulation(params){
     let s = 0;
     for(let i=0;i<n;i++){ s += arr[i]*dt; cum[i] = s; }
     out.cum[k] = cum;
+  }
+
+  out.audit.n_balance_end = NH4 + NO2 + NO3 + N_bio;
+  out.audit.c_balance_end = CO2_g + COD_bio + S.carb + S.prot + S.fat + S_slow.carb + S_slow.prot + S_slow.fat
+    + pelFloat.carb + pelFloat.prot + pelFloat.fat + pelBot.carb + pelBot.prot + pelBot.fat + powBot.carb + powBot.prot + powBot.fat;
+  if(initialN > 0 && Math.abs(out.audit.n_balance_end - initialN)/initialN > 0.15){
+    addWarning('Nitrogen balance drift exceeds 15% — check kinetics or timestep.');
+  }
+  if(initialC > 0 && Math.abs(out.audit.c_balance_end - initialC)/initialC > 0.25){
+    addWarning('Carbon balance drift exceeds 25% — check hydrolysis/CO2 terms.');
   }
 
   return out;
@@ -1324,6 +1723,7 @@ function runMonteCarlo(baseParams){
   const tot_runs = new Array(runs);
   const sup_runs = new Array(runs);
   const cum_runs = new Array(runs);
+  const chem_runs = Object.fromEntries(CHEM_SERIES.map(s=>[s.key, new Array(runs)]));
 
   // Per-run scalars
   const minDO = new Array(runs);
@@ -1333,6 +1733,11 @@ function runMonteCarlo(baseParams){
   const deficitArea = new Array(runs);
   const nh4pk = new Array(runs);
   const no2pk = new Array(runs);
+  const no3pk = new Array(runs);
+  const nh3pk = new Array(runs);
+  const co2pk = new Array(runs);
+  const macroPk = new Array(runs);
+  const microPk = new Array(runs);
   const otrMax = new Array(runs);
   const kLa = new Array(runs);
   const Cstar = new Array(runs);
@@ -1386,6 +1791,9 @@ function runMonteCarlo(baseParams){
     tot_runs[r] = sim.rate.total;
     sup_runs[r] = sim.rate.supply;
     cum_runs[r] = sim.cum.total;
+    for(const s of CHEM_SERIES){
+      chem_runs[s.key][r] = sim.chem[s.key];
+    }
 
     // scalars
     let dmin = Infinity, dminDay = 0;
@@ -1405,11 +1813,21 @@ function runMonteCarlo(baseParams){
     under1[r] = tU1;
     deficitArea[r] = defA;
 
-    let nh = 0, n2 = 0;
+    let nh = 0, n2 = 0, n3 = 0, nh3 = 0, co2 = 0, mA = 0, mI = 0;
     for(let i=0;i<sim.NH4_mgL.length;i++) if(sim.NH4_mgL[i] > nh) nh = sim.NH4_mgL[i];
     for(let i=0;i<sim.NO2_mgL.length;i++) if(sim.NO2_mgL[i] > n2) n2 = sim.NO2_mgL[i];
+    for(let i=0;i<sim.NO3_mgL.length;i++) if(sim.NO3_mgL[i] > n3) n3 = sim.NO3_mgL[i];
+    for(let i=0;i<sim.NH3_mgL.length;i++) if(sim.NH3_mgL[i] > nh3) nh3 = sim.NH3_mgL[i];
+    for(let i=0;i<sim.CO2_mgL.length;i++) if(sim.CO2_mgL[i] > co2) co2 = sim.CO2_mgL[i];
+    for(let i=0;i<sim.macro_mgL.length;i++) if(sim.macro_mgL[i] > mA) mA = sim.macro_mgL[i];
+    for(let i=0;i<sim.micro_mgL.length;i++) if(sim.micro_mgL[i] > mI) mI = sim.micro_mgL[i];
     nh4pk[r] = nh;
     no2pk[r] = n2;
+    no3pk[r] = n3;
+    nh3pk[r] = nh3;
+    co2pk[r] = co2;
+    macroPk[r] = mA;
+    microPk[r] = mI;
 
     otrMax[r] = sim.meta.oxy.OTR_max;
     kLa[r] = sim.meta.oxy.kLa;
@@ -1421,6 +1839,7 @@ function runMonteCarlo(baseParams){
   const qTot= {lo:new Float32Array(n), mid:new Float32Array(n), hi:new Float32Array(n)};
   const qSup= {lo:new Float32Array(n), mid:new Float32Array(n), hi:new Float32Array(n)};
   const qCum= {lo:new Float32Array(n), mid:new Float32Array(n), hi:new Float32Array(n)};
+  const qChem = Object.fromEntries(CHEM_SERIES.map(s=>[s.key, {lo:new Float32Array(n), mid:new Float32Array(n), hi:new Float32Array(n)}]));
 
   const tmp = new Array(runs);
 
@@ -1438,6 +1857,9 @@ function runMonteCarlo(baseParams){
   fillQ(tot_runs, qTot);
   fillQ(sup_runs, qSup);
   fillQ(cum_runs, qCum);
+  for(const s of CHEM_SERIES){
+    fillQ(chem_runs[s.key], qChem[s.key]);
+  }
 
   // Scalar bands
   const sMinDO = scalarStats(minDO, qLo, qHi);
@@ -1445,6 +1867,11 @@ function runMonteCarlo(baseParams){
   const sDefA  = scalarStats(deficitArea, qLo, qHi);
   const sNH4   = scalarStats(nh4pk, qLo, qHi);
   const sNO2   = scalarStats(no2pk, qLo, qHi);
+  const sNO3   = scalarStats(no3pk, qLo, qHi);
+  const sNH3   = scalarStats(nh3pk, qLo, qHi);
+  const sCO2   = scalarStats(co2pk, qLo, qHi);
+  const sMacro = scalarStats(macroPk, qLo, qHi);
+  const sMicro = scalarStats(microPk, qLo, qHi);
   const sOTR   = scalarStats(otrMax, qLo, qHi);
   const sKLA   = scalarStats(kLa, qLo, qHi);
   const sCstar = scalarStats(Cstar, qLo, qHi);
@@ -1459,13 +1886,18 @@ function runMonteCarlo(baseParams){
 
   return {
     baseSim,
-    q: {DO:qDO, rateTotal:qTot, rateSupply:qSup, cumTotal:qCum},
+    q: {DO:qDO, rateTotal:qTot, rateSupply:qSup, cumTotal:qCum, chemBands:qChem},
     scalars: {
       minDO:sMinDO,
       minDO_day:sMinDODay,
       deficitArea:sDefA,
       nh4pk:sNH4,
       no2pk:sNO2,
+      no3pk:sNO3,
+      nh3pk:sNH3,
+      co2pk:sCO2,
+      macroPk:sMacro,
+      microPk:sMicro,
       otrMax:sOTR,
       kLa:sKLA,
       Cstar:sCstar,
@@ -1536,22 +1968,25 @@ function drawPlot(canvas, tArr, seriesDict, opts={}){
   const h = canvas.height = canvas.clientHeight * devicePixelRatio;
   ctx.clearRect(0,0,w,h);
 
-  const m = {l:56*devicePixelRatio, r:16*devicePixelRatio, t:30*devicePixelRatio, b:34*devicePixelRatio};
+  const m = {l:56*devicePixelRatio, r:56*devicePixelRatio, t:30*devicePixelRatio, b:34*devicePixelRatio};
   const pw = w - m.l - m.r;
   const ph = h - m.t - m.b;
 
   const xMax = tArr[tArr.length-1] || 1;
 
+  const seriesList = opts.series || RATE_SERIES;
+  const visibleMap = opts.visible || visibleRate;
+
   // y max from visible series + optional bands
   let yMax = 0;
-  for(const s of SERIES){
-    if(!visible[s.key]) continue;
+  for(const s of seriesList){
+    if(!visibleMap[s.key]) continue;
     const arr = seriesDict[s.key];
     if(arr) for(const v of arr) if(v>yMax) yMax=v;
   }
   if(opts.bands){
     for(const key of Object.keys(opts.bands)){
-      if(visible[key] === false) continue;
+      if(visibleMap[key] === false) continue;
       const b = opts.bands[key];
       if(b && b.hi){
         for(let i=0;i<b.hi.length;i++){
@@ -1643,17 +2078,18 @@ function drawPlot(canvas, tArr, seriesDict, opts={}){
   // draw bands first (so lines sit on top)
   if(opts.bands){
     for(const [key,b] of Object.entries(opts.bands)){
-      if(visible[key] === false) continue;
+      if(visibleMap[key] === false) continue;
       let color = 'rgba(255,140,171,1)'; // demand-ish
       if(key === 'supply') color = 'rgba(97,230,180,1)';
       if(key === 'total')  color = 'rgba(255,140,171,1)';
+      if(opts.bandColors && opts.bandColors[key]) color = opts.bandColors[key];
       drawBand(b.lo, b.hi, b.alpha ?? 0.14, color);
     }
   }
 
   // series (base lines)
-  for(const s of SERIES){
-    if(!visible[s.key]) continue;
+  for(const s of seriesList){
+    if(!visibleMap[s.key]) continue;
     const arr = seriesDict[s.key];
     if(!arr) continue;
 
@@ -1682,11 +2118,12 @@ function drawPlot(canvas, tArr, seriesDict, opts={}){
   // median lines from bands (draw on top)
   if(opts.bands){
     for(const [key,b] of Object.entries(opts.bands)){
-      if(visible[key] === false) continue;
+      if(visibleMap[key] === false) continue;
       if(!b.mid) continue;
       let color = 'rgba(255,140,171,1)';
       if(key === 'supply') color = 'rgba(97,230,180,1)';
       if(key === 'total')  color = 'rgba(255,140,171,1)';
+      if(opts.bandColors && opts.bandColors[key]) color = opts.bandColors[key];
       ctx.save();
       ctx.lineWidth = 2.2 * devicePixelRatio;
       ctx.strokeStyle = color;
@@ -1754,7 +2191,9 @@ function drawDOPlot(canvas, sim, overlay=null){
     ctx.stroke();
   }
 
-  // y labels
+  const CstarRef = (overlay && overlay.Cstar && Number.isFinite(overlay.Cstar.mid)) ? overlay.Cstar.mid : sim.meta.oxy.Cstar;
+
+  // y labels (mg/L)
   ctx.fillStyle = 'rgba(231,236,255,0.75)';
   ctx.font = `12px ${getComputedStyle(document.documentElement).getPropertyValue('--mono')}`;
   ctx.textAlign = 'right';
@@ -1762,6 +2201,14 @@ function drawDOPlot(canvas, sim, overlay=null){
   for(let y=0;y<=yTop+1e-12;y+=yStep){
     const py = m.t + ph - (y/yTop)*ph;
     ctx.fillText(y.toFixed(1), m.l-8, py);
+  }
+  // right axis (% saturation)
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  for(let y=0;y<=yTop+1e-12;y+=yStep){
+    const py = m.t + ph - (y/yTop)*ph;
+    const pct = (CstarRef > 1e-9) ? (100 * y / CstarRef) : 0;
+    ctx.fillText(`${Math.round(pct)}%`, m.l+pw+8, py);
   }
   // x labels
   ctx.textAlign = 'center';
@@ -1780,6 +2227,8 @@ function drawDOPlot(canvas, sim, overlay=null){
   ctx.fillStyle = 'rgba(231,236,255,0.9)';
   ctx.font = `13px ${getComputedStyle(document.documentElement).getPropertyValue('--sans')}`;
   ctx.fillText('Dissolved Oxygen (mg/L)', m.l, 10);
+  ctx.textAlign = 'right';
+  ctx.fillText('% saturation', m.l + pw, 10);
 
   // C* band + line
   const drawHBand = (yLo, yHi, alpha)=>{
@@ -1881,16 +2330,34 @@ function drawDOPlot(canvas, sim, overlay=null){
 /* =========================================================
    Legend + events
 ========================================================= */
-function buildLegend(){
-  const root = el('legend');
+function buildLegendRate(){
+  const root = el('legendRate');
+  if(!root) return;
   root.innerHTML = '';
-  for(const s of SERIES){
+  for(const s of RATE_SERIES){
     const d = document.createElement('div');
-    d.className = 'leg' + (visible[s.key] ? '' : ' off');
+    d.className = 'leg' + (visibleRate[s.key] ? '' : ' off');
     d.innerHTML = `<span class="dot" style="background:${s.color}"></span><span>${s.name}</span>`;
     d.addEventListener('click', ()=>{
-      visible[s.key] = !visible[s.key];
-      buildLegend();
+      visibleRate[s.key] = !visibleRate[s.key];
+      buildLegendRate();
+      recompute();
+    });
+    root.appendChild(d);
+  }
+}
+
+function buildLegendChem(){
+  const root = el('legendChem');
+  if(!root) return;
+  root.innerHTML = '';
+  for(const s of CHEM_SERIES){
+    const d = document.createElement('div');
+    d.className = 'leg' + (visibleChem[s.key] ? '' : ' off');
+    d.innerHTML = `<span class="dot" style="background:${s.color}"></span><span>${s.name}</span>`;
+    d.addEventListener('click', ()=>{
+      visibleChem[s.key] = !visibleChem[s.key];
+      buildLegendChem();
       recompute();
     });
     root.appendChild(d);
@@ -1899,10 +2366,42 @@ function buildLegend(){
 
 let EVENTS = [];
 
+function maxPelletCountFromInputs(){
+  const mEach = pelletMassEach(Number(el('pelLen')?.value || 1.0), Number(el('pelDia')?.value || 0.2), Number(el('pelRho')?.value || 0.55));
+  const totalMass = Number(el('pelMassN')?.value || 0);
+  return mEach > 0 ? totalMass / mEach : 0;
+}
+
+function normalizeEvents(){
+  const daysMax = Number(el('daysN')?.value);
+  const maxPel = maxPelletCountFromInputs();
+  let remaining = maxPel;
+  let truncated = false;
+  const cleaned = [];
+
+  EVENTS.sort((a,b)=>a.day-b.day);
+  for(const raw of EVENTS){
+    const day = clamp(Number(raw.day || 0), 0, Number.isFinite(daysMax) ? daysMax : raw.day);
+    let pel = Math.max(0, Math.round(Number(raw.pellets || 0)));
+    if(pel > remaining){
+      pel = Math.max(0, Math.floor(remaining));
+      truncated = true;
+    }
+    if(pel > 0){
+      cleaned.push({day, pellets: pel});
+      remaining -= pel;
+    }
+  }
+  if(truncated){
+    addWarning('Pop events truncated to avoid exceeding available pellets.');
+  }
+  EVENTS = cleaned;
+}
+
 function renderEvents(){
   const tb = el('eventsTable').querySelector('tbody');
+  normalizeEvents();
   tb.innerHTML = '';
-  EVENTS.sort((a,b)=>a.day-b.day);
   EVENTS.forEach((e, idx)=>{
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -1919,6 +2418,7 @@ function renderEvents(){
       const k = ev.target.dataset.k;
       EVENTS[i][k] = Number(ev.target.value);
       saveState();
+      renderEvents();
       recompute();
     });
   });
@@ -1949,6 +2449,7 @@ function saveState(){
     volL: Number(el('volL').value),
     airFlow: Number(el('airFlow').value),
     Tnow: Number(el('Tnow').value),
+    pH: Number(el('pH').value),
     altM: Number(el('altM').value),
     tds: Number(el('tds').value),
 
@@ -1960,6 +2461,7 @@ function saveState(){
     waterSurfCm: Number(el('waterSurfCm').value),
     blanketGapCm: Number(el('blanketGapCm').value),
     diffDepthCm: Number(el('diffDepthCm').value),
+    heaters: Number(el('heaters').value),
 
     // presets + numbers
     diffType: el('diffType').value,
@@ -1981,6 +2483,26 @@ function saveState(){
     // kinetics options
     o2Limit: el('o2Limit').value,
     kDoNit: Number(el('kDoNit').value),
+    kDoHet: Number(el('kDoHet').value),
+    slowFrac: Number(el('slowFrac').value),
+    biofilmMm: Number(el('biofilmMm').value),
+    kDenit: Number(el('kDenit').value),
+    denitCap: Number(el('denitCap').value),
+    fishMass: Number(el('fishMass').value),
+    fishO2: Number(el('fishO2').value),
+    plantO2: Number(el('plantO2').value),
+    tempAmp: Number(el('tempAmp').value),
+    lightHour: Number(el('lightHour').value),
+    kNH4Nit: Number(el('kNH4Nit').value),
+    kNO2Nit: Number(el('kNO2Nit').value),
+    nitCap: Number(el('nitCap').value),
+    nitQ10: Number(el('nitQ10').value),
+    nUnits: el('nUnits').value,
+    chemNerd: !!el('chemNerd').checked,
+    macroRelease: Number(el('macroRelease').value),
+    microRelease: Number(el('microRelease').value),
+    macroUptake: Number(el('macroUptake').value),
+    microUptake: Number(el('microUptake').value),
 
     // pellet geometry
     pelLen: 1.00, // hardcoded
@@ -2024,8 +2546,10 @@ function loadState(){
     if(s.days !== undefined){ el('days').value = s.days; el('daysN').value = s.days; }
 
     // environment + geometry
-    ['volL','airFlow','Tnow','altM','tds','ripplePct','lenCm','widCm','tankHCm','waterSurfCm','blanketGapCm','diffDepthCm',
-     'sotePerM','kCalm','kRipple','tight','otrCal','doInitPct','kDoNit','pelLen','pelDia','pelRho'
+    ['volL','airFlow','Tnow','pH','altM','tds','ripplePct','lenCm','widCm','tankHCm','waterSurfCm','blanketGapCm','diffDepthCm',
+     'heaters','sotePerM','kCalm','kRipple','tight','otrCal','doInitPct','kDoNit','kNH4Nit','kNO2Nit','nitCap','nitQ10',
+     'kDoHet','slowFrac','biofilmMm','kDenit','denitCap','fishMass','fishO2','plantO2','tempAmp','lightHour',
+     'pelLen','pelDia','pelRho','macroRelease','microRelease','macroUptake','microUptake'
     ].forEach(k=>set(k, s[k]));
 
     if(s.diffType !== undefined) el('diffType').value = s.diffType;
@@ -2035,6 +2559,8 @@ function loadState(){
     if(s.initDOPreset !== undefined && el('initDOPreset')) el('initDOPreset').value = s.initDOPreset;
 
     if(s.o2Limit !== undefined) el('o2Limit').value = s.o2Limit;
+    if(s.nUnits !== undefined && el('nUnits')) el('nUnits').value = s.nUnits;
+    setCheck('chemNerd', s.chemNerd);
 
     // uncertainty mode
     if(el('runMode') && s.runMode !== undefined) el('runMode').value = s.runMode;
@@ -2053,6 +2579,12 @@ function loadState(){
     setCheck('uInitDO', s.uInitDO);
 
     EVENTS = Array.isArray(s.events) ? s.events : [];
+    EVENTS = EVENTS.map(ev=>{
+      if(ev && ev.pop !== undefined && ev.pellets === undefined){
+        return {day: ev.day, pellets: ev.pop};
+      }
+      return ev;
+    });
     // re-sync preset numeric fields after load
     try{ applyAllPresets(); }catch(_){}
   }catch(_){}
@@ -2065,7 +2597,7 @@ let lastSim = null;
 let lastMC = null;
 let rateGeom = null;
 let doGeom = null;
-let cumGeom = null;
+let chemGeom = null;
 let interactionsBound = false;
 
 function initCanvasInteractions(){
@@ -2117,8 +2649,8 @@ function initCanvasInteractions(){
       if(kind === 'rate'){
         const lines = [];
         lines.push(`<div><b>Day ${day.toFixed(2)}</b></div>`);
-        for(const s of SERIES){
-          if(!visible[s.key]) continue;
+        for(const s of RATE_SERIES){
+          if(!visibleRate[s.key]) continue;
           const v = lastSim.rate[s.key]?.[idx];
           if(v === undefined) continue;
           lines.push(`<div style="margin-top:4px"><span style="color:${s.color}">●</span> ${s.name}: <b class="mono">${v.toFixed(3)}</b></div>`);
@@ -2141,21 +2673,28 @@ function initCanvasInteractions(){
         show(ev, lines.join(''));
       }
 
-      if(kind === 'cum'){
+      if(kind === 'chem'){
         const lines = [];
         lines.push(`<div><b>Day ${day.toFixed(2)}</b></div>`);
-        for(const s of SERIES){
-          if(!visible[s.key]) continue;
-          const v = lastSim.cum[s.key]?.[idx];
+        for(const s of CHEM_SERIES){
+          if(!visibleChem[s.key]) continue;
+          const v = lastSim.chem?.[s.key]?.[idx];
           if(v === undefined) continue;
           lines.push(`<div style="margin-top:4px"><span style="color:${s.color}">●</span> ${s.name}: <b class="mono">${v.toFixed(3)}</b></div>`);
         }
 
         if(lastMC){
-          const mid = lastMC.q.cumTotal.mid[idx], lo = lastMC.q.cumTotal.lo[idx], hi = lastMC.q.cumTotal.hi[idx];
-          lines.push(`<div class="hr" style="margin:8px 0"></div>`);
-          lines.push(`<div class="small" style="opacity:.85">Uncertainty band:</div>`);
-          lines.push(bandLine('Cumulative total', mid, lo, hi, 'rgba(255,140,171,1)'));
+          const band = lastMC.q.chemBands;
+          if(band){
+            lines.push(`<div class="hr" style="margin:8px 0"></div>`);
+            lines.push(`<div class="small" style="opacity:.85">Uncertainty band:</div>`);
+            for(const s of CHEM_SERIES){
+              if(!visibleChem[s.key]) continue;
+              const b = band[s.key];
+              if(!b) continue;
+              lines.push(bandLine2(s.name, b.mid[idx], b.lo[idx], b.hi[idx], s.color));
+            }
+          }
         }
 
         show(ev, lines.join(''));
@@ -2184,9 +2723,20 @@ function initCanvasInteractions(){
     canvas.addEventListener('mouseleave', hide);
   };
 
-  bind(el('rateCanvas'), ()=>rateGeom, 'rate');
-  bind(el('cumCanvas'), ()=>cumGeom, 'cum');
+  const rateCanvas = el('rateCanvas');
+  bind(rateCanvas, ()=>rateGeom, 'rate');
+  bind(el('chemCanvas'), ()=>chemGeom, 'chem');
   bind(el('doCanvas'), ()=>doGeom, 'do');
+
+  if(rateCanvas && rateGeom && rateCanvas.dataset.clickBound !== '1'){
+    rateCanvas.dataset.clickBound = '1';
+    rateCanvas.addEventListener('click', (ev)=>{
+      if(!lastSim || !rateGeom) return;
+      const idx = idxFromEvent(ev, rateGeom);
+      if(idx === null) return;
+      el('evDay').value = lastSim.t[idx].toFixed(2);
+    });
+  }
 }
 
 /* =========================================================
@@ -2198,10 +2748,20 @@ function setFlags(sim, params, mc){
 
   const add = (kind, title, msg)=>{
     const div = document.createElement('div');
-    div.className = 'flag ' + kind;
-    div.innerHTML = `<b>${title}</b><div class="small">${msg}</div>`;
+    div.className = 'flag-card';
+    div.innerHTML = `
+      <div class="flag-tag ${kind}">${title}<span>${kind.toUpperCase()}</span></div>
+      <div class="flag-body"><div class="small">${msg}</div></div>
+    `;
     flags.appendChild(div);
   };
+
+  const estPellets = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
+  const pelCount = estPellets > 0 ? (params.pelletMass_g / estPellets) : 0;
+  const eventTotal = (params.events || []).reduce((acc, e)=>acc + (Number(e.pellets) || 0), 0);
+  if(eventTotal > pelCount + 1){
+    add('warn', 'Pop events exceed pellets', `Total pops (${eventTotal.toFixed(0)}) exceed estimated pellet count (${pelCount.toFixed(0)}). The model caps pops automatically, but the schedule is probably too aggressive.`);
+  }
 
   const rate = sim.rate.total;
   const supply = sim.rate.supply;
@@ -2228,6 +2788,13 @@ function setFlags(sim, params, mc){
     if(v < 2.0) tUnder2 += sim.meta.dt;
     if(v < 1.0) tUnder1 += sim.meta.dt;
   }
+
+  let nh4Peak = 0, no2Peak = 0, no3Peak = 0, nh3Peak = 0;
+  for(let i=0;i<sim.NH4_mgL.length;i++) if(sim.NH4_mgL[i] > nh4Peak) nh4Peak = sim.NH4_mgL[i];
+  for(let i=0;i<sim.NO2_mgL.length;i++) if(sim.NO2_mgL[i] > no2Peak) no2Peak = sim.NO2_mgL[i];
+  for(let i=0;i<sim.NO3_mgL.length;i++) if(sim.NO3_mgL[i] > no3Peak) no3Peak = sim.NO3_mgL[i];
+  for(let i=0;i<sim.NH3_mgL.length;i++) if(sim.NH3_mgL[i] > nh3Peak) nh3Peak = sim.NH3_mgL[i];
+  const denitN_mgL = (sim.audit.no3_to_n2 * 1000) / params.volL;
 
   // --------------------------
   // Uncertainty mode flags
@@ -2259,7 +2826,16 @@ function setFlags(sim, params, mc){
     add('note','O₂ deficit area (integrated)','Median oxygen “debt” (area where demand &gt; supply): ' + fmtBand(mc.scalars.deficitArea,'g',2) + '. Bigger debt = longer or deeper DO dips.');
 
     // Nitrogen peaks (still model-dependent)
-    add('note','Nitrogen peaks (modelled)','NH₄⁺ peak: ' + fmtBand(mc.scalars.nh4pk,'mg/L',3) + ' • NO₂⁻ peak: ' + fmtBand(mc.scalars.no2pk,'mg/L',3) + '. These are not “test kit forecasts”, but they’re useful relative indicators.');
+    add('note','Nitrogen peaks (modelled)','NH₄ peak: ' + fmtBand(mc.scalars.nh4pk,'mg/L',3) + ' • NO₂ peak: ' + fmtBand(mc.scalars.no2pk,'mg/L',3) + ' • NO₃ peak: ' + fmtBand(mc.scalars.no3pk,'mg/L',3) + '. These are not “test kit forecasts”, but they’re useful relative indicators.');
+
+    const nh3Mid = mc.scalars.nh3pk.mid;
+    if(nh3Mid > 0.10){
+      add('danger','NH₃ toxicity risk','Median unionized NH₃ peak is ' + fmtBand(mc.scalars.nh3pk,'mg/L',3) + '. Consider reducing inputs or buffering pH/temp.');
+    }else if(nh3Mid > 0.05){
+      add('warn','NH₃ watch zone','Median unionized NH₃ peak is ' + fmtBand(mc.scalars.nh3pk,'mg/L',3) + '. Sensitive species can react at low ppm.');
+    }else{
+      add('note','NH₃ looks low (model)','Median unionized NH₃ peak is ' + fmtBand(mc.scalars.nh3pk,'mg/L',3) + '.');
+    }
 
     return;
   }
@@ -2293,6 +2869,19 @@ function setFlags(sim, params, mc){
   if(tUnder1 > 0){
     add('danger', 'Time under 1 mg/L', `Time under 1 mg/L: ${(tUnder1*24).toFixed(1)} h (single run).`);
   }
+
+  if(nh3Peak > 0.10){
+    add('danger', 'NH₃ toxicity risk', `Unionized NH₃ peaks near ${nh3Peak.toFixed(3)} mg/L. Consider lower pH, reduced load, or more nitrification capacity.`);
+  }else if(nh3Peak > 0.05){
+    add('warn', 'NH₃ watch zone', `Unionized NH₃ peaks near ${nh3Peak.toFixed(3)} mg/L. Keep an eye on sensitive stock.`);
+  }else{
+    add('note', 'NH₃ stays low', `Unionized NH₃ peaks near ${nh3Peak.toFixed(3)} mg/L.`);
+  }
+
+  add('note', 'Nitrogen peaks (single run)', `NH₄: ${nh4Peak.toFixed(3)} mg/L • NO₂: ${no2Peak.toFixed(3)} mg/L • NO₃: ${no3Peak.toFixed(3)} mg/L.`);
+  if(denitN_mgL > 0.2){
+    add('note', 'Denitrification activity', `Estimated NO₃ → N₂ conversion: ${denitN_mgL.toFixed(2)} mg/L as N. Low-DO windows are driving denitrification.`);
+  }
 }
 
 /* =========================================================
@@ -2317,6 +2906,7 @@ function getParams(){
     volL: Number(el('volL').value),
     airFlow: Number(el('airFlow').value),
     Tnow: Number(el('Tnow').value),
+    pH: Number(el('pH').value),
     altM: Number(el('altM').value),
     tds: Number(el('tds').value),
 
@@ -2328,6 +2918,7 @@ function getParams(){
     waterSurfCm: Number(el('waterSurfCm').value),
     blanketGapCm: Number(el('blanketGapCm').value),
     diffDepthCm: Number(el('diffDepthCm').value),
+    heaters: Number(el('heaters').value),
 
     diffType: el('diffType').value,
     sotePerM: Number(el('sotePerM').value),
@@ -2346,6 +2937,26 @@ function getParams(){
 
     o2Limit: el('o2Limit').value,
     kDoNit: Number(el('kDoNit').value),
+    kDoHet: Number(el('kDoHet').value),
+    slowFrac: Number(el('slowFrac').value),
+    biofilmMm: Number(el('biofilmMm').value),
+    kDenit: Number(el('kDenit').value),
+    denitCap: Number(el('denitCap').value),
+    fishMass: Number(el('fishMass').value),
+    fishO2: Number(el('fishO2').value),
+    plantO2: Number(el('plantO2').value),
+    tempAmp: Number(el('tempAmp').value),
+    lightHour: Number(el('lightHour').value),
+    kNH4Nit: Number(el('kNH4Nit').value),
+    kNO2Nit: Number(el('kNO2Nit').value),
+    nitCap: Number(el('nitCap').value),
+    nitQ10: Number(el('nitQ10').value),
+    nUnits: el('nUnits').value,
+    chemNerd: !!el('chemNerd').checked,
+    macroRelease: Number(el('macroRelease').value),
+    microRelease: Number(el('microRelease').value),
+    macroUptake: Number(el('macroUptake').value),
+    microUptake: Number(el('microUptake').value),
 
     pelLen: Number(el('pelLen').value),
     pelDia: Number(el('pelDia').value),
@@ -2373,6 +2984,10 @@ function getParams(){
 
   // light sanitization
   p.mcRuns = clamp(Math.round(p.mcRuns || 0), 10, 5000);
+  p.pH = clamp(Number.isFinite(p.pH) ? p.pH : 7.0, 5.0, 9.5);
+  p.nitCap = clamp(Number.isFinite(p.nitCap) ? p.nitCap : 1.0, 0, 1);
+  p.denitCap = clamp(Number.isFinite(p.denitCap) ? p.denitCap : 1.0, 0, 1);
+  p.lightHour = clamp(Number.isFinite(p.lightHour) ? p.lightHour : 8, 0, 23);
   return p;
 }
 
@@ -2380,6 +2995,11 @@ function fmtBand(stats, unit, decimals=2){
   const lo = stats.lo, mid = stats.mid, hi = stats.hi;
   if(!Number.isFinite(lo) || !Number.isFinite(mid) || !Number.isFinite(hi)) return '—';
   return `${mid.toFixed(decimals)} ${unit}  [${lo.toFixed(decimals)}–${hi.toFixed(decimals)}]`;
+}
+
+function convertStats(stats, factor){
+  if(!stats) return stats;
+  return {lo: stats.lo*factor, mid: stats.mid*factor, hi: stats.hi*factor};
 }
 
 function fmtPct(p){
@@ -2390,6 +3010,7 @@ function fmtPct(p){
 function recompute(){
   clearError();
   setStage('recompute', 'start');
+  DEBUG_STATE.warnings = [];
 
   try{
     setStage('UI', 'apply presets');
@@ -2400,6 +3021,21 @@ function recompute(){
     DEBUG_STATE.lastParams = params;
     DEBUG_STATE.lastMode = params.runMode;
     DEBUG_STATE.lastUpdateISO = new Date().toISOString();
+
+    updateChemSeriesLabels(params.nUnits);
+    buildLegendChem();
+    const nh4Label = el('nh4Label');
+    const no2Label = el('no2Label');
+    const no3Label = el('no3Label');
+    if(params.nUnits === 'asIon'){
+      if(nh4Label) nh4Label.textContent = 'NH₄⁺ peak';
+      if(no2Label) no2Label.textContent = 'NO₂⁻ peak';
+      if(no3Label) no3Label.textContent = 'NO₃⁻ peak';
+    }else{
+      if(nh4Label) nh4Label.textContent = 'NH₄-N peak';
+      if(no2Label) no2Label.textContent = 'NO₂-N peak';
+      if(no3Label) no3Label.textContent = 'NO₃-N peak';
+    }
 
     assertFinite('days', params.days);
     assertFinite('volL', params.volL);
@@ -2440,6 +3076,19 @@ function recompute(){
       el('pUnder2Out').textContent = fmtPct(mc.probs.anyUnder2);
       el('pUnder1Out').textContent = fmtPct(mc.probs.anyUnder1);
 
+      const nh4Stats = params.nUnits === 'asIon' ? convertStats(mc.scalars.nh4pk, CHEM.NH4_ion_per_N) : mc.scalars.nh4pk;
+      const no2Stats = params.nUnits === 'asIon' ? convertStats(mc.scalars.no2pk, CHEM.NO2_ion_per_N) : mc.scalars.no2pk;
+      const no3Stats = params.nUnits === 'asIon' ? convertStats(mc.scalars.no3pk, CHEM.NO3_ion_per_N) : mc.scalars.no3pk;
+
+      el('nh4Out').textContent = fmtBand(nh4Stats, 'mg/L', 3);
+      el('no2Out').textContent = fmtBand(no2Stats, 'mg/L', 3);
+      el('no3Out').textContent = fmtBand(no3Stats, 'mg/L', 3);
+      el('nh3Out').textContent = fmtBand(mc.scalars.nh3pk, 'mg/L', 3);
+      el('co2Out').textContent = fmtBand(mc.scalars.co2pk, 'mg/L', 2);
+      const macroStats = mc.scalars.macroPk;
+      const microStats = mc.scalars.microPk;
+      el('nutrOut').textContent = `${fmtBand(macroStats, 'mg/L', 2)} • ${fmtBand(microStats, 'mg/L', 2)}`;
+
       // Plots with bands
       setStage('Plots', 'rate');
       rateGeom = drawPlot(el('rateCanvas'), baseSim.t, baseSim.rate, {
@@ -2456,12 +3105,17 @@ function recompute(){
         Cstar: mc.scalars.Cstar
       });
 
-      setStage('Plots', 'cumulative');
-      cumGeom = drawPlot(el('cumCanvas'), baseSim.t, baseSim.cum, {
-        title:"Oxygen CUMULATIVE (g O₂)",
-        bands:{
-          total:{lo:mc.q.cumTotal.lo, hi:mc.q.cumTotal.hi, mid:mc.q.cumTotal.mid, alpha:0.16}
-        }
+      setStage('Plots', 'chemistry');
+      const chemBands = mc.q.chemBands;
+      chemGeom = drawPlot(el('chemCanvas'), baseSim.t, baseSim.chem, {
+        title:"Chemistry / Compounds (mg/L)",
+        series: CHEM_SERIES,
+        visible: visibleChem,
+        bands: Object.fromEntries(CHEM_SERIES.map(s=>[
+          s.key,
+          {lo:chemBands[s.key].lo, hi:chemBands[s.key].hi, mid:chemBands[s.key].mid, alpha:0.12}
+        ])),
+        bandColors: Object.fromEntries(CHEM_SERIES.map(s=>[s.key, s.color]))
       });
 
       setStage('Flags', 'evaluate');
@@ -2482,6 +3136,11 @@ function recompute(){
       dbg.push(`Base OTR max: ${oxy.OTR_max.toFixed(3)} g/day`);
       dbg.push(`Base kLa inferred: ${oxy.kLa.toFixed(4)} 1/day`);
       dbg.push(`Sim dt: ${baseSim.meta.dt.toFixed(4)} days (~${(baseSim.meta.dt*24).toFixed(2)} h)`);
+      dbg.push(`Biofilm proxy: ${params.biofilmMm} mm • slowFrac ${params.slowFrac}`);
+      dbg.push(`Denit: k=${params.kDenit} 1/day • cap=${params.denitCap}`);
+      dbg.push(`Fish O2: ${params.fishMass} g @ ${params.fishO2} mg/g/day • Plant O2 peak ${params.plantO2} mg/L/day`);
+      dbg.push(`Diurnal: tempAmp ${params.tempAmp}°C • lights @ ${params.lightHour}:00`);
+      dbg.push(`N units: ${params.nUnits} • pH=${params.pH} • NH3 frac=${nh3Fraction(params.pH ?? 7.0, params.Tnow).toFixed(3)}`);
       dbg.push('');
       dbg.push('--- Snapshot ---');
       dbg.push(...buildDebugSnapshot([]));
@@ -2505,13 +3164,36 @@ function recompute(){
       el('pUnder2Out').textContent = '—';
       el('pUnder1Out').textContent = '—';
 
+      const nFactorNH4 = params.nUnits === 'asIon' ? CHEM.NH4_ion_per_N : 1;
+      const nFactorNO2 = params.nUnits === 'asIon' ? CHEM.NO2_ion_per_N : 1;
+      const nFactorNO3 = params.nUnits === 'asIon' ? CHEM.NO3_ion_per_N : 1;
+      const nh4Peak = Math.max(...baseSim.NH4_mgL) * nFactorNH4;
+      const no2Peak = Math.max(...baseSim.NO2_mgL) * nFactorNO2;
+      const no3Peak = Math.max(...baseSim.NO3_mgL) * nFactorNO3;
+      const nh3Peak = Math.max(...baseSim.NH3_mgL);
+      const co2Peak = Math.max(...baseSim.CO2_mgL);
+      const macroPeak = Math.max(...baseSim.macro_mgL);
+      const microPeak = Math.max(...baseSim.micro_mgL);
+      el('nh4Out').textContent = `${nh4Peak.toFixed(3)} mg/L`;
+      el('no2Out').textContent = `${no2Peak.toFixed(3)} mg/L`;
+      el('no3Out').textContent = `${no3Peak.toFixed(3)} mg/L`;
+      el('nh3Out').textContent = `${nh3Peak.toFixed(3)} mg/L`;
+      el('co2Out').textContent = `${co2Peak.toFixed(2)} mg/L`;
+      el('nutrOut').textContent = `${macroPeak.toFixed(2)} mg/L • ${microPeak.toFixed(2)} mg/L`;
+
       // Draw plots
       setStage('Plots', 'rate');
-      rateGeom = drawPlot(el('rateCanvas'), baseSim.t, baseSim.rate, {title:"Oxygen RATE (g O₂/day)"});
+      rateGeom = drawPlot(el('rateCanvas'), baseSim.t, baseSim.rate, {
+        title:"Oxygen RATE (g O₂/day)"
+      });
       setStage('Plots', 'dissolved oxygen');
       doGeom   = drawDOPlot(el('doCanvas'), baseSim);
-      setStage('Plots', 'cumulative');
-      cumGeom  = drawPlot(el('cumCanvas'),  baseSim.t, baseSim.cum,  {title:"Oxygen CUMULATIVE (g O₂)"});
+      setStage('Plots', 'chemistry');
+      chemGeom  = drawPlot(el('chemCanvas'),  baseSim.t, baseSim.chem,  {
+        title:"Chemistry / Compounds (mg/L)",
+        series: CHEM_SERIES,
+        visible: visibleChem
+      });
 
       // Flags
       setStage('Flags', 'evaluate');
@@ -2530,10 +3212,43 @@ function recompute(){
       dbg.push(`OTR max: ${oxy.OTR_max.toFixed(3)} g/day`);
       dbg.push(`kLa inferred: ${oxy.kLa.toFixed(4)} 1/day`);
       dbg.push(`Sim dt: ${baseSim.meta.dt.toFixed(4)} days (~${(baseSim.meta.dt*24).toFixed(2)} h)`);
+      dbg.push(`Biofilm proxy: ${params.biofilmMm} mm • slowFrac ${params.slowFrac}`);
+      dbg.push(`Denit: k=${params.kDenit} 1/day • cap=${params.denitCap}`);
+      dbg.push(`Fish O2: ${params.fishMass} g @ ${params.fishO2} mg/g/day • Plant O2 peak ${params.plantO2} mg/L/day`);
+      dbg.push(`Diurnal: tempAmp ${params.tempAmp}°C • lights @ ${params.lightHour}:00`);
+      dbg.push(`N units: ${params.nUnits} • pH=${params.pH} • NH3 frac=${nh3Fraction(params.pH ?? 7.0, params.Tnow).toFixed(3)}`);
       dbg.push('');
       dbg.push('--- Snapshot ---');
       dbg.push(...buildDebugSnapshot([]));
       setDebugText(dbg);
+    }
+
+    const auditEl = el('chemAudit');
+    const auditDetails = el('chemAuditDetails');
+    if(auditEl && auditDetails){
+      const showAudit = !!params.chemNerd;
+      auditDetails.style.display = showAudit ? 'block' : 'none';
+      auditDetails.open = showAudit;
+      if(showAudit){
+        const a = baseSim.audit;
+        const lines = [
+          `NH₄ from protein oxidation: ${(a.nh4_from_pro*1000/params.volL).toFixed(3)} mg/L as N`,
+          `NH₄ from biomass turnover: ${(a.nh4_from_endog*1000/params.volL).toFixed(3)} mg/L as N`,
+          `NH₄ → NO₂ consumed: ${(a.nh4_to_no2*1000/params.volL).toFixed(3)} mg/L as N`,
+          `NO₂ → NO₃ consumed: ${(a.no2_to_no3*1000/params.volL).toFixed(3)} mg/L as N`,
+          `NO₃ → N₂ (denit): ${(a.no3_to_n2*1000/params.volL).toFixed(3)} mg/L as N`,
+          `CO₂ from oxidation: ${(a.co2_from_ox*1000/params.volL).toFixed(2)} mg/L`,
+          `CO₂ from endogenous: ${(a.co2_from_endog*1000/params.volL).toFixed(2)} mg/L`,
+          `CO₂ from denit: ${(a.co2_from_denit*1000/params.volL).toFixed(2)} mg/L`,
+          `Macros released: ${(a.macro_release*1000/params.volL).toFixed(2)} mg/L`,
+          `Macros uptake: ${(a.macro_uptake*1000/params.volL).toFixed(2)} mg/L`,
+          `Micros released: ${(a.micro_release*1000/params.volL).toFixed(2)} mg/L`,
+          `Micros uptake: ${(a.micro_uptake*1000/params.volL).toFixed(2)} mg/L`,
+          `N balance: ${(a.n_balance_end*1000/params.volL).toFixed(3)} mg/L as N (initial ${(a.n_balance_init*1000/params.volL).toFixed(3)})`,
+          `C balance: ${(a.c_balance_end*1000/params.volL).toFixed(2)} mg/L (initial ${(a.c_balance_init*1000/params.volL).toFixed(2)})`
+        ];
+        auditEl.textContent = lines.join('\n');
+      }
     }
 
     setStage('Interactions', 'init canvases');
@@ -2674,10 +3389,12 @@ function updateModeUI(){
 }
 
 function init(){
+  installGlobalErrorHandlers();
   loadState();
   try{ applyAllPresets(); }catch(_){}
 
   updateModeUI();
+  setDebugText(buildDebugSnapshot(['Init: handlers ready, awaiting recompute.']));
 
   // Link sliders
   linkRangeAndNumber(el('pelMass'), el('pelMassN'), ()=>{ scheduleRecompute(); });
@@ -2691,10 +3408,12 @@ function init(){
 
   // Inputs that trigger recompute
   [
-    'volL','airFlow','Tnow','altM','tds','ripplePct',
-    'lenCm','widCm','tankHCm','waterSurfCm','blanketGapCm','diffDepthCm',
+    'volL','airFlow','Tnow','pH','altM','tds','ripplePct',
+    'lenCm','widCm','tankHCm','waterSurfCm','blanketGapCm','diffDepthCm','heaters',
     'sotePerM','kCalm','kRipple','tight','otrCal',
-    'doInitPct','kDoNit',
+    'doInitPct','kDoNit','kNH4Nit','kNO2Nit','nitCap','nitQ10','nUnits',
+    'kDoHet','slowFrac','biofilmMm','kDenit','denitCap','fishMass','fishO2','plantO2','tempAmp','lightHour',
+    'macroRelease','microRelease','macroUptake','microUptake','chemNerd',
     'pelLen','pelDia','pelRho',
     'diffType','surfacePreset','tightPreset','otrPreset','initDOPreset',
     'runMode','uncLevel','bandPreset','seed','liveRecompute',
@@ -2717,10 +3436,14 @@ function init(){
   // Events UI
   el('addEventBtn').addEventListener('click', ()=>{
     const day = Number(el('evDay').value);
-    const pop = Number(el('evPop').value);
-    if(!Number.isFinite(day) || !Number.isFinite(pop)) return;
-    EVENTS.push({day, pop});
-    EVENTS.sort((a,b)=>a.day-b.day);
+    const pellets = Number(el('evPellets').value);
+    const daysMax = Number(el('daysN').value);
+    if(!Number.isFinite(day) || !Number.isFinite(pellets)) return;
+    const safeDay = clamp(day, 0, Number.isFinite(daysMax) ? daysMax : day);
+    const safePel = Math.max(0, Math.round(pellets));
+    if(safePel <= 0) return;
+    EVENTS.push({day: safeDay, pellets: safePel});
+    normalizeEvents();
     saveState();
     renderEvents();
     scheduleRecompute();
@@ -2742,7 +3465,8 @@ function init(){
     });
   }
 
-  buildLegend();
+  buildLegendRate();
+  buildLegendChem();
   renderEvents();
   recompute();
 }
