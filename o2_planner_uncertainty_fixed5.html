@@ -13,23 +13,49 @@
       --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
     }
-    body{margin:0;background:linear-gradient(180deg,#070a14,#0b1020 20%,#0b1020);color:var(--text);font-family:var(--sans);}
-    header{
-      padding:20px 18px 14px; border-bottom:1px solid var(--line);
-      position:sticky; top:0; background:rgba(11,16,32,.92); backdrop-filter: blur(10px); z-index:10;
+    body{
+      margin:0;
+      background:
+        radial-gradient(1200px 600px at 15% -10%, rgba(122,162,255,.18), transparent 60%),
+        radial-gradient(900px 400px at 90% 0%, rgba(99,230,190,.12), transparent 55%),
+        linear-gradient(180deg,#070a14,#0b1020 25%,#0b1020);
+      color:var(--text);
+      font-family:var(--sans);
+      min-height:100vh;
     }
-    header h1{margin:0;font-size:18px;font-weight:700;letter-spacing:.2px}
-    header p{margin:6px 0 0;color:var(--muted);font-size:13px;max-width:1100px;line-height:1.35}
-    .wrap{max-width:1250px;margin:0 auto;padding:18px;display:grid;gap:14px;grid-template-columns: 480px 1fr;}
+    body::before{
+      content:"";
+      position:fixed;
+      inset:0;
+      pointer-events:none;
+      background-image: linear-gradient(rgba(255,255,255,.04) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px);
+      background-size: 42px 42px, 42px 42px;
+      opacity:.25;
+      z-index:0;
+    }
+    header{
+      padding:22px 20px 16px;
+      border-bottom:1px solid var(--line);
+      position:sticky;
+      top:0;
+      background:linear-gradient(180deg, rgba(11,16,32,.98), rgba(11,16,32,.88));
+      backdrop-filter: blur(12px);
+      z-index:10;
+    }
+    header h1{margin:0;font-size:20px;font-weight:700;letter-spacing:.3px}
+    header p{margin:8px 0 0;color:var(--muted);font-size:13px;max-width:1100px;line-height:1.45}
+    .wrap{max-width:1280px;margin:0 auto;padding:20px;display:grid;gap:16px;grid-template-columns: 480px 1fr;position:relative;z-index:1;}
     @media (max-width: 1100px){ .wrap{grid-template-columns:1fr;} header{position:static;} }
     .card{
-      background:linear-gradient(180deg,var(--panel),var(--panel2));
-      border:1px solid rgba(122,162,255,.14);
+      background:linear-gradient(180deg,rgba(17,26,51,.98),rgba(13,20,44,.96));
+      border:1px solid rgba(122,162,255,.16);
       border-radius:var(--radius);
       box-shadow:var(--shadow);
-      padding:14px;
+      padding:16px;
+      backdrop-filter: blur(6px);
     }
-    .card h2{margin:0 0 10px;font-size:14px;color:#dfe6ff}
+    .card h2{margin:0 0 12px;font-size:14px;color:#dfe6ff;text-transform:uppercase;letter-spacing:.12em}
     .grid2{display:grid;gap:10px;grid-template-columns:1fr 1fr;}
 
     .grid3{display:grid;gap:10px;grid-template-columns:1fr 1fr 1fr;}
@@ -42,20 +68,27 @@
       .grid3{grid-template-columns:1fr;}
       .grid4{grid-template-columns:1fr;}
     }
-    .row{display:flex;gap:10px;align-items:center}
-    .row label{flex:1;color:var(--muted);font-size:12px}
+    .row{display:flex;gap:12px;align-items:center}
+    .row label{flex:1;color:var(--muted);font-size:12px;letter-spacing:.02em}
     input[type="range"]{width:100%}
     input[type="number"], input[type="text"], select{
-      background:#0a0f22;border:1px solid rgba(122,162,255,.22);color:var(--text);
-      border-radius:10px;padding:8px 10px;font-size:13px;outline:none;
+      background:#0a1024;border:1px solid rgba(122,162,255,.26);color:var(--text);
+      border-radius:12px;padding:9px 12px;font-size:13px;outline:none;
+      transition:border-color .2s ease, box-shadow .2s ease, transform .2s ease;
     }
+    input[type="number"]:focus, input[type="text"]:focus, select:focus{
+      border-color:rgba(122,162,255,.55);
+      box-shadow:0 0 0 3px rgba(122,162,255,.18);
+      transform:translateY(-1px);
+    }
+    input[type="range"]{accent-color:var(--accent)}
     input[type="number"]{width:120px}
     select{width:100%}
     .small{font-size:12px;color:var(--muted);line-height:1.35}
     .mono{font-family:var(--mono)}
     .pill{
       display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:999px;
-      border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.04); font-size:12px;
+      border:1px solid rgba(255,255,255,.16); background:rgba(255,255,255,.05); font-size:12px;
     }
     .pill.ok{border-color:rgba(99,230,190,.35);} .pill.warn{border-color:rgba(255,207,90,.45);} .pill.danger{border-color:rgba(255,107,107,.45);}
     .flags{display:flex;flex-wrap:wrap;gap:8px}
@@ -68,24 +101,26 @@
       font-size:13px;
       cursor:pointer;
       user-select:none;
+      transition:transform .2s ease, box-shadow .2s ease, background .2s ease;
     }
-    .btn:hover{background:rgba(122,162,255,.24)}
+    .btn:hover{background:rgba(122,162,255,.26);transform:translateY(-1px);box-shadow:0 8px 18px rgba(0,0,0,.25)}
     .btn.danger{border-color:rgba(255,107,107,.55); background:rgba(255,107,107,.12)}
     .btn.danger:hover{background:rgba(255,107,107,.18)}
     .btn.ghost{background:transparent;border-color:rgba(255,255,255,.18)}
     .btn.ghost:hover{background:rgba(255,255,255,.06)}
-    details{border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:10px;background:rgba(0,0,0,.12)}
+    details{border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:12px;background:rgba(0,0,0,.16)}
     details summary{cursor:pointer;color:#dfe6ff;font-weight:600;font-size:13px}
     table{width:100%;border-collapse:collapse}
     th,td{padding:8px 6px;border-bottom:1px solid rgba(255,255,255,.08);font-size:12px;color:var(--muted)}
+    tr:nth-child(even) td{background:rgba(255,255,255,.02)}
     th{color:#dfe6ff;text-align:left;font-weight:600}
     td input[type="number"]{width:90px}
-    canvas{width:100%;height:300px;border-radius:14px;background:#070b18;border:1px solid rgba(255,255,255,.08)}
+    canvas{width:100%;height:300px;border-radius:14px;background:linear-gradient(180deg,#070b18,#070f1d);border:1px solid rgba(255,255,255,.08)}
     .charts{display:grid;gap:12px;grid-template-columns:1fr}
     .legend{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
     .leg{
       display:flex;gap:8px;align-items:center;font-size:12px;color:var(--muted);
-      padding:6px 8px;border:1px solid rgba(255,255,255,.12);border-radius:12px;background:rgba(255,255,255,.04);
+      padding:6px 10px;border:1px solid rgba(255,255,255,.12);border-radius:12px;background:rgba(255,255,255,.05);
       cursor:pointer; user-select:none;
     }
     .dot{width:10px;height:10px;border-radius:50%}
@@ -105,7 +140,7 @@
   </style>
 </head>
 <body>
-<header>
+<header class="app-header">
   <h1>O₂ Demand Planner — pellets + powder + “pop” events + DO simulation</h1>
   <p>
     This sim estimates <b>oxygen demand</b> from decomposing feed and (optionally) nitrification.
@@ -567,8 +602,10 @@ function showError(err){
   console.error(err);
 }
 function clearError(){
-  el('errBox').style.display = 'none';
-  el('errText').textContent = '';
+  const box = el('errBox');
+  const text = el('errText');
+  if(box) box.style.display = 'none';
+  if(text) text.textContent = '';
 }
 
 
