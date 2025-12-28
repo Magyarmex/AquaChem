@@ -2861,10 +2861,10 @@ function setFlags(sim, params, mc){
     if(v < 1.0) tUnder1 += sim.meta.dt;
   }
 
-  let nh4Peak = 0, no2Peak = 0, no3Peak = 0, nh3PeakValue = 0;
-  for(let i=0;i<sim.NH4_mgL.length;i++) if(sim.NH4_mgL[i] > nh4Peak) nh4Peak = sim.NH4_mgL[i];
-  for(let i=0;i<sim.NO2_mgL.length;i++) if(sim.NO2_mgL[i] > no2Peak) no2Peak = sim.NO2_mgL[i];
-  for(let i=0;i<sim.NO3_mgL.length;i++) if(sim.NO3_mgL[i] > no3Peak) no3Peak = sim.NO3_mgL[i];
+  let nh4PeakValue = 0, no2PeakValue = 0, no3PeakValue = 0, nh3PeakValue = 0;
+  for(let i=0;i<sim.NH4_mgL.length;i++) if(sim.NH4_mgL[i] > nh4PeakValue) nh4PeakValue = sim.NH4_mgL[i];
+  for(let i=0;i<sim.NO2_mgL.length;i++) if(sim.NO2_mgL[i] > no2PeakValue) no2PeakValue = sim.NO2_mgL[i];
+  for(let i=0;i<sim.NO3_mgL.length;i++) if(sim.NO3_mgL[i] > no3PeakValue) no3PeakValue = sim.NO3_mgL[i];
   for(let i=0;i<sim.NH3_mgL.length;i++) if(sim.NH3_mgL[i] > nh3PeakValue) nh3PeakValue = sim.NH3_mgL[i];
   const denitN_mgL = (sim.audit.no3_to_n2 * 1000) / params.volL;
 
@@ -3020,20 +3020,10 @@ function setFlags(sim, params, mc){
     add('note', 'NH₃ stays low', `Unionized NH₃ peaks near ${nh3PeakValue.toFixed(3)} mg/L.`);
   }
 
-  DEBUG_STATE.lastTagSummary = {
-    updated: new Date().toISOString(),
-    mode: isMC ? 'uncertainty' : 'single',
-    tags: [
-      {key:'do', value: doMin, tone: doClass.tone},
-      {key:'nh3', value: nh3Peak, tone: nh3Class.tone},
-      {key:'nh4', value: nh4Peak, tone: nh4Class.tone},
-      {key:'no2', value: no2Peak, tone: no2Class.tone},
-      {key:'no3', value: no3Peak, tone: no3Class.tone},
-      {key:'co2', value: co2Peak, tone: co2Class.tone},
-      {key:'macro', value: macroPeak, tone: macroClass.tone},
-      {key:'micro', value: microPeak, tone: microClass.tone}
-    ]
-  };
+  add('note', 'Nitrogen peaks (single run)', `NH₄: ${nh4PeakValue.toFixed(3)} mg/L • NO₂: ${no2PeakValue.toFixed(3)} mg/L • NO₃: ${no3PeakValue.toFixed(3)} mg/L.`);
+  if(denitN_mgL > 0.2){
+    add('note', 'Denitrification activity', `Estimated NO₃ → N₂ conversion: ${denitN_mgL.toFixed(2)} mg/L as N. Low-DO windows are driving denitrification.`);
+  }
 }
 
 /* =========================================================
