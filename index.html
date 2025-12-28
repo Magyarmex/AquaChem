@@ -836,6 +836,7 @@ const DEBUG_STATE = {
   lastRecomputeMs: null,
   lastFlagsCount: null,
   lastUpdateISO: null,
+  missingContainers: [],
   errors: [],  // newest last
   warnings: []
 };
@@ -935,6 +936,14 @@ lines.push(`surface=${p.lenCm}×${p.widCm} cm, blanket=${p.blanketPct}%, ripple=
     lines.push('');
     lines.push('--- Flags rendered (last) ---');
     lines.push(`Cards: ${DEBUG_STATE.lastFlagsCount}`);
+  }
+  if(DEBUG_STATE.missingContainers.length){
+    lines.push('');
+    lines.push('--- Missing containers (recent) ---');
+    const recent = DEBUG_STATE.missingContainers.slice(-3);
+    recent.forEach((m, i)=>{
+      lines.push(`#${DEBUG_STATE.missingContainers.length - recent.length + i + 1} ${m.timeISO} — ${m.id} (${m.context})`);
+    });
   }
   if(Number.isFinite(DEBUG_STATE.lastRecomputeMs)){
     lines.push('');
@@ -2473,7 +2482,18 @@ function normalizeEvents(){
 }
 
 function renderEvents(){
-  const tb = el('eventsTable').querySelector('tbody');
+  const table = el('eventsTable');
+  if(!table){
+    addWarning('Events table missing (#eventsTable). Skipping event rendering.');
+    DEBUG_STATE.missingContainers.push({timeISO: new Date().toISOString(), id:'eventsTable', context:'renderEvents'});
+    return;
+  }
+  const tb = table.querySelector('tbody');
+  if(!tb){
+    addWarning('Events table missing tbody. Skipping event rendering.');
+    DEBUG_STATE.missingContainers.push({timeISO: new Date().toISOString(), id:'eventsTable.tbody', context:'renderEvents'});
+    return;
+  }
   normalizeEvents();
   tb.innerHTML = '';
   EVENTS.forEach((e, idx)=>{
@@ -2826,24 +2846,20 @@ function initCanvasInteractions(){
    Flags + summary
 ========================================================= */
 function setFlags(sim, params, mc){
-  const flags = el('flags');
+  let flags = el('flags');
   if(!flags){
-    addWarning('Flags container missing (#flags). Skipping flag rendering.');
-    return;
+    addWarning('Flags container missing (#flags). Creating fallback container.');
+    DEBUG_STATE.missingContainers.push({timeISO: new Date().toISOString(), id:'flags', context:'setFlags'});
+    const cards = document.querySelectorAll('.wrap .card');
+    const host = cards.length ? cards[cards.length-1] : document.body;
+    flags = document.createElement('div');
+    flags.id = 'flags';
+    flags.className = 'flags';
+    flags.style.marginTop = '10px';
+    host.appendChild(flags);
   }
   flags.innerHTML = '';
   let flagCount = 0;
-
-  const kindAliases = {ok:'ok', warn:'warn', danger:'danger', note:'note', good:'ok'};
-  const good = kindAliases.good;
-  const normalizeKind = (kind)=>{
-    if(typeof kind !== 'string') return 'note';
-    const norm = kindAliases[kind] || 'note';
-    if(norm !== kind){
-      addWarning(`Unknown flag kind "${kind}" normalized to "${norm}".`);
-    }
-    return norm;
-  };
 
   const kindAliases = {ok:'ok', warn:'warn', danger:'danger', note:'note', good:'ok'};
   const good = kindAliases.good;
