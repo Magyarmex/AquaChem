@@ -1,0 +1,2717 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Aquarium O₂ Demand Planner (DO + oxygenation model)</title>
+  <style>
+    :root{
+      --bg:#0b1020; --panel:#111a33; --panel2:#0f1730; --text:#e7ecff; --muted:#a9b3d6;
+      --line:#2a3766; --accent:#7aa2ff; --warn:#ffcf5a; --danger:#ff6b6b; --ok:#63e6be;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --radius:14px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+    }
+    body{margin:0;background:linear-gradient(180deg,#070a14,#0b1020 20%,#0b1020);color:var(--text);font-family:var(--sans);}
+    header{
+      padding:20px 18px 14px; border-bottom:1px solid var(--line);
+      position:sticky; top:0; background:rgba(11,16,32,.92); backdrop-filter: blur(10px); z-index:10;
+    }
+    header h1{margin:0;font-size:18px;font-weight:700;letter-spacing:.2px}
+    header p{margin:6px 0 0;color:var(--muted);font-size:13px;max-width:1100px;line-height:1.35}
+    .wrap{max-width:1250px;margin:0 auto;padding:18px;display:grid;gap:14px;grid-template-columns: 480px 1fr;}
+    @media (max-width: 1100px){ .wrap{grid-template-columns:1fr;} header{position:static;} }
+    .card{
+      background:linear-gradient(180deg,var(--panel),var(--panel2));
+      border:1px solid rgba(122,162,255,.14);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      padding:14px;
+    }
+    .card h2{margin:0 0 10px;font-size:14px;color:#dfe6ff}
+    .grid2{display:grid;gap:10px;grid-template-columns:1fr 1fr;}
+
+    .grid3{display:grid;gap:10px;grid-template-columns:1fr 1fr 1fr;}
+    .grid4{display:grid;gap:10px;grid-template-columns:1fr 1fr 1fr 1fr;}
+    @media (max-width: 900px){
+      .grid3{grid-template-columns:1fr 1fr;}
+      .grid4{grid-template-columns:1fr 1fr;}
+    }
+    @media (max-width: 560px){
+      .grid3{grid-template-columns:1fr;}
+      .grid4{grid-template-columns:1fr;}
+    }
+    .row{display:flex;gap:10px;align-items:center}
+    .row label{flex:1;color:var(--muted);font-size:12px}
+    input[type="range"]{width:100%}
+    input[type="number"], input[type="text"], select{
+      background:#0a0f22;border:1px solid rgba(122,162,255,.22);color:var(--text);
+      border-radius:10px;padding:8px 10px;font-size:13px;outline:none;
+    }
+    input[type="number"]{width:120px}
+    select{width:100%}
+    .small{font-size:12px;color:var(--muted);line-height:1.35}
+    .mono{font-family:var(--mono)}
+    .pill{
+      display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:999px;
+      border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.04); font-size:12px;
+    }
+    .pill.ok{border-color:rgba(99,230,190,.35);} .pill.warn{border-color:rgba(255,207,90,.45);} .pill.danger{border-color:rgba(255,107,107,.45);}
+    .flags{display:flex;flex-wrap:wrap;gap:8px}
+    .btn{
+      background:rgba(122,162,255,.18);
+      border:1px solid rgba(122,162,255,.35);
+      color:var(--text);
+      border-radius:12px;
+      padding:9px 12px;
+      font-size:13px;
+      cursor:pointer;
+      user-select:none;
+    }
+    .btn:hover{background:rgba(122,162,255,.24)}
+    .btn.danger{border-color:rgba(255,107,107,.55); background:rgba(255,107,107,.12)}
+    .btn.danger:hover{background:rgba(255,107,107,.18)}
+    .btn.ghost{background:transparent;border-color:rgba(255,255,255,.18)}
+    .btn.ghost:hover{background:rgba(255,255,255,.06)}
+    details{border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:10px;background:rgba(0,0,0,.12)}
+    details summary{cursor:pointer;color:#dfe6ff;font-weight:600;font-size:13px}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:8px 6px;border-bottom:1px solid rgba(255,255,255,.08);font-size:12px;color:var(--muted)}
+    th{color:#dfe6ff;text-align:left;font-weight:600}
+    td input[type="number"]{width:90px}
+    canvas{width:100%;height:300px;border-radius:14px;background:#070b18;border:1px solid rgba(255,255,255,.08)}
+    .charts{display:grid;gap:12px;grid-template-columns:1fr}
+    .legend{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
+    .leg{
+      display:flex;gap:8px;align-items:center;font-size:12px;color:var(--muted);
+      padding:6px 8px;border:1px solid rgba(255,255,255,.12);border-radius:12px;background:rgba(255,255,255,.04);
+      cursor:pointer; user-select:none;
+    }
+    .dot{width:10px;height:10px;border-radius:50%}
+    .leg.off{opacity:.35}
+    .tooltip{
+      position:fixed; pointer-events:none; z-index:99;
+      background:rgba(17,26,51,.95); border:1px solid rgba(255,255,255,.14);
+      border-radius:12px; padding:10px 12px; box-shadow:var(--shadow);
+      font-size:12px; color:var(--text); max-width:360px; display:none;
+    }
+    .kbd{font-family:var(--mono);font-size:11px;padding:2px 6px;border:1px solid rgba(255,255,255,.16);border-radius:8px;background:rgba(255,255,255,.06);color:#dfe6ff}
+    .note{color:var(--muted);font-size:12px;line-height:1.45}
+    .footer{margin-top:8px;color:var(--muted);font-size:11px}
+    .hr{height:1px;background:rgba(255,255,255,.10);margin:10px 0}
+    .errbox{border:1px solid rgba(255,107,107,.35);background:rgba(255,107,107,.08);padding:10px;border-radius:12px;color:#ffd1d1;font-size:12px;display:none}
+    .errbox pre{margin:8px 0 0;white-space:pre-wrap;word-break:break-word;color:#ffd1d1}
+  </style>
+</head>
+<body>
+<header>
+  <h1>O₂ Demand Planner — pellets + powder + “pop” events + DO simulation</h1>
+  <p>
+    This sim estimates <b>oxygen demand</b> from decomposing feed and (optionally) nitrification.
+    It also simulates <b>dissolved oxygen (DO)</b> using an inferred oxygenation model:
+    <b>bubble transfer</b> (airflow + depth + diffuser efficiency) + <b>surface transfer</b> (ripples + blanket coverage + headspace ventilation).
+    The goal is inference: plausible numbers you can tune later with even one real-world measurement.
+  </p>
+</header>
+
+<div class="wrap">
+  <div class="card">
+    <h2>Inputs</h2>
+
+    <div class="row">
+      <label>Pellet mass added (as-fed, g)</label>
+      <input id="pelMass" type="range" min="0" max="5" step="0.01" value="1.00"/>
+      <input id="pelMassN" type="number" min="0" max="50" step="0.01" value="1.00"/>
+    </div>
+
+    <div class="row">
+      <label>Powder mass added (as-fed, g)</label>
+      <input id="powMass" type="range" min="0" max="5" step="0.01" value="0.00"/>
+      <input id="powMassN" type="number" min="0" max="50" step="0.01" value="0.00"/>
+    </div>
+
+    <div class="row">
+      <label>Blanket cover (%) — uncovered = chimney</label>
+      <input id="blanket" type="range" min="0" max="100" step="1" value="80"/>
+      <input id="blanketN" type="number" min="0" max="100" step="1" value="80"/>
+    </div>
+
+    <div class="row">
+      <label>Simulation time (days)</label>
+      <input id="days" type="range" min="7" max="180" step="1" value="30"/>
+      <input id="daysN" type="number" min="1" max="365" step="1" value="30"/>
+    </div>
+
+    <details id="uncModeDetails" open style="margin-top:10px">
+      <summary>Uncertainty Mode (Monte Carlo)</summary>
+      <div class="small" style="margin-top:10px">
+        Default mode: the sim runs many plausible “nearby realities” and shows a band (not a single pretend-precise line).
+        Without a real DO measurement, this is the honest way to use the model.
+      </div>
+
+      <div class="grid2" style="margin-top:10px">
+        <div class="row">
+          <label>Run mode</label>
+          <select id="runMode">
+            <option value="uncertainty" selected>Uncertainty (recommended)</option>
+            <option value="single">Single run (deterministic)</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>Uncertainty level</label>
+          <select id="uncLevel">
+            <option value="tight">Tight (you measured most things)</option>
+            <option value="typical" selected>Typical (some guesses)</option>
+            <option value="wide">Wide (many guesses)</option>
+          </select>
+        </div>
+
+        <div class="row">
+          <label>Monte Carlo runs</label>
+          <input id="mcRunsRange" type="range" min="50" max="800" step="10" value="200"/>
+          <input id="mcRuns" type="number" min="10" max="2000" step="10" value="200"/>
+        </div>
+
+        <div class="row">
+          <label>Band shown</label>
+          <select id="bandPreset">
+            <option value="10-90" selected>10–90% (wide)</option>
+            <option value="25-75">25–75% (mid)</option>
+            <option value="5-95">5–95% (very wide)</option>
+          </select>
+        </div>
+
+        <div class="row">
+          <label>Random seed</label>
+          <input id="seed" type="number" step="1" value="12345"/>
+        </div>
+        <div class="row">
+          <label>Live recompute</label>
+          <select id="liveRecompute">
+            <option value="on" selected>On (debounced)</option>
+            <option value="off">Off (click Recompute)</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="margin-top:10px">
+        <button class="btn" id="recomputeBtn" style="display:none">Recompute</button>
+      </div>
+
+      <div class="hr"></div>
+
+      <div class="small"><b>What varies across runs:</b></div>
+      <div class="grid2" style="margin-top:8px">
+        <div class="row"><label><input id="uAir" type="checkbox" checked> Pump delivered airflow</label></div>
+        <div class="row"><label><input id="uDiff" type="checkbox" checked> Bubble transfer efficiency</label></div>
+        <div class="row"><label><input id="uSurf" type="checkbox" checked> Surface exchange (k values)</label></div>
+        <div class="row"><label><input id="uTight" type="checkbox" checked> Blanket “tightness” / leakiness</label></div>
+        <div class="row"><label><input id="uBio" type="checkbox" checked> Biology speed (microbes, kinetics)</label></div>
+        <div class="row"><label><input id="uTemp" type="checkbox" checked> Water temperature</label></div>
+        <div class="row"><label><input id="uInitDO" type="checkbox" checked> Initial DO</label></div>
+      </div>
+
+      <div class="small" style="margin-top:8px">
+        The band is a <b>distribution</b>, not a promise. If you calibrate with real DO data later, the band shrinks and gets less “vibes, more physics”.
+      </div>
+    </details>
+
+
+
+    <div class="hr"></div>
+
+    <h2>Pop events (convert pellets → powder)</h2>
+    <div class="note">
+      Click the <span class="kbd">RATE</span> graph to add an event at that day, or use the table below.
+      Each event converts whole pellets into powder at that moment (mass is conserved).
+    </div>
+    <div style="margin-top:10px">
+      <button class="btn" id="addEventBtn">Add event</button>
+      <button class="btn ghost" id="clearEventsBtn">Clear events</button>
+    </div>
+
+    <div style="margin-top:10px; max-height:220px; overflow:auto;">
+      <table id="eventsTable">
+        <thead>
+          <tr><th>Day</th><th>Pellets to pop</th><th></th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="hr"></div>
+    <div class="errbox" id="errBox">
+      <b>Model error</b>
+      <div class="small" style="margin-top:6px">
+        If this repeats, open Dev / debug and copy the stack trace.
+      </div>
+      <pre id="errText"></pre>
+    </div>
+
+    <details style="margin-top:12px" open>
+      <summary>Advanced assumptions (oxygenation + environment)</summary>
+
+      <div class="grid2" style="margin-top:10px">
+        <div class="row">
+          <label>Tank water volume (L)</label>
+          <input id="volL" type="number" step="0.1" value="65.0"/>
+        </div>
+        <div class="row">
+          <label>Air pump delivered flow (L/min)</label>
+          <input id="airFlow" type="number" step="0.1" value="4.0"/>
+        </div>
+
+        <div class="row">
+          <label>Water temp (°C) at current blanket setting</label>
+          <input id="Tnow" type="number" step="0.1" value="22.0"/>
+        </div>
+        <div class="row">
+          <label>Altitude (m)</label>
+          <input id="altM" type="number" step="10" value="2300"/>
+        </div>
+
+        <div class="row">
+          <label>TDS (mg/L)</label>
+          <input id="tds" type="number" step="10" value="660"/>
+        </div>
+        <div class="row">
+          <label>Surface ripples (% of surface)</label>
+          <input id="ripplePct" type="number" step="1" value="50"/>
+        </div>
+
+        <div class="row">
+          <label>Tank length (cm)</label>
+          <input id="lenCm" type="number" step="0.1" value="78.0"/>
+        </div>
+        <div class="row">
+          <label>Tank width (cm)</label>
+          <input id="widCm" type="number" step="0.1" value="31.0"/>
+        </div>
+
+        <div class="row">
+          <label>Tank height (cm)</label>
+          <input id="tankHCm" type="number" step="0.1" value="48.0"/>
+        </div>
+        <div class="row">
+          <label>Water surface from bottom (cm)</label>
+          <input id="waterSurfCm" type="number" step="0.1" value="22.0"/>
+        </div>
+
+        <div class="row">
+          <label>Blanket gap above rim (cm)</label>
+          <input id="blanketGapCm" type="number" step="0.1" value="0.0"/>
+        </div>
+        <div class="row">
+          <label>Diffuser depth below surface (cm)</label>
+          <input id="diffDepthCm" type="number" step="0.1" value="17.0"/>
+        </div>
+
+        
+        <div class="row">
+          <label>Bubble transfer preset</label>
+          <select id="diffType">
+            <option value="airstone_med" selected>Typical airstones (medium bubbles)</option>
+            <option value="airstone_fine">Fine airstone (smaller bubbles)</option>
+            <option value="microbubble">Microbubble diffuser (very fine)</option>
+            <option value="wood">Wooden airstone (very fine, higher backpressure)</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+
+        <div class="row">
+          <label>Custom bubble efficiency: SOTE per meter (%)</label>
+          <input id="sotePerM" type="number" step="0.1" value="2.5"/>
+        </div>
+        <div class="small" style="margin-top:-6px; opacity:.85">
+          SOTE per meter is a <b>rough transfer efficiency</b> (how much O₂ in the air actually dissolves per meter of bubble travel).
+          If you’re unsure, use the preset — the uncertainty mode already widens results around it.
+        </div>
+
+        <div class="row" style="margin-top:10px">
+          <label>Surface exchange preset</label>
+          <select id="surfacePreset">
+            <option value="still">Still water (low exchange)</option>
+            <option value="typical" selected>Typical aquarium (some ripples)</option>
+            <option value="rippling">Strong ripples (good exchange)</option>
+            <option value="splashy">Splashy / fan / very agitated (very high)</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+
+        <div class="row">
+          <label>Surface k (calm) (m/day)</label>
+          <input id="kCalm" type="number" step="0.05" value="0.30"/>
+        </div>
+        <div class="row">
+          <label>Surface k (rippling) (m/day)</label>
+          <input id="kRipple" type="number" step="0.05" value="1.00"/>
+        </div>
+
+        <div class="row" style="margin-top:10px">
+          <label>Cover leakiness preset</label>
+          <select id="tightPreset">
+            <option value="open">No cover (open tank)</option>
+            <option value="loose_high" selected>Loose blanket (high above water)</option>
+            <option value="typical">Typical blanket (some restriction)</option>
+            <option value="near_sealed">Near-sealed lid (strong restriction)</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>Leakiness number (0 drafty → 1 sealed)</label>
+          <input id="tight" type="number" step="0.05" min="0" max="1" value="0.25"/>
+        </div>
+
+        <div class="row" style="margin-top:10px">
+          <label>Aeration performance preset</label>
+          <select id="otrPreset">
+            <option value="typical" selected>Typical (as expected)</option>
+            <option value="under">Underperforming (backpressure / leaks)</option>
+            <option value="over">Overperforming (very efficient)</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>Aeration performance factor</label>
+          <input id="otrCal" type="number" step="0.05" value="1.00"/>
+        </div>
+
+        <div class="row" style="margin-top:10px">
+          <label>Initial DO assumption</label>
+          <select id="initDOPreset">
+            <option value="100">Near saturation (100%)</option>
+            <option value="95" selected>High (95%)</option>
+            <option value="85">Moderate (85%)</option>
+            <option value="70">Low (70%)</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>Initial DO (% of local saturation)</label>
+          <input id="doInitPct" type="number" step="1" min="0" max="150" value="95"/>
+        </div>
+<div class="row">
+          <label>Enable oxygen limitation for nitrification</label>
+          <select id="o2Limit">
+            <option value="off">Off (demand not reduced when DO is low)</option>
+            <option value="on">On (nitrification slows as DO drops)</option>
+          </select>
+        </div>
+
+        <div class="row">
+          <label>Nitrifier DO half-saturation K (mg/L)</label>
+          <input id="kDoNit" type="number" step="0.05" value="0.50"/>
+        </div>
+
+        <div class="row">
+          <label>Pellet length (cm)</label>
+          <input id="pelLen" type="number" step="0.01" value="1.00" disabled title="Hardcoded: 1.00 cm"/>
+        </div>
+        <div class="row">
+          <label>Pellet diameter (cm)</label>
+          <input id="pelDia" type="number" step="0.01" value="0.20" disabled title="Hardcoded: 0.20 cm"/>
+        </div>
+        <div class="row">
+          <label>Pellet density (g/cm³)</label>
+          <input id="pelRho" type="number" step="0.01" value="0.55"/>
+        </div>
+      </div>
+
+      <div class="footer">
+        <b>How the oxygenation estimate works</b> (in plain talk):
+        <ul style="margin:6px 0 0 18px; padding:0; color:var(--muted)">
+          <li><b>Bubble side</b>: compute O₂ mass entering per day from the airflow (altitude affects pressure), then multiply by an efficiency fraction that scales with depth and diffuser type.</li>
+          <li><b>Surface side</b>: use a gas-film “speed” k (m/day) times surface area. Ripples get a higher k. Covered area gets k multiplied by a leak factor based on tightness + headspace ventilation.</li>
+          <li>Combine both into an <b>OTRmax</b> (g/day at DO≈0). Convert that into an inferred <b>kLa</b> so supply increases as DO drops: supply = kLa·(C*−DO)·V.</li>
+        </ul>
+      </div>
+    </details>
+
+  </div>
+
+  <div class="card">
+    <h2>Charts</h2>
+    <div class="charts">
+      <div>
+        <canvas id="rateCanvas" width="1200" height="360"></canvas>
+        <div class="small" style="margin-top:6px">Rate chart (g O₂/day). Click to add a “pop” event at that day.</div>
+      </div>
+      <div>
+        <canvas id="doCanvas" width="1200" height="360"></canvas>
+        <div class="small" style="margin-top:6px">Dissolved oxygen (mg/L). Dashed line is local saturation C*.</div>
+      </div>
+      <div>
+        <canvas id="cumCanvas" width="1200" height="360"></canvas>
+        <div class="small" style="margin-top:6px">Cumulative chart (g O₂). Total oxygen demanded over time.</div>
+      </div>
+    </div>
+
+    <div class="legend" id="legend"></div>
+
+    <div class="hr"></div>
+
+    <h2>Summary & flags</h2>
+    <div class="grid2">
+      <div class="small">
+        <div class="pill"><span>Pellet count (est.)</span> <b class="mono" id="pelCount">—</b></div>
+        <div class="pill" style="margin-top:8px"><span>Pellet mass each (est.)</span> <b class="mono" id="pelEach">—</b></div>
+        <div class="pill" style="margin-top:8px"><span>Surface area</span> <b class="mono" id="surfOut">—</b></div>
+        <div class="pill" style="margin-top:8px"><span>Headspace volume</span> <b class="mono" id="headOut">—</b></div>
+        <div class="pill" style="margin-top:8px"><span>Local DO saturation (C*)</span> <b class="mono" id="cStarOut">—</b></div>
+      </div>
+      <div class="small">
+        <div class="pill"><span>OTR max (bubble + surface)</span> <b class="mono" id="otrOut">—</b></div>
+        <div class="pill" style="margin-top:8px"><span>kLa inferred</span> <b class="mono" id="klaOut">—</b></div>
+        <div class="pill" style="margin-top:8px"><span>Min DO</span> <b class="mono" id="doMinOut">—</b></div>
+        <div class="pill" style="margin-top:8px"><span>P(DO &lt; 2 mg/L)</span> <b class="mono" id="pUnder2Out">—</b></div>
+        <div class="pill" style="margin-top:8px"><span>P(DO &lt; 1 mg/L)</span> <b class="mono" id="pUnder1Out">—</b></div>
+        <div class="pill" style="margin-top:8px"><span>NH₄-N / NO₂-N peaks</span> <b class="mono" id="nOut">—</b></div>
+      </div>
+    </div>
+
+    <div class="flags" id="flags" style="margin-top:10px"></div>
+
+    <div class="hr"></div>
+
+    <div class="note">
+      <b>Interpretation tip:</b> When DO is high, supply is smaller because (C*−DO) is smaller. As DO falls, the same aeration becomes more “hungry” and transfers more O₂.
+      If the DO curve still crashes, the model is saying “even when the water is starving for O₂, your demand beats your supply.”
+    </div>
+
+
+<details id="dbgDetails" style="margin-top:14px">
+  <summary>Dev / debug</summary>
+  <div class="small" style="margin-top:10px">
+    Errors and warnings also show in the browser console.
+  </div>
+  <div class="hr"></div>
+  <div class="small"><b>Last recompute diagnostics</b></div>
+  <pre id="dbg" class="mono" style="white-space:pre-wrap; word-break:break-word; color:rgba(231,236,255,.82)"></pre>
+</details>
+
+
+  </div>
+</div>
+
+<div class="tooltip" id="tip"></div>
+
+<script>
+
+/* =========================================================
+   Series registry (rate/cumulative charts)
+========================================================= */
+const SERIES = [
+  {key:"carb",  name:"Carbs → CO₂ (direct)", color:"#54a0ff"},
+  {key:"prot",  name:"Protein → CO₂ + NH₄ (direct)", color:"#ff9f43"},
+  {key:"fat",   name:"Fat → CO₂ (direct)", color:"#2ecc71"},
+  {key:"endog", name:"Endogenous respiration", color:"#ff6b6b"},
+  {key:"nh4",   name:"NH₄ → NO₂ (nitrification)", color:"#a29bfe"},
+  {key:"no2",   name:"NO₂ → NO₃ (nitrification)", color:"#c8d6e5"},
+  {key:"total", name:"TOTAL demand", color:"#ff5fd2", bold:true},
+  {key:"supply",name:"O₂ transfer into water (dynamic)", color:"#63e6be", dash:true},
+];
+
+let visible = Object.fromEntries(SERIES.map(s=>[s.key, true]));
+
+/* =========================================================
+   DOM helpers + error plumbing
+========================================================= */
+const el = id => document.getElementById(id);
+
+function ensureTooltip(){
+  // Robust: support either #tip or legacy #tooltip. Create if missing.
+  let t = el('tip') || el('tooltip');
+  if(!t){
+    t = document.createElement('div');
+    t.className = 'tooltip';
+    t.id = 'tip';
+    document.body.appendChild(t);
+  }
+  return t;
+}
+function clamp(x,a,b){ return Math.max(a, Math.min(b, x)); }
+
+function showError(err){
+  const box = el('errBox');
+  const txt = el('errText');
+  const msg = (err && err.stack) ? err.stack : String(err);
+
+  // Visible error banner
+  if(box) box.style.display = 'block';
+  if(txt) txt.textContent = msg;
+
+  // Record into debug state
+  try{
+    DEBUG_STATE.errors.push({
+      timeISO: new Date().toISOString(),
+      name: (err && err.name) ? err.name : 'Error',
+      message: (err && err.message) ? err.message : String(err),
+      stack: (err && err.stack) ? err.stack : '',
+      stage: DEBUG_STATE.stage,
+      stageExtra: DEBUG_STATE.stageExtra
+    });
+  }catch(_){}
+
+  // Populate debug panel with a snapshot + full stack
+  try{
+    const extra = [
+      'Error:',
+      msg
+    ];
+    setDebugText(buildDebugSnapshot(extra));
+    const det = el('dbgDetails');
+    if(det) det.open = true;
+  }catch(_){}
+
+  console.error(err);
+}
+function clearError(){
+  el('errBox').style.display = 'none';
+  el('errText').textContent = '';
+}
+
+
+// ---------------- Debug state (for “what just happened?”) ----------------
+const DEBUG_STATE = {
+  stage: 'init',
+  stageExtra: '',
+  lastParams: null,
+  lastOxy: null,
+  lastMode: null,
+  lastSimMeta: null,
+  lastScalars: null,
+  lastUpdateISO: null,
+  errors: []  // newest last
+};
+
+function setStage(stage, extra=null){
+  DEBUG_STATE.stage = String(stage || '');
+  DEBUG_STATE.stageExtra = extra ? String(extra) : '';
+}
+
+function setDebugText(lines){
+  const pre = el('dbg');
+  if(!pre) return;
+  pre.textContent = Array.isArray(lines) ? lines.join('\n') : String(lines ?? '');
+}
+
+function compactJSON(obj, maxLen=2200){
+  try{
+    const s = JSON.stringify(obj, (k,v)=>{
+      // avoid dumping giant arrays into the debug panel
+      if(Array.isArray(v) && v.length > 60){
+        return {__array__: true, length: v.length, head: v.slice(0, 10), tail: v.slice(-10)};
+      }
+      return v;
+    }, 2);
+    return s.length > maxLen ? (s.slice(0, maxLen) + "\n…(truncated)…") : s;
+  }catch(e){
+    return `[unserializable: ${e}]`;
+  }
+}
+
+function buildDebugSnapshot(extraLines=[]){
+  const lines = [];
+  lines.push(`Time: ${new Date().toISOString()}`);
+  lines.push(`Stage: ${DEBUG_STATE.stage}${DEBUG_STATE.stageExtra ? ' — ' + DEBUG_STATE.stageExtra : ''}`);
+  if(DEBUG_STATE.lastMode) lines.push(`Mode: ${DEBUG_STATE.lastMode}`);
+  lines.push(`devicePixelRatio: ${devicePixelRatio}`);
+  lines.push(`UserAgent: ${navigator.userAgent}`);
+  // DOM sanity
+  try{
+    const tipEl = el('tip') || el('tooltip');
+    lines.push(`TooltipEl: ${tipEl ? ('#'+tipEl.id+' .' + (tipEl.className||'')) : 'missing'}`);
+    const dbg = el('dbg');
+    lines.push(`DebugEl: ${dbg ? '#dbg OK' : 'missing'}`);
+  }catch(_){}
+  if(DEBUG_STATE.lastParams){
+    lines.push('');
+    lines.push('--- Params (last) ---');
+    const p = DEBUG_STATE.lastParams;
+    // small, human-relevant subset first
+    const dtDays = (p.dt != null) ? p.dt : (DEBUG_STATE.lastSimMeta && DEBUG_STATE.lastSimMeta.dt != null ? DEBUG_STATE.lastSimMeta.dt : null);
+    const dtHours = (dtDays != null && Number.isFinite(dtDays)) ? (dtDays*24) : NaN;
+    lines.push(`volL=${p.volL}, days=${p.days}, dtHours≈${Number.isFinite(dtHours) ? dtHours.toFixed(2) : 'n/a'}, airFlow=${p.airFlow} L/min @ alt=${p.altM} m`);
+lines.push(`surface=${p.lenCm}×${p.widCm} cm, blanket=${p.blanketPct}%, ripple=${p.ripplePct}%`);
+    lines.push(`diffuser=${p.diffType || 'n/a'}, depth=${p.diffDepthCm} cm, tight=${p.tight}`);
+    lines.push('');
+    lines.push(compactJSON(p, 1600));
+  }
+  if(DEBUG_STATE.lastOxy){
+    lines.push('');
+    lines.push('--- Oxygenation (last) ---');
+    const o = DEBUG_STATE.lastOxy;
+    try{
+      lines.push(`C*≈${(o.Cstar!=null?Number(o.Cstar).toFixed(2):(o.Cstar_mgL!=null?Number(o.Cstar_mgL).toFixed(2):'n/a'))} mg/L; OTRmax≈${(o.OTR_max!=null?Number(o.OTR_max).toFixed(3):(o.OTR_max_g_day!=null?Number(o.OTR_max_g_day).toFixed(3):'n/a'))} g/day; kLa≈${(o.kLa!=null?Number(o.kLa).toFixed(4):'n/a')} 1/day`);
+      if(o.OTR_bubble_max!=null && o.OTR_surface_max!=null){
+        lines.push(`bubble≈${Number(o.OTR_bubble_max).toFixed(3)} g/day; surface≈${Number(o.OTR_surface_max).toFixed(3)} g/day`);
+      }
+    }catch(_){}
+    lines.push(compactJSON(o, 1800));
+  }
+  if(DEBUG_STATE.lastSimMeta){
+    lines.push('');
+    lines.push('--- Sim meta (last) ---');
+    lines.push(compactJSON(DEBUG_STATE.lastSimMeta, 900));
+  }
+  if(DEBUG_STATE.lastScalars){
+    lines.push('');
+    lines.push('--- Uncertainty scalars (last) ---');
+    lines.push(compactJSON(DEBUG_STATE.lastScalars, 1200));
+  }
+  if(extraLines && extraLines.length){
+    lines.push('');
+    lines.push('--- Notes ---');
+    for(const l of extraLines) lines.push(String(l));
+  }
+  // recent errors
+  if(DEBUG_STATE.errors.length){
+    lines.push('');
+    lines.push('--- Recent errors ---');
+    const recent = DEBUG_STATE.errors.slice(-3);
+    recent.forEach((e, i)=>{
+      lines.push(`#${DEBUG_STATE.errors.length - recent.length + i + 1} ${e.timeISO} — ${e.name}: ${e.message}`);
+      if(e.stage) lines.push(`  stage: ${e.stage}${e.stageExtra ? ' — ' + e.stageExtra : ''}`);
+      if(e.stack) lines.push('  stack: ' + e.stack.split('\n').slice(0,5).join(' | '));
+    });
+  }
+  return lines;
+}
+function assertFinite(name, v){
+  if(!Number.isFinite(v)) throw new Error(`Non-finite value for ${name}: ${v}`);
+  return v;
+}
+
+function linkRangeAndNumber(rangeEl, numEl, onChange){
+  const sync = (src, dst)=>{ dst.value = src.value; onChange(); };
+  rangeEl.addEventListener("input", ()=>sync(rangeEl, numEl));
+  numEl.addEventListener("input", ()=>sync(numEl, rangeEl));
+}
+
+window.addEventListener('error', (e)=>{ try{ showError(e.error || e.message || e); }catch(_){ }});
+window.addEventListener('unhandledrejection', (e)=>{ try{ showError(e.reason || e); }catch(_){ }});
+
+/* =========================================================
+   Oxygenation / DO model (inference)
+========================================================= */
+const PHYS = {
+  R: 8.314462618,     // J/mol/K
+  O2_FRACTION: 0.2095,
+  M_O2: 31.998,       // g/mol
+  P0_kPa: 101.325
+};
+
+function pressureFromAltitude_kPa(alt_m){
+  // Standard atmosphere approximation:
+  // P = 101.325 * (1 - 2.25577e-5*h)^5.25588
+  const h = Math.max(0, alt_m);
+  const P = PHYS.P0_kPa * Math.pow(1 - 2.25577e-5*h, 5.25588);
+  return clamp(P, 30, 110);
+}
+
+function doSatSeaLevel_mgL_fresh(T_C){
+  // Common polynomial for freshwater DO saturation at 1 atm.
+  const T = T_C;
+  const sat = 14.652 - 0.41022*T + 0.007991*T*T - 0.000077774*T*T*T;
+  return Math.max(0, sat);
+}
+
+function doSat_mgL(T_C, alt_m, tds_mgL){
+  const P = pressureFromAltitude_kPa(alt_m);
+  const sat0 = doSatSeaLevel_mgL_fresh(T_C);
+
+  // Very light salinity-ish correction from TDS (ppt ~ g/L).
+  // This is intentionally conservative/rough: you can override with calibration later.
+  const sal_ppt = Math.max(0, tds_mgL/1000);
+  const salFactor = clamp(1 - 0.01*sal_ppt, 0.80, 1.0); // ~1% per ppt (rough)
+
+  const pressFactor = P / PHYS.P0_kPa;
+  return sat0 * salFactor * pressFactor;
+}
+
+function oxygenMassInPumpedAir_g_per_day(airFlow_L_min, T_C, alt_m){
+  // PV=nRT to convert airflow at ambient pressure into moles of gas, then oxygen mass.
+  const P_kPa = pressureFromAltitude_kPa(alt_m);
+  const P_Pa = P_kPa * 1000;
+  const T_K = (T_C + 273.15);
+
+  const V_m3_per_min = Math.max(0, airFlow_L_min) / 1000;
+  const n_total_per_min = (P_Pa * V_m3_per_min) / (PHYS.R * T_K);
+  const n_O2_per_min = n_total_per_min * PHYS.O2_FRACTION;
+  const g_O2_per_min = n_O2_per_min * PHYS.M_O2;
+
+  return g_O2_per_min * 1440;
+}
+
+function computeAreas(params){
+  const L = Math.max(1e-6, params.lenCm/100);
+  const W = Math.max(1e-6, params.widCm/100);
+  const A_total = L * W;
+
+  const openFrac = clamp(1 - params.blanketPct/100, 0, 1);
+  const A_open = A_total * openFrac;
+  const A_cov  = A_total - A_open;
+
+  const rippleFrac = clamp(params.ripplePct/100, 0, 1);
+  const A_ripple = A_total * rippleFrac;
+
+  // Assume ripple happens mostly where bubbles are (uncovered zone), but allow overflow.
+  const A_ripple_open = Math.min(A_ripple, A_open);
+  const A_ripple_cov  = Math.max(0, A_ripple - A_ripple_open);
+
+  const A_calm_open = Math.max(0, A_open - A_ripple_open);
+  const A_calm_cov  = Math.max(0, A_cov  - A_ripple_cov);
+
+  return {A_total, A_open, A_cov, A_ripple_open, A_ripple_cov, A_calm_open, A_calm_cov};
+}
+
+function computeHeadspace(params, areas){
+  // Headspace height = (tank height - water surface height) + extra blanket gap above rim.
+  const tankH_m = Math.max(0, params.tankHCm/100);
+  const waterSurf_m = Math.max(0, params.waterSurfCm/100);
+  const gap_m = Math.max(0, params.blanketGapCm/100);
+  const headH_m = Math.max(0, (tankH_m - waterSurf_m) + gap_m);
+
+  const V_head_m3 = areas.A_total * headH_m;
+  const V_head_L = V_head_m3 * 1000;
+
+  // How often the pump could replace the headspace volume, if air actually circulates.
+  const turnover_min = (params.airFlow > 1e-9) ? (V_head_L / params.airFlow) : Infinity;
+
+  return {headH_m, V_head_L, turnover_min};
+}
+
+function coverLeakFactor(params, head){
+  // Blanket penalty is mostly about how well the headspace exchanges with room air.
+  // Two forgiving factors:
+  //   (a) pump constantly flushing the headspace (short turnover)
+  //   (b) large headspace buffers composition drift (slower change)
+  //
+  // We fold those into an effective tightness and map it to a multiplier on surface k.
+
+  const tight = clamp(params.tight, 0, 1);
+
+  // If turnover is fast (<30 min), ventilation is strong → penalty shrinks.
+  const ventScore = Number.isFinite(head.turnover_min)
+    ? clamp(30 / Math.max(1e-6, head.turnover_min), 0, 1)
+    : 0;
+
+  // Larger headspace is more forgiving even if tight (composition changes slower).
+  const Vref = 15; // L (tunable)
+  const bufferScore = clamp(Vref / (Vref + Math.max(0, head.V_head_L)), 0, 1);
+
+  const effTight = tight * (1 - ventScore) * bufferScore;
+
+  // effTight=0 → almost no penalty
+  // effTight=1 → strong penalty (nearly sealed, small headspace, poor ventilation)
+  return (1 - effTight) * 0.90 + effTight * 0.05;
+}
+
+function oxygenationModel(params){
+  const T = params.Tnow;
+  const Cstar = doSat_mgL(T, params.altM, params.tds); // mg/L
+
+  const areas = computeAreas(params);
+  const head  = computeHeadspace(params, areas);
+
+  // Bubble transfer:
+  // O2_in_air_g_day scales with pressure (altitude) and airflow.
+  const depth_m = Math.max(0, params.diffDepthCm/100);
+  const sote_per_m = Math.max(0, params.sotePerM/100); // fraction per meter
+  const O2_in_air_g_day = oxygenMassInPumpedAir_g_per_day(params.airFlow, T, params.altM);
+
+  // Efficiency fraction over depth. Cap to avoid silly inputs.
+  const eff_bubble = clamp(sote_per_m * depth_m * Math.max(0.05, params.otrCal), 0, 0.35);
+  const OTR_bubble_max = O2_in_air_g_day * eff_bubble;
+
+  // Surface transfer:
+  // Treat k as a "film speed" (m/day). OTR_surface_max = C* (g/m^3) * k*A (m^3/day).
+  // Note: mg/L == g/m^3 numerically.
+  const kC = clamp(params.kCalm,   0, 10);
+  const kR = clamp(params.kRipple, 0, 10);
+
+  const leak = coverLeakFactor(params, head);
+
+  const kA_open = kC*areas.A_calm_open + kR*areas.A_ripple_open;
+  const kA_cov  = (kC*areas.A_calm_cov + kR*areas.A_ripple_cov) * leak;
+
+  const Cstar_g_m3 = Cstar;
+  const OTR_surface_max = Cstar_g_m3 * (kA_open + kA_cov);
+
+  // Total max transfer at DO≈0.
+  const OTR_max = OTR_bubble_max + OTR_surface_max;
+
+  // Infer kLa from OTR_max = kLa * C* * V
+  const volL = Math.max(1e-6, params.volL);
+  const kLa = (Cstar > 1e-9) ? ((OTR_max*1000) / (Cstar * volL)) : 0; // 1/day
+
+  return {
+    T, Cstar, areas, head,
+    leak, O2_in_air_g_day, eff_bubble,
+    OTR_bubble_max, OTR_surface_max, OTR_max, kLa
+  };
+}
+
+/* =========================================================
+   Demand model (mostly carried over)
+========================================================= */
+const FRACTIONS = { protein: 0.40, fat: 0.08, carb: 0.28 }; // tweak as needed
+const CHEM = {
+  // g O2 per g substrate oxidized to CO2 (approx)
+  O2_protein_C: 1.42,
+  O2_fat: 2.90,
+  O2_carb: 1.185,
+
+  // crude protein nitrogen fraction
+  gN_per_g_protein: 1/6.25,
+
+  // nitrification stoich: per g N
+  // NH4+ + 1.5 O2 -> NO2- + H2O + 2H+   (48 g O2 per 14 g N)
+  // NO2- + 0.5 O2 -> NO3-              (16 g O2 per 14 g N)
+  O2_per_gN_NH4_to_NO2: 48/14,
+  O2_per_gN_NO2_to_NO3: 16/14
+};
+
+function pelletMassEach(pelLen_cm, pelDia_cm, rho_g_cm3){
+  const r = pelDia_cm/2;
+  const vol = Math.PI * r*r * pelLen_cm; // cm^3
+  return vol * rho_g_cm3; // g
+}
+
+// crude "sinks over first few days"
+function sinkingHazard(day){
+  if(day < 1) return 0;
+  if(day >= 3) return 50;
+  return 1 / Math.max(3 - day, 0.05);
+}
+
+function runSimulation(params){
+  // dt: keep ~1200 points for smooth plots
+  const targetPts = 1200;
+  let dt = params.days/targetPts;
+  dt = clamp(dt, 1/48, 1/6); // between 0.5h and 4h
+  const n = Math.floor(params.days/dt) + 1;
+
+  const oxy = oxygenationModel(params);
+
+  // temperature factor (this is for biology only, not for physics C*)
+  const Q10 = 2.0;
+  const tempF0 = Math.pow(Q10, (oxy.T - 25.0)/10);
+  const bioMult = (Number.isFinite(params.bioMult) ? params.bioMult : 1.0);
+  const tempF = clamp(tempF0 * bioMult, 0.25, 6.0);
+
+  // Kinetics base (1/day). Pellets slower than powder.
+  const k_h_pel = {carb:0.35, prot:0.20, fat:0.08};
+  const k_ox_pel= {carb:0.65, prot:0.40, fat:0.22};
+  const Y_pel   = {carb:0.30, prot:0.42, fat:0.28};
+  const k_endog_pel = 0.12;
+  const k_nit_pel   = {nh4:0.75, no2:1.05};
+
+  const k_h_pow = {carb:1.10, prot:0.80, fat:0.35};
+  const k_ox_pow= {carb:1.60, prot:1.05, fat:0.55};
+  const Y_pow   = {carb:0.34, prot:0.46, fat:0.30};
+  const k_endog_pow = 0.18;
+  const k_nit_pow   = {nh4:1.20, no2:1.70};
+
+  const accessFloat = 1.00;
+  const accessBottom= 0.30;
+  const oxFloat = 1.00;
+  const oxBottom= 0.45;
+
+  // Pools (g as-fed broken into components)
+  let pelFloat = {
+    carb: params.pelletMass_g * FRACTIONS.carb,
+    prot: params.pelletMass_g * FRACTIONS.protein,
+    fat:  params.pelletMass_g * FRACTIONS.fat
+  };
+  let pelBot = {carb:0, prot:0, fat:0};
+  let powBot = {
+    carb: params.powderMass_g * FRACTIONS.carb,
+    prot: params.powderMass_g * FRACTIONS.protein,
+    fat:  params.powderMass_g * FRACTIONS.fat
+  };
+
+  let S = {carb:0, prot:0, fat:0}; // soluble pool (g)
+  let COD_bio = 0; // g O2-eq stored in heterotroph biomass
+  let N_bio = 0;   // g N stored in biomass
+  let NH4 = 0;     // g N
+  let NO2 = 0;     // g N
+
+  // Activity states (dimensionless 0..1)
+  let Bhet = 0.04;
+  let Bnit = 0.02;
+
+  const Ks = 0.006; // g
+  const Kn = 0.0012; // g N
+  const rHet = 2.2 * tempF;
+  const dHet = 0.12 * tempF;
+  const rNit = 1.2 * tempF;
+  const dNit = 0.08 * tempF;
+
+  // DO dynamics
+  const Cstar = oxy.Cstar;
+  let DO = clamp(Cstar * (params.doInitPct/100), 0, Cstar*1.2);
+  const kLa = oxy.kLa;
+
+  // Outputs
+  const out = {
+    t: new Array(n),
+    rate: {
+      carb:new Array(n).fill(0),
+      prot:new Array(n).fill(0),
+      fat:new Array(n).fill(0),
+      endog:new Array(n).fill(0),
+      nh4:new Array(n).fill(0),
+      no2:new Array(n).fill(0),
+      total:new Array(n).fill(0),
+      supply:new Array(n).fill(0),
+    },
+    cum: {},
+    DO_mgL: new Array(n).fill(0),
+    DO_pct: new Array(n).fill(0),
+    NH4_mgL: new Array(n).fill(0),
+    NO2_mgL: new Array(n).fill(0),
+    meta: { dt, oxy, tempF, kLa }
+  };
+
+  // Events sorted
+  const ev = [...params.events]
+    .filter(e=>Number.isFinite(e.day) && Number.isFinite(e.pellets) && e.pellets>0)
+    .sort((a,b)=>a.day-b.day);
+  let evIdx = 0;
+
+  const mEach = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
+
+  function blend(a,b,w){ return a*(1-w) + b*w; }
+
+  function pelTotalComp(){
+    return {
+      carb: pelFloat.carb + pelBot.carb,
+      prot: pelFloat.prot + pelBot.prot,
+      fat:  pelFloat.fat  + pelBot.fat
+    };
+  }
+  function removeFromPellets(compMass){
+    for(const k of ["carb","prot","fat"]){
+      let need = compMass[k];
+      const takeF = Math.min(need, pelFloat[k]);
+      pelFloat[k] -= takeF;
+      need -= takeF;
+      const takeB = Math.min(need, pelBot[k]);
+      pelBot[k] -= takeB;
+    }
+  }
+  function addToPowder(compMass){
+    for(const k of ["carb","prot","fat"]) powBot[k] += compMass[k];
+  }
+
+  function fluxPellet(Pmass, k, access){
+    // surface-limited intact pellet: ~ M^(2/3)
+    return k * Bhet * access * Math.pow(Math.max(Pmass,0), 2/3);
+  }
+  function fluxPowder(Pmass, k){
+    // distributed powder: first-order
+    return k * Bhet * Math.max(Pmass,0);
+  }
+  function capFlux(flux, mass){
+    if(mass <= 0) return 0;
+    return Math.min(flux, mass/dt);
+  }
+
+  for(let i=0;i<n;i++){
+    const day = i*dt;
+    out.t[i] = day;
+
+    // Apply pop events at this time slice
+    while(evIdx < ev.length && ev[evIdx].day <= day + dt/2){
+      const e = ev[evIdx];
+      const popMass_asfed = e.pellets * mEach;
+      const popComp = {
+        carb: popMass_asfed * FRACTIONS.carb,
+        prot: popMass_asfed * FRACTIONS.protein,
+        fat:  popMass_asfed * FRACTIONS.fat
+      };
+      const avail = pelTotalComp();
+      const availTot = avail.carb+avail.prot+avail.fat;
+      const wantTot = popComp.carb+popComp.prot+popComp.fat;
+      const scale = (availTot>0 && wantTot>0) ? Math.min(1.0, availTot/wantTot) : 0;
+      if(scale>0){
+        const capped = {carb: popComp.carb*scale, prot: popComp.prot*scale, fat: popComp.fat*scale};
+        removeFromPellets(capped);
+        addToPowder(capped);
+      }
+      evIdx++;
+    }
+
+    // Sinking
+    const hz = sinkingHazard(day);
+    for(const k of ["carb","prot","fat"]){
+      const dM = Math.min(hz * pelFloat[k] * dt, pelFloat[k]);
+      pelFloat[k] -= dM;
+      pelBot[k]   += dM;
+    }
+
+    // Blend kinetics based on how much is in powder state
+    const pelMassNow = pelFloat.carb+pelFloat.prot+pelFloat.fat + pelBot.carb+pelBot.prot+pelBot.fat;
+    const powMassNow = powBot.carb+powBot.prot+powBot.fat;
+    const wPow = (pelMassNow + powMassNow) > 0 ? (powMassNow/(pelMassNow+powMassNow)) : 0;
+
+    // Blend oxidation coefficients and yields
+    const k_ox = {
+      carb: tempF * blend(k_ox_pel.carb, k_ox_pow.carb, wPow),
+      prot: tempF * blend(k_ox_pel.prot, k_ox_pow.prot, wPow),
+      fat:  tempF * blend(k_ox_pel.fat,  k_ox_pow.fat,  wPow)
+    };
+    const Y = {
+      carb: blend(Y_pel.carb, Y_pow.carb, wPow),
+      prot: blend(Y_pel.prot, Y_pow.prot, wPow),
+      fat:  blend(Y_pel.fat,  Y_pow.fat,  wPow)
+    };
+    const k_endog = tempF * blend(k_endog_pel, k_endog_pow, wPow);
+    const k_nit_base = {
+      nh4: tempF * blend(k_nit_pel.nh4, k_nit_pow.nh4, wPow),
+      no2: tempF * blend(k_nit_pel.no2, k_nit_pow.no2, wPow)
+    };
+
+    // Optionally slow nitrification at low DO (a simple Monod term).
+    let nitO2Mult = 1.0;
+    if(params.o2Limit === "on"){
+      const K = Math.max(1e-6, params.kDoNit);
+      nitO2Mult = DO / (K + DO);
+    }
+    const k_nit = { nh4: k_nit_base.nh4 * nitO2Mult, no2: k_nit_base.no2 * nitO2Mult };
+
+    // Hydrolysis coefficients
+    const k_h_p = {
+      carb: tempF * k_h_pel.carb,
+      prot: tempF * k_h_pel.prot,
+      fat:  tempF * k_h_pel.fat
+    };
+    const k_h_w = {
+      carb: tempF * k_h_pow.carb,
+      prot: tempF * k_h_pow.prot,
+      fat:  tempF * k_h_pow.fat
+    };
+
+    // Hydrolysis fluxes per component
+    for(const k of ["carb","prot","fat"]){
+      const hf = capFlux(fluxPellet(pelFloat[k], k_h_p[k], accessFloat), pelFloat[k]);
+      const hb = capFlux(fluxPellet(pelBot[k],   k_h_p[k], accessBottom), pelBot[k]);
+      const hw = capFlux(fluxPowder(powBot[k],   k_h_w[k]), powBot[k]);
+
+      pelFloat[k] -= hf*dt;
+      pelBot[k]   -= hb*dt;
+      powBot[k]   -= hw*dt;
+
+      S[k] += (hf+hb+hw)*dt;
+    }
+
+    // Mixing penalty when hydrolysis happens mostly in bottom pellets
+    const hPelFloat = fluxPellet(pelFloat.carb,k_h_p.carb,accessFloat)+fluxPellet(pelFloat.prot,k_h_p.prot,accessFloat)+fluxPellet(pelFloat.fat,k_h_p.fat,accessFloat);
+    const hPelBot   = fluxPellet(pelBot.carb,k_h_p.carb,accessBottom)+fluxPellet(pelBot.prot,k_h_p.prot,accessBottom)+fluxPellet(pelBot.fat,k_h_p.fat,accessBottom);
+    const hPow      = fluxPowder(powBot.carb,k_h_w.carb)+fluxPowder(powBot.prot,k_h_w.prot)+fluxPowder(powBot.fat,k_h_w.fat);
+    const denom = (hPelFloat+hPelBot+hPow) + 1e-12;
+    const mixMult = (oxFloat*hPelFloat + oxBottom*hPelBot + 1.0*hPow) / denom;
+
+    // Oxidation of solubles
+    const ox = {carb:0, prot:0, fat:0};
+    for(const k of ["carb","prot","fat"]){
+      const flux = k_ox[k] * Bhet * mixMult * S[k];
+      ox[k] = Math.min(flux, S[k]/dt);
+      S[k] -= ox[k]*dt;
+    }
+
+    // Oxygen demand (rates)
+    const O2_carb = ox.carb * CHEM.O2_carb * (1 - Y.carb);
+    const O2_prot = ox.prot * CHEM.O2_protein_C * (1 - Y.prot);
+    const O2_fat  = ox.fat  * CHEM.O2_fat * (1 - Y.fat);
+
+    // Biomass storage and endogenous respiration
+    const COD_store = ox.carb*CHEM.O2_carb*Y.carb + ox.prot*CHEM.O2_protein_C*Y.prot + ox.fat*CHEM.O2_fat*Y.fat;
+    const N_store   = ox.prot * CHEM.gN_per_g_protein * Y.prot;
+    const NH4_prod  = ox.prot * CHEM.gN_per_g_protein * (1 - Y.prot);
+
+    const endog = Math.min(k_endog * COD_bio, COD_bio/dt);
+    const O2_endog = endog;
+    const N_rel = (COD_bio > 1e-12) ? (N_bio / COD_bio) * endog : 0;
+
+    COD_bio = COD_bio + COD_store*dt - endog*dt;
+    N_bio   = N_bio   + N_store*dt   - N_rel*dt;
+
+    // Nitrification (sequential)
+    NH4 = NH4 + (NH4_prod + N_rel)*dt;
+
+    const r1 = Math.min(Bnit * k_nit.nh4 * NH4, NH4/dt); // g N/day
+    NH4 = NH4 - r1*dt;
+    NO2 = NO2 + r1*dt;
+
+    const r2 = Math.min(Bnit * k_nit.no2 * NO2, NO2/dt);
+    NO2 = NO2 - r2*dt;
+
+    const O2_nh4 = r1 * CHEM.O2_per_gN_NH4_to_NO2;
+    const O2_no2 = r2 * CHEM.O2_per_gN_NO2_to_NO3;
+
+    const demand = O2_carb + O2_prot + O2_fat + O2_endog + O2_nh4 + O2_no2;
+
+    // DO dynamics (Euler)
+    // supply_g_day = kLa*(C* - DO)*V
+    const supply_g_day = (kLa * Math.max(0, (Cstar - DO)) * params.volL) / 1000;
+    const dDO = ((supply_g_day - demand) * 1000 / params.volL) * dt; // mg/L
+    DO = clamp(DO + dDO, 0, Cstar*1.2);
+
+    // Record outputs
+    out.rate.carb[i]  = O2_carb;
+    out.rate.prot[i]  = O2_prot;
+    out.rate.fat[i]   = O2_fat;
+    out.rate.endog[i] = O2_endog;
+    out.rate.nh4[i]   = O2_nh4;
+    out.rate.no2[i]   = O2_no2;
+    out.rate.total[i] = demand;
+    out.rate.supply[i]= supply_g_day;
+
+    out.DO_mgL[i] = DO;
+    out.DO_pct[i] = (Cstar>1e-9) ? (100*DO/Cstar) : 0;
+
+    out.NH4_mgL[i] = (NH4*1000)/params.volL;
+    out.NO2_mgL[i] = (NO2*1000)/params.volL;
+
+    // Update activity states
+    const S_tot = S.carb + S.prot + S.fat;
+    const fS = S_tot / (Ks + S_tot);
+    const fN = NH4 / (Kn + NH4);
+
+    Bhet = clamp(Bhet + (rHet*fS*(1-Bhet) - dHet*Bhet)*dt, 0.0, 1.0);
+    Bnit = clamp(Bnit + (rNit*fN*(1-Bnit) - dNit*Bnit)*dt, 0.0, 1.0);
+  }
+
+  // cumulative arrays
+  out.cum = {};
+  for(const k of Object.keys(out.rate)){
+    const arr = out.rate[k];
+    const cum = new Array(n).fill(0);
+    let s = 0;
+    for(let i=0;i<n;i++){ s += arr[i]*dt; cum[i] = s; }
+    out.cum[k] = cum;
+  }
+
+  return out;
+}
+/* =========================================================
+   Uncertainty mode (Monte Carlo)
+========================================================= */
+
+// Small PRNG so “seed” is reproducible across browsers.
+function mulberry32(seed){
+  let a = seed >>> 0;
+  return function(){
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function randn(rng){
+  // Box–Muller
+  let u = 0, v = 0;
+  while(u === 0) u = rng();
+  while(v === 0) v = rng();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
+function sampleLogNormalMean1(rng, cv){
+  // lognormal with mean=1 and desired coefficient of variation
+  const sigma = Math.sqrt(Math.log(1 + cv*cv));
+  const mu = -0.5 * sigma * sigma;
+  return Math.exp(mu + sigma * randn(rng));
+}
+
+function bandToQuantiles(bandPreset){
+  if(bandPreset === '25-75') return {qLo:0.25, qHi:0.75};
+  if(bandPreset === '5-95')  return {qLo:0.05, qHi:0.95};
+  return {qLo:0.10, qHi:0.90}; // default 10–90
+}
+
+function profileForLevel(level){
+  // These are “priors”: intentionally conservative. With calibration, shrink these.
+  if(level === 'tight'){
+    return {cvFlow:0.07, cvSote:0.12, cvSurf:0.18, cvBio:0.18, sdTemp:0.35, sdTight:0.10, cvInit:0.06};
+  }
+  if(level === 'wide'){
+    return {cvFlow:0.25, cvSote:0.55, cvSurf:0.70, cvBio:0.70, sdTemp:1.20, sdTight:0.35, cvInit:0.18};
+  }
+  return {cvFlow:0.14, cvSote:0.30, cvSurf:0.35, cvBio:0.35, sdTemp:0.70, sdTight:0.20, cvInit:0.10}; // typical
+}
+
+function meanDeliveryFactor(diffType){
+  // Rated pump flow is often higher than delivered flow once you add depth + diffuser backpressure.
+  // This is a gentle, realism-biased default. Uncertainty adds noise around it.
+  if(diffType === 'wood') return 0.65;
+  if(diffType === 'microbubble') return 0.70;
+  if(diffType === 'airstone_fine') return 0.80;
+  return 0.90; // airstone_med or custom
+}
+
+function quantileFromSorted(sorted, q){
+  if(sorted.length === 0) return NaN;
+  const x = q * (sorted.length - 1);
+  const i0 = Math.floor(x);
+  const i1 = Math.min(sorted.length - 1, i0 + 1);
+  const t = x - i0;
+  return sorted[i0] * (1 - t) + sorted[i1] * t;
+}
+
+function scalarStats(values, qLo, qHi){
+  const arr = values.slice().sort((a,b)=>a-b);
+  return {
+    lo: quantileFromSorted(arr, qLo),
+    mid: quantileFromSorted(arr, 0.5),
+    hi: quantileFromSorted(arr, qHi)
+  };
+}
+
+function runMonteCarlo(baseParams){
+  const runs = clamp(Math.round(baseParams.mcRuns || 0), 10, 5000);
+  const {qLo, qHi} = bandToQuantiles(baseParams.bandPreset);
+  const prof = profileForLevel(baseParams.uncLevel);
+  const rng = mulberry32((Number.isFinite(baseParams.seed) ? baseParams.seed : 12345) | 0);
+
+  // Keep time grid consistent for all runs by using base dt (as implemented inside runSimulation).
+  // (runSimulation derives dt only from days.)
+  const baseSim = runSimulation(baseParams);
+  const n = baseSim.t.length;
+
+  // Store per-run arrays we care about
+  const DO_runs = new Array(runs);
+  const tot_runs = new Array(runs);
+  const sup_runs = new Array(runs);
+  const cum_runs = new Array(runs);
+
+  // Per-run scalars
+  const minDO = new Array(runs);
+  const minDO_day = new Array(runs);
+  const under2 = new Array(runs);
+  const under1 = new Array(runs);
+  const deficitArea = new Array(runs);
+  const nh4pk = new Array(runs);
+  const no2pk = new Array(runs);
+  const otrMax = new Array(runs);
+  const kLa = new Array(runs);
+  const Cstar = new Array(runs);
+  const effFlow = new Array(runs);
+
+  for(let r=0;r<runs;r++){
+    const p = JSON.parse(JSON.stringify(baseParams)); // cheap clone; fine at these sizes
+
+    // Sample uncertainties around the base choices
+    if(baseParams.u && baseParams.u.temp){
+      p.Tnow = p.Tnow + randn(rng) * prof.sdTemp;
+    }
+
+    if(baseParams.u && baseParams.u.initDO){
+      p.doInitPct = clamp(p.doInitPct * sampleLogNormalMean1(rng, prof.cvInit), 10, 150);
+    }
+
+    if(baseParams.u && baseParams.u.tight){
+      p.tight = clamp(p.tight + randn(rng) * prof.sdTight, 0, 1);
+    }
+
+    // Delivered flow: treat user-entered flow as “rated-ish”, then sample delivery factor.
+    if(baseParams.u && baseParams.u.air){
+      const mean = meanDeliveryFactor(p.diffType);
+      const mult = sampleLogNormalMean1(rng, prof.cvFlow);
+      p.airFlow = clamp(p.airFlow * mean * mult, 0.05, 50);
+      effFlow[r] = p.airFlow;
+    }else{
+      effFlow[r] = p.airFlow;
+    }
+
+    if(baseParams.u && baseParams.u.diff){
+      p.sotePerM = clamp(p.sotePerM * sampleLogNormalMean1(rng, prof.cvSote), 0.1, 25);
+    }
+
+    if(baseParams.u && baseParams.u.surf){
+      const m = sampleLogNormalMean1(rng, prof.cvSurf);
+      const m2 = sampleLogNormalMean1(rng, prof.cvSurf * 0.35);
+      p.kCalm = clamp(p.kCalm * m, 0.01, 6.0);
+      p.kRipple = clamp(p.kRipple * m * m2, 0.01, 10.0);
+    }
+
+    if(baseParams.u && baseParams.u.bio){
+      p.bioMult = clamp(sampleLogNormalMean1(rng, prof.cvBio), 0.1, 6.0);
+    }else{
+      p.bioMult = 1.0;
+    }
+
+    const sim = runSimulation(p);
+    DO_runs[r]  = sim.DO_mgL;
+    tot_runs[r] = sim.rate.total;
+    sup_runs[r] = sim.rate.supply;
+    cum_runs[r] = sim.cum.total;
+
+    // scalars
+    let dmin = Infinity, dminDay = 0;
+    let tU2 = 0, tU1 = 0;
+    let defA = 0;
+    for(let i=0;i<n;i++){
+      const d = sim.DO_mgL[i];
+      if(d < dmin){ dmin = d; dminDay = sim.t[i]; }
+      if(d < 2.0) tU2 += sim.meta.dt;
+      if(d < 1.0) tU1 += sim.meta.dt;
+      const def = sim.rate.total[i] - sim.rate.supply[i];
+      if(def > 0) defA += def * sim.meta.dt; // g/day * day = g
+    }
+    minDO[r] = dmin;
+    minDO_day[r] = dminDay;
+    under2[r] = tU2;
+    under1[r] = tU1;
+    deficitArea[r] = defA;
+
+    let nh = 0, n2 = 0;
+    for(let i=0;i<sim.NH4_mgL.length;i++) if(sim.NH4_mgL[i] > nh) nh = sim.NH4_mgL[i];
+    for(let i=0;i<sim.NO2_mgL.length;i++) if(sim.NO2_mgL[i] > n2) n2 = sim.NO2_mgL[i];
+    nh4pk[r] = nh;
+    no2pk[r] = n2;
+
+    otrMax[r] = sim.meta.oxy.OTR_max;
+    kLa[r] = sim.meta.oxy.kLa;
+    Cstar[r] = sim.meta.oxy.Cstar;
+  }
+
+  // Quantile arrays (time series)
+  const qDO = {lo:new Float32Array(n), mid:new Float32Array(n), hi:new Float32Array(n)};
+  const qTot= {lo:new Float32Array(n), mid:new Float32Array(n), hi:new Float32Array(n)};
+  const qSup= {lo:new Float32Array(n), mid:new Float32Array(n), hi:new Float32Array(n)};
+  const qCum= {lo:new Float32Array(n), mid:new Float32Array(n), hi:new Float32Array(n)};
+
+  const tmp = new Array(runs);
+
+  function fillQ(srcRuns, out){
+    for(let i=0;i<n;i++){
+      for(let r=0;r<runs;r++) tmp[r] = srcRuns[r][i];
+      tmp.sort((a,b)=>a-b);
+      out.lo[i]  = quantileFromSorted(tmp, qLo);
+      out.mid[i] = quantileFromSorted(tmp, 0.5);
+      out.hi[i]  = quantileFromSorted(tmp, qHi);
+    }
+  }
+
+  fillQ(DO_runs, qDO);
+  fillQ(tot_runs, qTot);
+  fillQ(sup_runs, qSup);
+  fillQ(cum_runs, qCum);
+
+  // Scalar bands
+  const sMinDO = scalarStats(minDO, qLo, qHi);
+  const sMinDODay = scalarStats(minDO_day, qLo, qHi);
+  const sDefA  = scalarStats(deficitArea, qLo, qHi);
+  const sNH4   = scalarStats(nh4pk, qLo, qHi);
+  const sNO2   = scalarStats(no2pk, qLo, qHi);
+  const sOTR   = scalarStats(otrMax, qLo, qHi);
+  const sKLA   = scalarStats(kLa, qLo, qHi);
+  const sCstar = scalarStats(Cstar, qLo, qHi);
+
+  // Probabilities (based on min DO)
+  let pU2 = 0, pU1 = 0;
+  for(let r=0;r<runs;r++){
+    if(minDO[r] < 2.0) pU2++;
+    if(minDO[r] < 1.0) pU1++;
+  }
+  pU2 /= runs; pU1 /= runs;
+
+  return {
+    baseSim,
+    q: {DO:qDO, rateTotal:qTot, rateSupply:qSup, cumTotal:qCum},
+    scalars: {
+      minDO:sMinDO,
+      minDO_day:sMinDODay,
+      deficitArea:sDefA,
+      nh4pk:sNH4,
+      no2pk:sNO2,
+      otrMax:sOTR,
+      kLa:sKLA,
+      Cstar:sCstar,
+      runs
+    },
+    probs: {anyUnder2:pU2, anyUnder1:pU1}
+  };
+}
+
+
+/* =========================================================
+   Plotting (canvas)
+========================================================= */
+
+
+// ---- Chart scaling helpers (avoid “mystery math”, just readable axes) ----
+// niceTop(yMax): round the plot ceiling to 1/2/5 * 10^n
+function niceTop(max){
+  max = Math.max(0, max);
+  if(max === 0) return 1;
+  const p = Math.pow(10, Math.floor(Math.log10(max)));
+  const n = max / p;
+  let top;
+  if(n <= 1) top = 1;
+  else if(n <= 2) top = 2;
+  else if(n <= 5) top = 5;
+  else top = 10;
+  return top * p;
+}
+// niceStep(yTop): choose a “pleasant” grid step for ~4–6 lines
+function niceStep(top){
+  top = Math.max(0, top);
+  if(top === 0) return 1;
+  const raw = top / 5;
+  const p = Math.pow(10, Math.floor(Math.log10(raw)));
+  const n = raw / p;
+  let step;
+  if(n < 1.5) step = 1 * p;
+  else if(n < 3) step = 2 * p;
+  else if(n < 7) step = 5 * p;
+  else step = 10 * p;
+  return step;
+}
+
+// niceXStep(xMax): choose a pleasant x-grid step (days) for ~5–7 vertical lines.
+function niceXStep(xMax){
+  xMax = Math.max(1e-9, xMax);
+  const targetLines = 6;
+  const raw = xMax / targetLines;
+  const p = Math.pow(10, Math.floor(Math.log10(raw)));
+  const n = raw / p;
+  let step;
+  if(n < 1.5) step = 1 * p;
+  else if(n < 3) step = 2 * p;
+  else if(n < 7) step = 5 * p;
+  else step = 10 * p;
+  // Avoid “0” step and keep labels sensible for short runs
+  if(step <= 0) step = xMax;
+  // If the run is very short, allow half-day ticks
+  if(xMax <= 5 && step > 1) step = 1;
+  if(xMax <= 2 && step > 0.5) step = 0.5;
+  return step;
+}
+
+function drawPlot(canvas, tArr, seriesDict, opts={}){
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width = canvas.clientWidth * devicePixelRatio;
+  const h = canvas.height = canvas.clientHeight * devicePixelRatio;
+  ctx.clearRect(0,0,w,h);
+
+  const m = {l:56*devicePixelRatio, r:16*devicePixelRatio, t:30*devicePixelRatio, b:34*devicePixelRatio};
+  const pw = w - m.l - m.r;
+  const ph = h - m.t - m.b;
+
+  const xMax = tArr[tArr.length-1] || 1;
+
+  // y max from visible series + optional bands
+  let yMax = 0;
+  for(const s of SERIES){
+    if(!visible[s.key]) continue;
+    const arr = seriesDict[s.key];
+    if(arr) for(const v of arr) if(v>yMax) yMax=v;
+  }
+  if(opts.bands){
+    for(const key of Object.keys(opts.bands)){
+      if(visible[key] === false) continue;
+      const b = opts.bands[key];
+      if(b && b.hi){
+        for(let i=0;i<b.hi.length;i++){
+          const v = b.hi[i];
+          if(v>yMax) yMax=v;
+        }
+      }
+    }
+  }
+  yMax = Math.max(0.0001, yMax);
+  const yTop = niceTop(yMax);
+  const yStep = niceStep(yTop);
+
+  // frame
+  ctx.strokeStyle = 'rgba(231,236,255,0.18)';
+  ctx.lineWidth = 1*devicePixelRatio;
+  ctx.strokeRect(m.l, m.t, pw, ph);
+
+  // grid
+  ctx.strokeStyle = 'rgba(231,236,255,0.06)';
+  ctx.lineWidth = 1*devicePixelRatio;
+  for(let y=0;y<=yTop+1e-12;y+=yStep){
+    const py = m.t + ph - (y/yTop)*ph;
+    ctx.beginPath();
+    ctx.moveTo(m.l, py);
+    ctx.lineTo(m.l+pw, py);
+    ctx.stroke();
+  }
+  const xStep = niceXStep(xMax);
+  for(let x=0;x<=xMax+1e-9;x+=xStep){
+    const px = m.l + (x/xMax)*pw;
+    ctx.beginPath();
+    ctx.moveTo(px, m.t);
+    ctx.lineTo(px, m.t+ph);
+    ctx.stroke();
+  }
+
+  // axis labels
+  ctx.fillStyle = 'rgba(231,236,255,0.75)';
+  ctx.font = `12px ${getComputedStyle(document.documentElement).getPropertyValue('--mono')}`;
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  for(let y=0;y<=yTop+1e-12;y+=yStep){
+    const py = m.t + ph - (y/yTop)*ph;
+    const txt = (yTop >= 1) ? y.toFixed(2) : y.toExponential(2);
+    ctx.fillText(txt, m.l-8, py);
+  }
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  for(let x=0;x<=xMax+1e-9;x+=xStep){
+    const px = m.l + (x/xMax)*pw;
+    ctx.fillStyle = 'rgba(231,236,255,0.70)';
+    const xLbl = (xStep < 1) ? x.toFixed(1) : String(Math.round(x));
+
+        ctx.fillText(xLbl, px, m.t+ph+10);
+  }
+
+  // title
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillStyle = 'rgba(231,236,255,0.9)';
+  ctx.font = `13px ${getComputedStyle(document.documentElement).getPropertyValue('--sans')}`;
+  ctx.fillText(opts.title || '', m.l, 10);
+
+  // helper: band fill
+  const drawBand = (lo, hi, alpha, color)=>{
+    if(!lo || !hi) return;
+    ctx.save();
+    ctx.globalAlpha = alpha ?? 0.15;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    // upper
+    for(let i=0;i<tArr.length;i++){
+      const x = m.l + (tArr[i]/xMax)*pw;
+      const y = m.t + ph - (hi[i]/yTop)*ph;
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    // lower (reverse)
+    for(let i=tArr.length-1;i>=0;i--){
+      const x = m.l + (tArr[i]/xMax)*pw;
+      const y = m.t + ph - (lo[i]/yTop)*ph;
+      ctx.lineTo(x,y);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  };
+
+  // draw bands first (so lines sit on top)
+  if(opts.bands){
+    for(const [key,b] of Object.entries(opts.bands)){
+      if(visible[key] === false) continue;
+      let color = 'rgba(255,140,171,1)'; // demand-ish
+      if(key === 'supply') color = 'rgba(97,230,180,1)';
+      if(key === 'total')  color = 'rgba(255,140,171,1)';
+      drawBand(b.lo, b.hi, b.alpha ?? 0.14, color);
+    }
+  }
+
+  // series (base lines)
+  for(const s of SERIES){
+    if(!visible[s.key]) continue;
+    const arr = seriesDict[s.key];
+    if(!arr) continue;
+
+    // If we have uncertainty bands for this series, draw base line more subtly to avoid clutter
+    const hasBand = opts.bands && opts.bands[s.key] && opts.bands[s.key].mid;
+    if(hasBand){
+      ctx.save();
+      ctx.globalAlpha = 0.35;
+      ctx.setLineDash([3*devicePixelRatio, 3*devicePixelRatio]);
+    }else{
+      ctx.setLineDash([]);
+    }
+
+    ctx.lineWidth = (s.bold ? 2.6 : 1) * devicePixelRatio;
+    ctx.strokeStyle = s.color;
+    ctx.beginPath();
+    for(let i=0;i<tArr.length;i++){
+      const x = m.l + (tArr[i]/xMax)*pw;
+      const y = m.t + ph - (arr[i]/yTop)*ph;
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // median lines from bands (draw on top)
+  if(opts.bands){
+    for(const [key,b] of Object.entries(opts.bands)){
+      if(visible[key] === false) continue;
+      if(!b.mid) continue;
+      let color = 'rgba(255,140,171,1)';
+      if(key === 'supply') color = 'rgba(97,230,180,1)';
+      if(key === 'total')  color = 'rgba(255,140,171,1)';
+      ctx.save();
+      ctx.lineWidth = 2.2 * devicePixelRatio;
+      ctx.strokeStyle = color;
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      for(let i=0;i<tArr.length;i++){
+        const x = m.l + (tArr[i]/xMax)*pw;
+        const y = m.t + ph - (b.mid[i]/yTop)*ph;
+        if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  return {m, pw, ph, xMax, yTop, tArr, seriesDict, opts};
+}
+
+function drawDOPlot(canvas, sim, overlay=null){
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width = canvas.clientWidth * devicePixelRatio;
+  const h = canvas.height = canvas.clientHeight * devicePixelRatio;
+  ctx.clearRect(0,0,w,h);
+
+  const m = {l:56*devicePixelRatio, r:16*devicePixelRatio, t:30*devicePixelRatio, b:34*devicePixelRatio};
+  const pw = w - m.l - m.r;
+  const ph = h - m.t - m.b;
+
+  const tArr = sim.t;
+  const xMax = tArr[tArr.length-1] || 1;
+
+  let yMax = sim.meta.oxy.Cstar * 1.1;
+  for(const v of sim.DO_mgL) if(v>yMax) yMax=v;
+  if(overlay && overlay.DO && overlay.DO.hi){
+    for(let i=0;i<overlay.DO.hi.length;i++) if(overlay.DO.hi[i] > yMax) yMax = overlay.DO.hi[i];
+  }
+  if(overlay && overlay.Cstar && Number.isFinite(overlay.Cstar.hi)){
+    yMax = Math.max(yMax, overlay.Cstar.hi * 1.1);
+  }
+  yMax = Math.max(0.1, yMax);
+  const yTop = niceTop(yMax);
+  const yStep = niceStep(yTop);
+
+  // frame
+  ctx.strokeStyle = 'rgba(231,236,255,0.18)';
+  ctx.lineWidth = 1*devicePixelRatio;
+  ctx.strokeRect(m.l, m.t, pw, ph);
+
+  // grid
+  ctx.strokeStyle = 'rgba(231,236,255,0.06)';
+  ctx.lineWidth = 1*devicePixelRatio;
+  for(let y=0;y<=yTop+1e-12;y+=yStep){
+    const py = m.t + ph - (y/yTop)*ph;
+    ctx.beginPath();
+    ctx.moveTo(m.l, py);
+    ctx.lineTo(m.l+pw, py);
+    ctx.stroke();
+  }
+  const xStep = niceXStep(xMax);
+  for(let x=0;x<=xMax+1e-9;x+=xStep){
+    const px = m.l + (x/xMax)*pw;
+    ctx.beginPath();
+    ctx.moveTo(px, m.t);
+    ctx.lineTo(px, m.t+ph);
+    ctx.stroke();
+  }
+
+  // y labels
+  ctx.fillStyle = 'rgba(231,236,255,0.75)';
+  ctx.font = `12px ${getComputedStyle(document.documentElement).getPropertyValue('--mono')}`;
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  for(let y=0;y<=yTop+1e-12;y+=yStep){
+    const py = m.t + ph - (y/yTop)*ph;
+    ctx.fillText(y.toFixed(1), m.l-8, py);
+  }
+  // x labels
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  for(let x=0;x<=xMax+1e-9;x+=xStep){
+    const px = m.l + (x/xMax)*pw;
+    ctx.fillStyle = 'rgba(231,236,255,0.70)';
+    const xLbl = (xStep < 1) ? x.toFixed(1) : String(Math.round(x));
+
+        ctx.fillText(xLbl, px, m.t+ph+10);
+  }
+
+  // title
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillStyle = 'rgba(231,236,255,0.9)';
+  ctx.font = `13px ${getComputedStyle(document.documentElement).getPropertyValue('--sans')}`;
+  ctx.fillText('Dissolved Oxygen (mg/L)', m.l, 10);
+
+  // C* band + line
+  const drawHBand = (yLo, yHi, alpha)=>{
+    const py1 = m.t + ph - (yHi/yTop)*ph;
+    const py2 = m.t + ph - (yLo/yTop)*ph;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = 'rgba(231,236,255,1)';
+    ctx.fillRect(m.l, py1, pw, py2-py1);
+    ctx.restore();
+  };
+
+  if(overlay && overlay.Cstar && Number.isFinite(overlay.Cstar.lo)){
+    drawHBand(overlay.Cstar.lo, overlay.Cstar.hi, 0.07);
+    const yMed = overlay.Cstar.mid;
+    const py = m.t + ph - (yMed/yTop)*ph;
+    ctx.save();
+    ctx.setLineDash([6*devicePixelRatio, 6*devicePixelRatio]);
+    ctx.strokeStyle = 'rgba(231,236,255,0.75)';
+    ctx.lineWidth = 2*devicePixelRatio;
+    ctx.beginPath();
+    ctx.moveTo(m.l, py);
+    ctx.lineTo(m.l+pw, py);
+    ctx.stroke();
+    ctx.restore();
+  }else{
+    const y = sim.meta.oxy.Cstar;
+    const py = m.t + ph - (y/yTop)*ph;
+    ctx.save();
+    ctx.setLineDash([6*devicePixelRatio, 6*devicePixelRatio]);
+    ctx.strokeStyle = 'rgba(231,236,255,0.65)';
+    ctx.lineWidth = 2*devicePixelRatio;
+    ctx.beginPath();
+    ctx.moveTo(m.l, py);
+    ctx.lineTo(m.l+pw, py);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // DO band
+  if(overlay && overlay.DO && overlay.DO.lo && overlay.DO.hi){
+    ctx.save();
+    ctx.globalAlpha = overlay.DO.alpha ?? 0.16;
+    ctx.fillStyle = 'rgba(118,178,255,1)';
+    ctx.beginPath();
+    for(let i=0;i<tArr.length;i++){
+      const x = m.l + (tArr[i]/xMax)*pw;
+      const y = m.t + ph - (overlay.DO.hi[i]/yTop)*ph;
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    for(let i=tArr.length-1;i>=0;i--){
+      const x = m.l + (tArr[i]/xMax)*pw;
+      const y = m.t + ph - (overlay.DO.lo[i]/yTop)*ph;
+      ctx.lineTo(x,y);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // base DO (subtle if band exists)
+  ctx.save();
+  ctx.lineWidth = 2.4*devicePixelRatio;
+  ctx.strokeStyle = 'rgba(118,178,255,1)';
+  if(overlay && overlay.DO && overlay.DO.mid){
+    ctx.globalAlpha = 0.30;
+    ctx.setLineDash([3*devicePixelRatio, 3*devicePixelRatio]);
+  }else{
+    ctx.setLineDash([]);
+  }
+  ctx.beginPath();
+  for(let i=0;i<tArr.length;i++){
+    const x = m.l + (tArr[i]/xMax)*pw;
+    const y = m.t + ph - (sim.DO_mgL[i]/yTop)*ph;
+    if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+  ctx.restore();
+
+  // median DO line
+  if(overlay && overlay.DO && overlay.DO.mid){
+    ctx.save();
+    ctx.lineWidth = 2.8*devicePixelRatio;
+    ctx.strokeStyle = 'rgba(118,178,255,1)';
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    for(let i=0;i<tArr.length;i++){
+      const x = m.l + (tArr[i]/xMax)*pw;
+      const y = m.t + ph - (overlay.DO.mid[i]/yTop)*ph;
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  return {m, pw, ph, xMax, yTop, tArr, sim, overlay};
+}
+
+/* =========================================================
+   Legend + events
+========================================================= */
+function buildLegend(){
+  const root = el('legend');
+  root.innerHTML = '';
+  for(const s of SERIES){
+    const d = document.createElement('div');
+    d.className = 'leg' + (visible[s.key] ? '' : ' off');
+    d.innerHTML = `<span class="dot" style="background:${s.color}"></span><span>${s.name}</span>`;
+    d.addEventListener('click', ()=>{
+      visible[s.key] = !visible[s.key];
+      buildLegend();
+      recompute();
+    });
+    root.appendChild(d);
+  }
+}
+
+let EVENTS = [];
+
+function renderEvents(){
+  const tb = el('eventsTable').querySelector('tbody');
+  tb.innerHTML = '';
+  EVENTS.sort((a,b)=>a.day-b.day);
+  EVENTS.forEach((e, idx)=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="number" step="0.1" min="0" value="${Number(e.day).toFixed(1)}" data-idx="${idx}" data-k="day"></td>
+      <td><input type="number" step="1" min="0" value="${Math.round(Number(e.pellets))}" data-idx="${idx}" data-k="pellets"></td>
+      <td><button class="btn danger" data-del="${idx}">Remove</button></td>
+    `;
+    tb.appendChild(tr);
+  });
+
+  tb.querySelectorAll('input').forEach(inp=>{
+    inp.addEventListener('input', (ev)=>{
+      const i = Number(ev.target.dataset.idx);
+      const k = ev.target.dataset.k;
+      EVENTS[i][k] = Number(ev.target.value);
+      saveState();
+      recompute();
+    });
+  });
+
+  tb.querySelectorAll('button[data-del]').forEach(btn=>{
+    btn.addEventListener('click',(ev)=>{
+      const i = Number(ev.target.dataset.del);
+      EVENTS.splice(i,1);
+      saveState();
+      renderEvents();
+      recompute();
+    });
+  });
+}
+
+/* =========================================================
+   State persistence
+========================================================= */
+function saveState(){
+  const s = {
+    // main sliders
+    pelMass: Number(el('pelMassN').value),
+    powMass: Number(el('powMassN').value),
+    blanket: Number(el('blanketN').value),
+    days: Number(el('daysN').value),
+
+    // environment
+    volL: Number(el('volL').value),
+    airFlow: Number(el('airFlow').value),
+    Tnow: Number(el('Tnow').value),
+    altM: Number(el('altM').value),
+    tds: Number(el('tds').value),
+
+    // geometry + exchange
+    ripplePct: Number(el('ripplePct').value),
+    lenCm: Number(el('lenCm').value),
+    widCm: Number(el('widCm').value),
+    tankHCm: Number(el('tankHCm').value),
+    waterSurfCm: Number(el('waterSurfCm').value),
+    blanketGapCm: Number(el('blanketGapCm').value),
+    diffDepthCm: Number(el('diffDepthCm').value),
+
+    // presets + numbers
+    diffType: el('diffType').value,
+    sotePerM: Number(el('sotePerM').value),
+
+    surfacePreset: el('surfacePreset') ? el('surfacePreset').value : 'typical',
+    kCalm: Number(el('kCalm').value),
+    kRipple: Number(el('kRipple').value),
+
+    tightPreset: el('tightPreset') ? el('tightPreset').value : 'loose_high',
+    tight: Number(el('tight').value),
+
+    otrPreset: el('otrPreset') ? el('otrPreset').value : 'typical',
+    otrCal: Number(el('otrCal').value),
+
+    initDOPreset: el('initDOPreset') ? el('initDOPreset').value : '95',
+    doInitPct: Number(el('doInitPct').value),
+
+    // kinetics options
+    o2Limit: el('o2Limit').value,
+    kDoNit: Number(el('kDoNit').value),
+
+    // pellet geometry
+    pelLen: 1.00, // hardcoded
+    pelDia: 0.20, // hardcoded
+    pelRho: Number(el('pelRho').value),
+
+    // uncertainty mode
+    runMode: el('runMode') ? el('runMode').value : 'uncertainty',
+    uncLevel: el('uncLevel') ? el('uncLevel').value : 'typical',
+    mcRuns: el('mcRuns') ? Number(el('mcRuns').value) : 200,
+    bandPreset: el('bandPreset') ? el('bandPreset').value : '10-90',
+    seed: el('seed') ? Number(el('seed').value) : 12345,
+    liveRecompute: el('liveRecompute') ? el('liveRecompute').value : 'on',
+    uAir: el('uAir') ? !!el('uAir').checked : true,
+    uDiff: el('uDiff') ? !!el('uDiff').checked : true,
+    uSurf: el('uSurf') ? !!el('uSurf').checked : true,
+    uTight: el('uTight') ? !!el('uTight').checked : true,
+    uBio: el('uBio') ? !!el('uBio').checked : true,
+    uTemp: el('uTemp') ? !!el('uTemp').checked : true,
+    uInitDO: el('uInitDO') ? !!el('uInitDO').checked : true,
+
+    events: EVENTS
+  };
+  localStorage.setItem('o2planner_state_v3', JSON.stringify(s));
+}
+
+function loadState(){
+  try{
+    let raw = localStorage.getItem('o2planner_state_v3');
+    if(!raw) raw = localStorage.getItem('o2planner_state_v2'); // backwards compatibility
+    if(!raw) return;
+
+    const s = JSON.parse(raw);
+    const set = (id, v)=>{ if(el(id) && v !== undefined && v !== null) el(id).value = v; };
+    const setCheck = (id, v)=>{ if(el(id) && v !== undefined && v !== null) el(id).checked = !!v; };
+
+    // sliders (range+number pairs)
+    if(s.pelMass !== undefined){ el('pelMass').value = s.pelMass; el('pelMassN').value = s.pelMass; }
+    if(s.powMass !== undefined){ el('powMass').value = s.powMass; el('powMassN').value = s.powMass; }
+    if(s.blanket !== undefined){ el('blanket').value = s.blanket; el('blanketN').value = s.blanket; }
+    if(s.days !== undefined){ el('days').value = s.days; el('daysN').value = s.days; }
+
+    // environment + geometry
+    ['volL','airFlow','Tnow','altM','tds','ripplePct','lenCm','widCm','tankHCm','waterSurfCm','blanketGapCm','diffDepthCm',
+     'sotePerM','kCalm','kRipple','tight','otrCal','doInitPct','kDoNit','pelLen','pelDia','pelRho'
+    ].forEach(k=>set(k, s[k]));
+
+    if(s.diffType !== undefined) el('diffType').value = s.diffType;
+    if(s.surfacePreset !== undefined && el('surfacePreset')) el('surfacePreset').value = s.surfacePreset;
+    if(s.tightPreset !== undefined && el('tightPreset')) el('tightPreset').value = s.tightPreset;
+    if(s.otrPreset !== undefined && el('otrPreset')) el('otrPreset').value = s.otrPreset;
+    if(s.initDOPreset !== undefined && el('initDOPreset')) el('initDOPreset').value = s.initDOPreset;
+
+    if(s.o2Limit !== undefined) el('o2Limit').value = s.o2Limit;
+
+    // uncertainty mode
+    if(el('runMode') && s.runMode !== undefined) el('runMode').value = s.runMode;
+    if(el('uncLevel') && s.uncLevel !== undefined) el('uncLevel').value = s.uncLevel;
+    if(el('mcRuns') && s.mcRuns !== undefined){ el('mcRuns').value = s.mcRuns; if(el('mcRunsRange')) el('mcRunsRange').value = s.mcRuns; }
+    if(el('bandPreset') && s.bandPreset !== undefined) el('bandPreset').value = s.bandPreset;
+    if(el('seed') && s.seed !== undefined) el('seed').value = s.seed;
+    if(el('liveRecompute') && s.liveRecompute !== undefined) el('liveRecompute').value = s.liveRecompute;
+
+    setCheck('uAir', s.uAir);
+    setCheck('uDiff', s.uDiff);
+    setCheck('uSurf', s.uSurf);
+    setCheck('uTight', s.uTight);
+    setCheck('uBio', s.uBio);
+    setCheck('uTemp', s.uTemp);
+    setCheck('uInitDO', s.uInitDO);
+
+    EVENTS = Array.isArray(s.events) ? s.events : [];
+    // re-sync preset numeric fields after load
+    try{ applyAllPresets(); }catch(_){}
+  }catch(_){}
+}
+
+/* =========================================================
+   Tooltips + click-to-add-event (bind once)
+========================================================= */
+let lastSim = null;
+let lastMC = null;
+let rateGeom = null;
+let doGeom = null;
+let cumGeom = null;
+let interactionsBound = false;
+
+function initCanvasInteractions(){
+  const tip = ensureTooltip();
+
+  const hide = ()=>{ if(!tip) return; tip.style.display='none'; };
+  const show = (ev, html)=>{
+    if(!tip) return;
+    tip.innerHTML = html;
+    tip.style.display = 'block';
+    const pad = 14;
+    const x = ev.clientX + pad;
+    const y = ev.clientY + pad;
+    tip.style.left = x + 'px';
+    tip.style.top = y + 'px';
+  };
+
+  function idxFromEvent(ev, geom){
+    const rect = ev.target.getBoundingClientRect();
+    const x = (ev.clientX - rect.left) * devicePixelRatio;
+    const y = (ev.clientY - rect.top) * devicePixelRatio;
+    if(x < geom.m.l || x > geom.m.l + geom.pw || y < geom.m.t || y > geom.m.t + geom.ph) return null;
+    const frac = clamp((x - geom.m.l)/geom.pw, 0, 1);
+    const day = frac * geom.xMax;
+    const idx = clamp(Math.round(day / lastSim.meta.dt), 0, lastSim.t.length-1);
+    return idx;
+  }
+
+  function bandLine(label, mid, lo, hi, color){
+    return `<div style="margin-top:4px; color:${color}; opacity:.95">${label}: <span class="mono">${mid.toFixed(3)}</span> <span class="small" style="opacity:.9">[${lo.toFixed(3)}–${hi.toFixed(3)}]</span></div>`;
+  }
+  function bandLine2(label, mid, lo, hi, color){
+    return `<div style="margin-top:4px; color:${color}; opacity:.95">${label}: <span class="mono">${mid.toFixed(2)}</span> <span class="small" style="opacity:.9">[${lo.toFixed(2)}–${hi.toFixed(2)}]</span></div>`;
+  }
+
+  const bind = (canvas, getGeom, kind)=>{
+    if(canvas.dataset.bound === '1') return;
+    canvas.dataset.bound = '1';
+
+    canvas.addEventListener('mousemove', (ev)=>{
+      if(!lastSim) return;
+      const geom = getGeom();
+      if(!geom) return;
+      const idx = idxFromEvent(ev, geom);
+      if(idx === null){ hide(); return; }
+
+      const day = lastSim.t[idx];
+
+      if(kind === 'rate'){
+        const lines = [];
+        lines.push(`<div><b>Day ${day.toFixed(2)}</b></div>`);
+        for(const s of SERIES){
+          if(!visible[s.key]) continue;
+          const v = lastSim.rate[s.key]?.[idx];
+          if(v === undefined) continue;
+          lines.push(`<div style="margin-top:4px"><span style="color:${s.color}">●</span> ${s.name}: <b class="mono">${v.toFixed(3)}</b></div>`);
+        }
+
+        const DO = lastSim.DO_mgL[idx], DOpc = lastSim.DO_pct[idx];
+        lines.push(`<div style="margin-top:6px; color:rgba(231,236,255,0.8)">DO (base): <span class="mono">${DO.toFixed(2)} mg/L</span> (${DOpc.toFixed(0)}%)</div>`);
+
+        if(lastMC){
+          const tmid = lastMC.q.rateTotal.mid[idx], tlo = lastMC.q.rateTotal.lo[idx], thi = lastMC.q.rateTotal.hi[idx];
+          const smid = lastMC.q.rateSupply.mid[idx], slo = lastMC.q.rateSupply.lo[idx], shi = lastMC.q.rateSupply.hi[idx];
+          lines.push(`<div class="hr" style="margin:8px 0"></div>`);
+          lines.push(`<div class="small" style="opacity:.85">Uncertainty band:</div>`);
+          lines.push(bandLine('Total demand', tmid, tlo, thi, 'rgba(255,140,171,1)'));
+          lines.push(bandLine('O₂ supply', smid, slo, shi, 'rgba(97,230,180,1)'));
+          const dmid = lastMC.q.DO.mid[idx], dlo = lastMC.q.DO.lo[idx], dhi = lastMC.q.DO.hi[idx];
+          lines.push(bandLine2('DO', dmid, dlo, dhi, 'rgba(118,178,255,1)'));
+        }
+
+        show(ev, lines.join(''));
+      }
+
+      if(kind === 'cum'){
+        const lines = [];
+        lines.push(`<div><b>Day ${day.toFixed(2)}</b></div>`);
+        for(const s of SERIES){
+          if(!visible[s.key]) continue;
+          const v = lastSim.cum[s.key]?.[idx];
+          if(v === undefined) continue;
+          lines.push(`<div style="margin-top:4px"><span style="color:${s.color}">●</span> ${s.name}: <b class="mono">${v.toFixed(3)}</b></div>`);
+        }
+
+        if(lastMC){
+          const mid = lastMC.q.cumTotal.mid[idx], lo = lastMC.q.cumTotal.lo[idx], hi = lastMC.q.cumTotal.hi[idx];
+          lines.push(`<div class="hr" style="margin:8px 0"></div>`);
+          lines.push(`<div class="small" style="opacity:.85">Uncertainty band:</div>`);
+          lines.push(bandLine('Cumulative total', mid, lo, hi, 'rgba(255,140,171,1)'));
+        }
+
+        show(ev, lines.join(''));
+      }
+
+      if(kind === 'do'){
+        const lines = [];
+        lines.push(`<div><b>Day ${day.toFixed(2)}</b></div>`);
+        const DO = lastSim.DO_mgL[idx], DOpc = lastSim.DO_pct[idx];
+        lines.push(`<div style="margin-top:4px"><span style="color:rgba(118,178,255,1)">●</span> DO (base): <b class="mono">${DO.toFixed(2)} mg/L</b> (${DOpc.toFixed(0)}%)</div>`);
+        const c = lastSim.meta.oxy.Cstar;
+        lines.push(`<div style="margin-top:4px; opacity:.8">C* (base): <span class="mono">${c.toFixed(2)} mg/L</span></div>`);
+
+        if(lastMC){
+          const dmid = lastMC.q.DO.mid[idx], dlo = lastMC.q.DO.lo[idx], dhi = lastMC.q.DO.hi[idx];
+          lines.push(`<div class="hr" style="margin:8px 0"></div>`);
+          lines.push(`<div class="small" style="opacity:.85">Uncertainty band:</div>`);
+          lines.push(bandLine2('DO', dmid, dlo, dhi, 'rgba(118,178,255,1)'));
+          lines.push(`<div style="margin-top:4px; opacity:.8">C*: <span class="mono">${lastMC.scalars.Cstar.mid.toFixed(2)} mg/L</span> <span class="small">[${lastMC.scalars.Cstar.lo.toFixed(2)}–${lastMC.scalars.Cstar.hi.toFixed(2)}]</span></div>`);
+        }
+
+        show(ev, lines.join(''));
+      }
+    });
+
+    canvas.addEventListener('mouseleave', hide);
+  };
+
+  bind(el('rateCanvas'), ()=>rateGeom, 'rate');
+  bind(el('cumCanvas'), ()=>cumGeom, 'cum');
+  bind(el('doCanvas'), ()=>doGeom, 'do');
+}
+
+/* =========================================================
+   Flags + summary
+========================================================= */
+function setFlags(sim, params, mc){
+  const flags = el('flags');
+  flags.innerHTML = '';
+
+  const add = (kind, title, msg)=>{
+    const div = document.createElement('div');
+    div.className = 'flag ' + kind;
+    div.innerHTML = `<b>${title}</b><div class="small">${msg}</div>`;
+    flags.appendChild(div);
+  };
+
+  const rate = sim.rate.total;
+  const supply = sim.rate.supply;
+
+  // Peak demand and peak deficit vs supply (base run)
+  let peak = {v:0, day:0, idx:0};
+  let peakDef = {v:0, day:0, idx:0};
+  for(let i=0;i<rate.length;i++){
+    if(rate[i] > peak.v) peak = {v:rate[i], day:sim.t[i], idx:i};
+    const def = rate[i] - supply[i];
+    if(def > peakDef.v) peakDef = {v:def, day:sim.t[i], idx:i};
+  }
+
+  // Base deficit area
+  let baseArea = 0;
+  for(let i=0;i<rate.length;i++) baseArea += Math.max(0, rate[i]-supply[i]) * sim.meta.dt;
+
+  // Base DO min
+  let doMin = {v:Infinity, day:0, idx:0};
+  let tUnder2 = 0, tUnder1 = 0;
+  for(let i=0;i<sim.DO_mgL.length;i++){
+    const v = sim.DO_mgL[i];
+    if(v < doMin.v) doMin = {v, day:sim.t[i], idx:i};
+    if(v < 2.0) tUnder2 += sim.meta.dt;
+    if(v < 1.0) tUnder1 += sim.meta.dt;
+  }
+
+  // --------------------------
+  // Uncertainty mode flags
+  // --------------------------
+  if(mc){
+    const p2 = mc.probs.anyUnder2;
+    const p1 = mc.probs.anyUnder1;
+
+    // Severity by probability of dipping below thresholds (based on min DO across the run)
+    if(p1 > 0.25){
+      add('danger', 'Very high hypoxia risk', `In ${fmtPct(p1)} of runs, DO dips below <b>1 mg/L</b> at least once. That's “fish emergency” territory.`);
+    }else if(p1 > 0.10){
+      add('warn', 'High hypoxia risk', `In ${fmtPct(p1)} of runs, DO dips below <b>1 mg/L</b>. Consider reducing input, increasing aeration, or increasing open surface exchange.`);
+    }
+
+    if(p2 > 0.50){
+      add('danger', 'Likely stress zone', `In ${fmtPct(p2)} of runs, DO goes below <b>2 mg/L</b> at least once (stress zone for many fish/inverts).`);
+    }else if(p2 > 0.20){
+      add('warn', 'Meaningful stress chance', `In ${fmtPct(p2)} of runs, DO dips below <b>2 mg/L</b>. This is a “don’t roll the dice” range unless you accept losses.`);
+    }else if(p2 > 0.05){
+      add('note', 'Low-but-not-zero stress chance', `In ${fmtPct(p2)} of runs, DO dips below <b>2 mg/L</b>. If you’re optimizing for safety, still treat this as actionable.`);
+    }else{
+      add('note', 'Low hypoxia probability (under this model)', `Model band suggests low chance of DO &lt; 2 mg/L: ${fmtPct(p2)}. Still: this is conditional on assumptions.`);
+    }
+
+    add('note','What the band means','The shaded band is a distribution of plausible outcomes. If you later calibrate with real DO readings, the band can become much tighter (and less “guessy”).');
+
+    // Deficit area distribution
+    add('note','O₂ deficit area (integrated)','Median oxygen “debt” (area where demand &gt; supply): ' + fmtBand(mc.scalars.deficitArea,'g',2) + '. Bigger debt = longer or deeper DO dips.');
+
+    // Nitrogen peaks (still model-dependent)
+    add('note','Nitrogen peaks (modelled)','NH₄⁺ peak: ' + fmtBand(mc.scalars.nh4pk,'mg/L',3) + ' • NO₂⁻ peak: ' + fmtBand(mc.scalars.no2pk,'mg/L',3) + '. These are not “test kit forecasts”, but they’re useful relative indicators.');
+
+    return;
+  }
+
+  // --------------------------
+  // Single-run flags
+  // --------------------------
+  if(doMin.v < 1.0){
+    add('danger', 'DO crash', `Min DO is <b>${doMin.v.toFixed(2)} mg/L</b> at day ${doMin.day.toFixed(2)}. That’s a crash risk.`);
+  }else if(doMin.v < 2.0){
+    add('warn', 'Low DO window', `Min DO is <b>${doMin.v.toFixed(2)} mg/L</b> at day ${doMin.day.toFixed(2)}. Many animals get stressed below ~2 mg/L.`);
+  }else if(doMin.v < 4.0){
+    add('note', 'Moderate DO dip', `Min DO is ${doMin.v.toFixed(2)} mg/L at day ${doMin.day.toFixed(2)}. Probably fine for hardier stock, but still worth watching.`);
+  }else{
+    add('note', 'DO looks comfortable', `Min DO is ${doMin.v.toFixed(2)} mg/L at day ${doMin.day.toFixed(2)}.`);
+  }
+
+  if(peakDef.v > 0.1){
+    add('warn', 'Demand exceeds supply', `Peak deficit is <b>${peakDef.v.toFixed(2)} g/day</b> at day ${peakDef.day.toFixed(2)}. Expect DO to trend downward around that window.`);
+  }else{
+    add('note', 'Supply generally keeps up', `Peak deficit is ${peakDef.v.toFixed(2)} g/day.`);
+  }
+
+  if(baseArea > 0.5){
+    add('note', 'Cumulative deficit', `Integrated oxygen deficit area is ${baseArea.toFixed(2)} g. This is a rough “oxygen debt” proxy.`);
+  }
+
+  if(tUnder2 > 0){
+    add('warn', 'Time under 2 mg/L', `Time under 2 mg/L: ${(tUnder2*24).toFixed(1)} h (single run).`);
+  }
+  if(tUnder1 > 0){
+    add('danger', 'Time under 1 mg/L', `Time under 1 mg/L: ${(tUnder1*24).toFixed(1)} h (single run).`);
+  }
+}
+
+/* =========================================================
+   Main recompute + render
+========================================================= */
+function getParams(){
+  // Keep “preset selectors” synced to their numeric fields before reading
+  try{ applyAllPresets(); }catch(_){}
+
+  // Hardcoded pellet geometry (project standard)
+  try{
+    if(el('pelLen')) el('pelLen').value = '1.00';
+    if(el('pelDia')) el('pelDia').value = '0.20';
+  }catch(_){}
+
+  const p = {
+    pelletMass_g: Number(el('pelMassN').value),
+    powderMass_g: Number(el('powMassN').value),
+    blanketPct: Number(el('blanketN').value),
+    days: Number(el('daysN').value),
+
+    volL: Number(el('volL').value),
+    airFlow: Number(el('airFlow').value),
+    Tnow: Number(el('Tnow').value),
+    altM: Number(el('altM').value),
+    tds: Number(el('tds').value),
+
+    ripplePct: Number(el('ripplePct').value),
+
+    lenCm: Number(el('lenCm').value),
+    widCm: Number(el('widCm').value),
+    tankHCm: Number(el('tankHCm').value),
+    waterSurfCm: Number(el('waterSurfCm').value),
+    blanketGapCm: Number(el('blanketGapCm').value),
+    diffDepthCm: Number(el('diffDepthCm').value),
+
+    diffType: el('diffType').value,
+    sotePerM: Number(el('sotePerM').value),
+    surfacePreset: el('surfacePreset') ? el('surfacePreset').value : 'typical',
+    kCalm: Number(el('kCalm').value),
+    kRipple: Number(el('kRipple').value),
+
+    tightPreset: el('tightPreset') ? el('tightPreset').value : 'loose_high',
+    tight: Number(el('tight').value),
+
+    otrPreset: el('otrPreset') ? el('otrPreset').value : 'typical',
+    otrCal: Number(el('otrCal').value),
+
+    initDOPreset: el('initDOPreset') ? el('initDOPreset').value : '95',
+    doInitPct: Number(el('doInitPct').value),
+
+    o2Limit: el('o2Limit').value,
+    kDoNit: Number(el('kDoNit').value),
+
+    pelLen: Number(el('pelLen').value),
+    pelDia: Number(el('pelDia').value),
+    pelRho: Number(el('pelRho').value),
+
+    // Uncertainty mode controls
+    runMode: el('runMode') ? el('runMode').value : 'uncertainty',
+    uncLevel: el('uncLevel') ? el('uncLevel').value : 'typical',
+    mcRuns: el('mcRuns') ? Number(el('mcRuns').value) : 200,
+    bandPreset: el('bandPreset') ? el('bandPreset').value : '10-90',
+    seed: el('seed') ? Number(el('seed').value) : 12345,
+    liveRecompute: el('liveRecompute') ? el('liveRecompute').value : 'on',
+    u: {
+      air: el('uAir') ? el('uAir').checked : true,
+      diff: el('uDiff') ? el('uDiff').checked : true,
+      surf: el('uSurf') ? el('uSurf').checked : true,
+      tight: el('uTight') ? el('uTight').checked : true,
+      bio: el('uBio') ? el('uBio').checked : true,
+      temp: el('uTemp') ? el('uTemp').checked : true,
+      initDO: el('uInitDO') ? el('uInitDO').checked : true,
+    },
+
+    events: EVENTS
+  };
+
+  // light sanitization
+  p.mcRuns = clamp(Math.round(p.mcRuns || 0), 10, 5000);
+  return p;
+}
+
+function fmtBand(stats, unit, decimals=2){
+  const lo = stats.lo, mid = stats.mid, hi = stats.hi;
+  if(!Number.isFinite(lo) || !Number.isFinite(mid) || !Number.isFinite(hi)) return '—';
+  return `${mid.toFixed(decimals)} ${unit}  [${lo.toFixed(decimals)}–${hi.toFixed(decimals)}]`;
+}
+
+function fmtPct(p){
+  if(!Number.isFinite(p)) return '—';
+  return `${(100*p).toFixed(1)}%`;
+}
+
+function recompute(){
+  clearError();
+  setStage('recompute', 'start');
+
+  try{
+    setStage('UI', 'apply presets');
+    applyAllPresets();
+
+    setStage('UI', 'read params');
+    const params = getParams();
+    DEBUG_STATE.lastParams = params;
+    DEBUG_STATE.lastMode = params.runMode;
+    DEBUG_STATE.lastUpdateISO = new Date().toISOString();
+
+    assertFinite('days', params.days);
+    assertFinite('volL', params.volL);
+
+    saveState();
+
+    // Pellet derived quantities
+    setStage('Pellets', 'derive pellet count');
+    const mEach = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
+    const nPel = (mEach > 0) ? (params.pelletMass_g / mEach) : 0;
+    el('pelCount').textContent = `${nPel.toFixed(1)} pellets`;
+    el('pelEach').textContent = `${mEach.toFixed(4)} g each`;
+
+    // Base sim (used for breakdown lines + UI even in uncertainty mode)
+    setStage('Simulation', 'run base sim');
+    const baseSim = runSimulation(params);
+    lastSim = baseSim;
+    lastMC = null;
+
+    const oxy = baseSim.meta.oxy;
+    DEBUG_STATE.lastOxy = oxy;
+    DEBUG_STATE.lastSimMeta = baseSim.meta;
+
+    // If uncertainty mode: run MC overlay
+    if(params.runMode === 'uncertainty'){
+      setStage('Uncertainty', 'Monte Carlo');
+      const mc = runMonteCarlo(params);
+      lastMC = mc;
+      DEBUG_STATE.lastScalars = mc.scalars;
+
+      // Oxygenation meta (bands)
+      el('cStarOut').textContent = fmtBand(mc.scalars.Cstar, 'mg/L', 2);
+      el('otrOut').textContent   = fmtBand(mc.scalars.otrMax, 'g/day', 2);
+      el('klaOut').textContent   = fmtBand(mc.scalars.kLa, '1/day', 3);
+
+      // DO min + risk
+      el('doMinOut').textContent = `${fmtBand(mc.scalars.minDO, 'mg/L', 2)}  @ day ${fmtBand(mc.scalars.minDO_day, '', 2).replace('  [','[')}`;
+      el('pUnder2Out').textContent = fmtPct(mc.probs.anyUnder2);
+      el('pUnder1Out').textContent = fmtPct(mc.probs.anyUnder1);
+
+      // Plots with bands
+      setStage('Plots', 'rate');
+      rateGeom = drawPlot(el('rateCanvas'), baseSim.t, baseSim.rate, {
+        title:"Oxygen RATE (g O₂/day)",
+        bands:{
+          total:{lo:mc.q.rateTotal.lo, hi:mc.q.rateTotal.hi, mid:mc.q.rateTotal.mid, alpha:0.18},
+          supply:{lo:mc.q.rateSupply.lo, hi:mc.q.rateSupply.hi, mid:mc.q.rateSupply.mid, alpha:0.14}
+        }
+      });
+
+      setStage('Plots', 'dissolved oxygen');
+      doGeom = drawDOPlot(el('doCanvas'), baseSim, {
+        DO:{lo:mc.q.DO.lo, hi:mc.q.DO.hi, mid:mc.q.DO.mid, alpha:0.18},
+        Cstar: mc.scalars.Cstar
+      });
+
+      setStage('Plots', 'cumulative');
+      cumGeom = drawPlot(el('cumCanvas'), baseSim.t, baseSim.cum, {
+        title:"Oxygen CUMULATIVE (g O₂)",
+        bands:{
+          total:{lo:mc.q.cumTotal.lo, hi:mc.q.cumTotal.hi, mid:mc.q.cumTotal.mid, alpha:0.16}
+        }
+      });
+
+      setStage('Flags', 'evaluate');
+      setFlags(baseSim, params, mc);
+
+      // Debug (human-readable summary + machine snapshot)
+      const dbg = [];
+      dbg.push(`Mode: Uncertainty (Monte Carlo)`);
+      dbg.push(`Runs: ${mc.scalars.runs}, band: ${params.bandPreset}, level: ${params.uncLevel}`);
+      dbg.push(`What varies: air=${params.u.air}, diffuser=${params.u.diff}, surface=${params.u.surf}, cover=${params.u.tight}, bio=${params.u.bio}, temp=${params.u.temp}, initDO=${params.u.initDO}`);
+      dbg.push(`Pressure @ altitude: ${pressureFromAltitude_kPa(params.altM).toFixed(2)} kPa`);
+      dbg.push(`Base O2 in pumped air (rated flow): ${oxy.O2_in_air_g_day.toFixed(2)} g/day`);
+      dbg.push(`Base bubble eff fraction: ${(100*oxy.eff_bubble).toFixed(2)}%  (depth ${params.diffDepthCm.toFixed(1)} cm, SOTE/m ${params.sotePerM.toFixed(2)}%)`);
+      dbg.push(`Surface areas: total ${oxy.areas.A_total.toFixed(4)} m²; open ${oxy.areas.A_open.toFixed(4)}; covered ${oxy.areas.A_cov.toFixed(4)}`);
+      dbg.push(`Cover leak factor (base): ${oxy.leak.toFixed(3)} (tight=${params.tight.toFixed(2)}, headspace ${oxy.head.V_head_L.toFixed(1)} L)`);
+      dbg.push(`Base OTR surface max: ${oxy.OTR_surface_max.toFixed(3)} g/day  (kCalm ${params.kCalm}, kRipple ${params.kRipple}, ripple ${params.ripplePct}%)`);
+      dbg.push(`Base OTR bubble max: ${oxy.OTR_bubble_max.toFixed(3)} g/day`);
+      dbg.push(`Base OTR max: ${oxy.OTR_max.toFixed(3)} g/day`);
+      dbg.push(`Base kLa inferred: ${oxy.kLa.toFixed(4)} 1/day`);
+      dbg.push(`Sim dt: ${baseSim.meta.dt.toFixed(4)} days (~${(baseSim.meta.dt*24).toFixed(2)} h)`);
+      dbg.push('');
+      dbg.push('--- Snapshot ---');
+      dbg.push(...buildDebugSnapshot([]));
+      setDebugText(dbg);
+
+    }else{
+      setStage('Mode', 'deterministic single run');
+
+      // Deterministic (single)
+      el('cStarOut').textContent = `${oxy.Cstar.toFixed(2)} mg/L`;
+      el('otrOut').textContent   = `${oxy.OTR_max.toFixed(2)} g/day`;
+      el('klaOut').textContent   = `${oxy.kLa.toFixed(3)} 1/day`;
+
+      // Min DO display
+      let doMin = Infinity;
+      let doMinDay = 0;
+      for(let i=0;i<baseSim.DO_mgL.length;i++){
+        if(baseSim.DO_mgL[i] < doMin){ doMin = baseSim.DO_mgL[i]; doMinDay = baseSim.t[i]; }
+      }
+      el('doMinOut').textContent = `${doMin.toFixed(2)} mg/L @ day ${doMinDay.toFixed(2)}`;
+      el('pUnder2Out').textContent = '—';
+      el('pUnder1Out').textContent = '—';
+
+      // Draw plots
+      setStage('Plots', 'rate');
+      rateGeom = drawPlot(el('rateCanvas'), baseSim.t, baseSim.rate, {title:"Oxygen RATE (g O₂/day)"});
+      setStage('Plots', 'dissolved oxygen');
+      doGeom   = drawDOPlot(el('doCanvas'), baseSim);
+      setStage('Plots', 'cumulative');
+      cumGeom  = drawPlot(el('cumCanvas'),  baseSim.t, baseSim.cum,  {title:"Oxygen CUMULATIVE (g O₂)"});
+
+      // Flags
+      setStage('Flags', 'evaluate');
+      setFlags(baseSim, params, null);
+
+      // Debug text
+      const dbg = [];
+      dbg.push(`Mode: Single run (deterministic)`);
+      dbg.push(`Pressure @ altitude: ${pressureFromAltitude_kPa(params.altM).toFixed(2)} kPa`);
+      dbg.push(`O2 in pumped air: ${oxy.O2_in_air_g_day.toFixed(2)} g O2/day`);
+      dbg.push(`Bubble eff fraction: ${(100*oxy.eff_bubble).toFixed(2)}%  (depth ${params.diffDepthCm.toFixed(1)} cm, SOTE/m ${params.sotePerM.toFixed(2)}%)`);
+      dbg.push(`Surface areas: total ${oxy.areas.A_total.toFixed(4)} m²; open ${oxy.areas.A_open.toFixed(4)}; covered ${oxy.areas.A_cov.toFixed(4)}`);
+      dbg.push(`Cover leak factor: ${oxy.leak.toFixed(3)}  (tight ${params.tight.toFixed(2)}, headspace ${oxy.head.V_head_L.toFixed(1)} L)`);
+      dbg.push(`OTR surface max: ${oxy.OTR_surface_max.toFixed(3)} g/day  (kCalm ${params.kCalm}, kRipple ${params.kRipple}, ripple ${params.ripplePct}%)`);
+      dbg.push(`OTR bubble max: ${oxy.OTR_bubble_max.toFixed(3)} g/day`);
+      dbg.push(`OTR max: ${oxy.OTR_max.toFixed(3)} g/day`);
+      dbg.push(`kLa inferred: ${oxy.kLa.toFixed(4)} 1/day`);
+      dbg.push(`Sim dt: ${baseSim.meta.dt.toFixed(4)} days (~${(baseSim.meta.dt*24).toFixed(2)} h)`);
+      dbg.push('');
+      dbg.push('--- Snapshot ---');
+      dbg.push(...buildDebugSnapshot([]));
+      setDebugText(dbg);
+    }
+
+    setStage('Interactions', 'init canvases');
+    initCanvasInteractions();
+
+    setStage('recompute', 'done');
+
+  }catch(err){
+    showError(err);
+  }
+}
+
+function applyDiffuserPreset(){
+  const t = el('diffType').value;
+  const s = el('sotePerM');
+  let v = null;
+
+  // “Reasonable starting points”. Real SOTE depends a lot on bubble size, contact time, and circulation.
+  if(t === 'airstone_med')      v = 2.5;
+  else if(t === 'airstone_fine')v = 3.5;
+  else if(t === 'microbubble') v = 5.5;
+  else if(t === 'wood')        v = 4.5;
+
+  if(v !== null){
+    s.value = v;
+    s.disabled = true;
+    s.title = 'Preset value. Choose Custom to edit.';
+  }else{
+    s.disabled = false;
+    s.title = '';
+  }
+}
+
+function applySurfacePreset(){
+  const t = el('surfacePreset').value;
+  const kc = el('kCalm');
+  const kr = el('kRipple');
+  let v = null;
+
+  if(t === 'still')        v = {kCalm:0.15, kRipple:0.45};
+  else if(t === 'typical') v = {kCalm:0.30, kRipple:1.00};
+  else if(t === 'rippling')v = {kCalm:0.45, kRipple:1.60};
+  else if(t === 'splashy') v = {kCalm:0.70, kRipple:2.50};
+
+  if(v){
+    kc.value = v.kCalm;
+    kr.value = v.kRipple;
+    kc.disabled = true; kr.disabled = true;
+    kc.title = 'Preset value. Choose Custom to edit.';
+    kr.title = 'Preset value. Choose Custom to edit.';
+  }else{
+    kc.disabled = false; kr.disabled = false;
+    kc.title = ''; kr.title = '';
+  }
+}
+
+function applyTightPreset(){
+  const t = el('tightPreset').value;
+  const ti = el('tight');
+  let v = null;
+
+  if(t === 'open')        v = 0.00;
+  else if(t === 'loose_high') v = 0.15;
+  else if(t === 'typical')    v = 0.35;
+  else if(t === 'near_sealed')v = 0.80;
+
+  if(v !== null){
+    ti.value = v;
+    ti.disabled = true;
+    ti.title = 'Preset value. Choose Custom to edit.';
+  }else{
+    ti.disabled = false;
+    ti.title = '';
+  }
+}
+
+function applyOtrPreset(){
+  const t = el('otrPreset').value;
+  const o = el('otrCal');
+  let v = null;
+  if(t === 'typical') v = 1.00;
+  else if(t === 'under') v = 0.75;
+  else if(t === 'over') v = 1.25;
+
+  if(v !== null){
+    o.value = v;
+    o.disabled = true;
+    o.title = 'Preset value. Choose Custom to edit.';
+  }else{
+    o.disabled = false;
+    o.title = '';
+  }
+}
+
+function applyInitDOPreset(){
+  const t = el('initDOPreset').value;
+  const d = el('doInitPct');
+  if(t !== 'custom'){
+    d.value = Number(t);
+    d.disabled = true;
+    d.title = 'Preset value. Choose Custom to edit.';
+  }else{
+    d.disabled = false;
+    d.title = '';
+  }
+}
+
+function applyAllPresets(){
+  // These keep the “human presets” and the numeric fields in sync.
+  if(el('diffType')) applyDiffuserPreset();
+  if(el('surfacePreset')) applySurfacePreset();
+  if(el('tightPreset')) applyTightPreset();
+  if(el('otrPreset')) applyOtrPreset();
+  if(el('initDOPreset')) applyInitDOPreset();
+}
+
+
+/* =========================================================
+   Init
+========================================================= */
+let recomputeTimer = null;
+function scheduleRecompute(){
+  const mode = el('liveRecompute') ? el('liveRecompute').value : 'on';
+  if(mode === 'off'){
+    if(el('recomputeBtn')) el('recomputeBtn').style.display = 'inline-block';
+    return;
+  }
+  if(el('recomputeBtn')) el('recomputeBtn').style.display = 'none';
+  clearTimeout(recomputeTimer);
+  recomputeTimer = setTimeout(()=>recompute(), 150);
+}
+
+function updateModeUI(){
+  if(!el('runMode')) return;
+  const mode = el('runMode').value;
+  if(el('uncSection')) el('uncSection').style.display = (mode === 'uncertainty') ? 'block' : 'none';
+  if(el('singleNote')) el('singleNote').style.display = (mode === 'single') ? 'block' : 'none';
+}
+
+function init(){
+  loadState();
+  try{ applyAllPresets(); }catch(_){}
+
+  updateModeUI();
+
+  // Link sliders
+  linkRangeAndNumber(el('pelMass'), el('pelMassN'), ()=>{ scheduleRecompute(); });
+  linkRangeAndNumber(el('powMass'), el('powMassN'), ()=>{ scheduleRecompute(); });
+  linkRangeAndNumber(el('blanket'), el('blanketN'), ()=>{ scheduleRecompute(); });
+  linkRangeAndNumber(el('days'), el('daysN'), ()=>{ scheduleRecompute(); });
+
+  if(el('mcRunsRange') && el('mcRuns')){
+    linkRangeAndNumber(el('mcRunsRange'), el('mcRuns'), ()=>{ scheduleRecompute(); });
+  }
+
+  // Inputs that trigger recompute
+  [
+    'volL','airFlow','Tnow','altM','tds','ripplePct',
+    'lenCm','widCm','tankHCm','waterSurfCm','blanketGapCm','diffDepthCm',
+    'sotePerM','kCalm','kRipple','tight','otrCal',
+    'doInitPct','kDoNit',
+    'pelLen','pelDia','pelRho',
+    'diffType','surfacePreset','tightPreset','otrPreset','initDOPreset',
+    'runMode','uncLevel','bandPreset','seed','liveRecompute',
+    'uAir','uDiff','uSurf','uTight','uBio','uTemp','uInitDO',
+    'o2Limit'
+  ].forEach(id=>{
+    const e = el(id);
+    if(!e) return;
+    const ev = (e.type === 'checkbox' || e.tagName === 'SELECT') ? 'change' : 'input';
+    e.addEventListener(ev, ()=>{
+      if(id === 'runMode') updateModeUI();
+      // presets need to refresh numeric fields before sim
+      if(['diffType','surfacePreset','tightPreset','otrPreset','initDOPreset'].includes(id)){
+        try{ applyAllPresets(); }catch(_){}
+      }
+      scheduleRecompute();
+    });
+  });
+
+  // Events UI
+  el('addEventBtn').addEventListener('click', ()=>{
+    const day = Number(el('evDay').value);
+    const pop = Number(el('evPop').value);
+    if(!Number.isFinite(day) || !Number.isFinite(pop)) return;
+    EVENTS.push({day, pop});
+    EVENTS.sort((a,b)=>a.day-b.day);
+    saveState();
+    renderEvents();
+    scheduleRecompute();
+  });
+
+  el('clearEventsBtn').addEventListener('click', ()=>{
+    EVENTS = [];
+    saveState();
+    renderEvents();
+    scheduleRecompute();
+  });
+
+  if(el('recomputeBtn')){
+    el('recomputeBtn').addEventListener('click', ()=>{
+      recompute();
+      if(el('liveRecompute') && el('liveRecompute').value !== 'off'){
+        el('recomputeBtn').style.display = 'none';
+      }
+    });
+  }
+
+  buildLegend();
+  renderEvents();
+  recompute();
+}
+
+init();
+
+</script>
+</body>
+</html>
