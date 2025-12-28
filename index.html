@@ -115,6 +115,41 @@
     .flag-tag.danger{background:rgba(255,107,107,.22); color:#ffd1d1;}
     .flag-tag.note{background:rgba(122,162,255,.18); color:#dfe6ff;}
     .flag-body{padding:10px 12px;color:var(--text)}
+    .tag-stack{display:grid;gap:8px}
+    .tag-line{
+      border:1px solid rgba(255,255,255,.14);
+      border-radius:12px;
+      padding:8px 12px;
+      background:rgba(0,0,0,.18);
+    }
+    .tag-line summary{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      list-style:none;
+      cursor:pointer;
+      color:#dfe6ff;
+      font-weight:600;
+      font-size:13px;
+    }
+    .tag-line summary::-webkit-details-marker{display:none}
+    .tag-line .tag-title{flex:1;min-width:0}
+    .tag-line .tag-meta{color:var(--muted);font-weight:500;font-size:12px;white-space:nowrap}
+    .tag-line .tag-chip{
+      padding:2px 8px;
+      border-radius:999px;
+      font-size:10px;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+      border:1px solid transparent;
+    }
+    .tag-line.tone-ok{border-color:rgba(99,230,190,.32)}
+    .tag-line.tone-warn{border-color:rgba(255,207,90,.32)}
+    .tag-line.tone-danger{border-color:rgba(255,107,107,.32)}
+    .tag-line .tag-chip.ok{background:rgba(99,230,190,.18); color:#d5fff1; border-color:rgba(99,230,190,.45)}
+    .tag-line .tag-chip.warn{background:rgba(255,207,90,.18); color:#fff3d1; border-color:rgba(255,207,90,.45)}
+    .tag-line .tag-chip.danger{background:rgba(255,107,107,.18); color:#ffd1d1; border-color:rgba(255,107,107,.45)}
+    .tag-details{margin-top:8px;color:var(--muted);font-size:12px;line-height:1.45}
     .btn{
       background:rgba(122,162,255,.18);
       border:1px solid rgba(122,162,255,.35);
@@ -615,31 +650,9 @@
 
     <div class="hr"></div>
 
-    <h2>Summary & flags</h2>
-    <div class="grid2">
-      <div class="small">
-        <div class="pill"><span>Pellet count (est.)</span> <b class="mono" id="pelCount">—</b></div>
-        <div class="pill" style="margin-top:8px"><span>Pellet mass each (est.)</span> <b class="mono" id="pelEach">—</b></div>
-        <div class="pill" style="margin-top:8px"><span>Surface area</span> <b class="mono" id="surfOut">—</b></div>
-        <div class="pill" style="margin-top:8px"><span>Headspace volume</span> <b class="mono" id="headOut">—</b></div>
-        <div class="pill" style="margin-top:8px"><span>Local DO saturation (C*)</span> <b class="mono" id="cStarOut">—</b></div>
-      </div>
-      <div class="small">
-        <div class="pill"><span>OTR max (bubble + surface)</span> <b class="mono" id="otrOut">—</b></div>
-        <div class="pill" style="margin-top:8px"><span>kLa inferred</span> <b class="mono" id="klaOut">—</b></div>
-        <div class="pill" style="margin-top:8px"><span>Min DO</span> <b class="mono" id="doMinOut">—</b></div>
-        <div class="pill" style="margin-top:8px"><span>P(DO &lt; 2 mg/L)</span> <b class="mono" id="pUnder2Out">—</b></div>
-        <div class="pill" style="margin-top:8px"><span>P(DO &lt; 1 mg/L)</span> <b class="mono" id="pUnder1Out">—</b></div>
-        <div class="pill" style="margin-top:8px"><span id="nh4Label">NH₄ peak</span> <b class="mono" id="nh4Out">—</b></div>
-        <div class="pill" style="margin-top:8px"><span id="no2Label">NO₂ peak</span> <b class="mono" id="no2Out">—</b></div>
-        <div class="pill" style="margin-top:8px"><span id="no3Label">NO₃ peak</span> <b class="mono" id="no3Out">—</b></div>
-        <div class="pill" style="margin-top:8px"><span>NH₃ (unionized)</span> <b class="mono" id="nh3Out">—</b></div>
-        <div class="pill" style="margin-top:8px"><span>CO₂ produced (mg/L)</span> <b class="mono" id="co2Out">—</b></div>
-        <div class="pill" style="margin-top:8px"><span>Macros / Micros (mg/L)</span> <b class="mono" id="nutrOut">—</b></div>
-      </div>
-    </div>
-
-    <div class="flags" id="flags" style="margin-top:10px"></div>
+    <h2>Chemistry overview</h2>
+    <div class="small">Inconspicuous tag lines that summarize the modeled chemical peaks/mins. Tap a line to expand details and see safe vs caution vs dangerous reference bands.</div>
+    <div class="tag-stack" id="chemTags" style="margin-top:10px"></div>
 
     <details id="chemAuditDetails" style="margin-top:10px; display:none;">
       <summary>Chemistry audit (nerd mode)</summary>
@@ -740,6 +753,10 @@ function buildCumulativeSeries(seriesDict, dt){
    DOM helpers + error plumbing
 ========================================================= */
 const el = id => document.getElementById(id);
+const setText = (id, value)=>{
+  const node = el(id);
+  if(node) node.textContent = value;
+};
 
 function ensureTooltip(){
   // Robust: support either #tip or legacy #tooltip. Create if missing.
@@ -901,6 +918,11 @@ lines.push(`surface=${p.lenCm}×${p.widCm} cm, blanket=${p.blanketPct}%, ripple=
     lines.push('');
     lines.push('--- Sim meta (last) ---');
     lines.push(compactJSON(DEBUG_STATE.lastSimMeta, 900));
+  }
+  if(DEBUG_STATE.lastTagSummary){
+    lines.push('');
+    lines.push('--- Chemistry tags (last) ---');
+    lines.push(compactJSON(DEBUG_STATE.lastTagSummary, 1200));
   }
   if(DEBUG_STATE.lastScalars){
     lines.push('');
@@ -2792,17 +2814,15 @@ function initCanvasInteractions(){
    Flags + summary
 ========================================================= */
 function setFlags(sim, params, mc){
-  const flags = el('flags');
-  flags.innerHTML = '';
+  const tags = el('chemTags');
+  if(!tags) return;
+  tags.innerHTML = '';
 
-  const add = (kind, title, msg)=>{
-    const div = document.createElement('div');
-    div.className = 'flag-card';
-    div.innerHTML = `
-      <div class="flag-tag ${kind}">${title}<span>${kind.toUpperCase()}</span></div>
-      <div class="flag-body"><div class="small">${msg}</div></div>
-    `;
-    flags.appendChild(div);
+  const fmtVal = (value, unit)=>{
+    if(!Number.isFinite(value)) return '—';
+    const abs = Math.abs(value);
+    const decimals = abs < 1 ? 3 : (abs < 10 ? 2 : 1);
+    return `${value.toFixed(decimals)} ${unit}`;
   };
 
   const estPellets = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
@@ -2861,36 +2881,91 @@ function setFlags(sim, params, mc){
     }else if(p1 > 0.10){
       add('warn', 'High hypoxia risk', `In ${fmtPct(p1)} of runs, DO dips below <b>1 mg/L</b>. Consider reducing input, increasing aeration, or increasing open surface exchange.`);
     }
-
-    if(p2 > 0.50){
-      add('danger', 'Likely stress zone', `In ${fmtPct(p2)} of runs, DO goes below <b>2 mg/L</b> at least once (stress zone for many fish/inverts).`);
-    }else if(p2 > 0.20){
-      add('warn', 'Meaningful stress chance', `In ${fmtPct(p2)} of runs, DO dips below <b>2 mg/L</b>. This is a “don’t roll the dice” range unless you accept losses.`);
-    }else if(p2 > 0.05){
-      add('note', 'Low-but-not-zero stress chance', `In ${fmtPct(p2)} of runs, DO dips below <b>2 mg/L</b>. If you’re optimizing for safety, still treat this as actionable.`);
-    }else{
-      add('note', 'Low hypoxia probability (under this model)', `Model band suggests low chance of DO &lt; 2 mg/L: ${fmtPct(p2)}. Still: this is conditional on assumptions.`);
+    return `Safe ≤ ${fmtVal(good, unit)} • Watch ${fmtVal(good, unit)}–${fmtVal(warn, unit)} • Risk > ${fmtVal(warn, unit)}`;
+  };
+  const classify = (mode, value, good, warn)=>{
+    if(!Number.isFinite(value)){
+      addWarning('Chem tag value missing; check simulation outputs.');
+      return {tone:'warn', label:'unknown'};
     }
-
-    add('note','What the band means','The shaded band is a distribution of plausible outcomes. If you later calibrate with real DO readings, the band can become much tighter (and less “guessy”).');
-
-    // Deficit area distribution
-    add('note','O₂ deficit area (integrated)','Median oxygen “debt” (area where demand &gt; supply): ' + fmtBand(mc.scalars.deficitArea,'g',2) + '. Bigger debt = longer or deeper DO dips.');
-
-    // Nitrogen peaks (still model-dependent)
-    add('note','Nitrogen peaks (modelled)','NH₄ peak: ' + fmtBand(mc.scalars.nh4pk,'mg/L',3) + ' • NO₂ peak: ' + fmtBand(mc.scalars.no2pk,'mg/L',3) + ' • NO₃ peak: ' + fmtBand(mc.scalars.no3pk,'mg/L',3) + '. These are not “test kit forecasts”, but they’re useful relative indicators.');
-
-    const nh3Mid = mc.scalars.nh3pk.mid;
-    if(nh3Mid > 0.10){
-      add('danger','NH₃ toxicity risk','Median unionized NH₃ peak is ' + fmtBand(mc.scalars.nh3pk,'mg/L',3) + '. Consider reducing inputs or buffering pH/temp.');
-    }else if(nh3Mid > 0.05){
-      add('warn','NH₃ watch zone','Median unionized NH₃ peak is ' + fmtBand(mc.scalars.nh3pk,'mg/L',3) + '. Sensitive species can react at low ppm.');
-    }else{
-      add('note','NH₃ looks low (model)','Median unionized NH₃ peak is ' + fmtBand(mc.scalars.nh3pk,'mg/L',3) + '.');
+    if(mode === 'min'){
+      if(value >= good) return {tone:'ok', label:'good'};
+      if(value >= warn) return {tone:'warn', label:'watch'};
+      return {tone:'danger', label:'risk'};
     }
+    if(value <= good) return {tone:'ok', label:'good'};
+    if(value <= warn) return {tone:'warn', label:'watch'};
+    return {tone:'danger', label:'risk'};
+  };
+  const addTag = ({label, tone, status, summary, details})=>{
+    const det = document.createElement('details');
+    det.className = `tag-line tone-${tone}`;
+    det.innerHTML = `
+      <summary>
+        <span class="tag-title">${label}</span>
+        <span class="tag-meta">${summary}</span>
+        <span class="tag-chip ${tone}">${status}</span>
+      </summary>
+      <div class="tag-details">${details.map(line=>`<div>${line}</div>`).join('')}</div>
+    `;
+    tags.appendChild(det);
+  };
 
-    return;
-  }
+  const isMC = !!mc;
+  const nFactorNH4 = params.nUnits === 'asIon' ? CHEM.NH4_ion_per_N : 1;
+  const nFactorNO2 = params.nUnits === 'asIon' ? CHEM.NO2_ion_per_N : 1;
+  const nFactorNO3 = params.nUnits === 'asIon' ? CHEM.NO3_ion_per_N : 1;
+
+  const doMin = isMC ? mc.scalars.minDO.mid : Math.min(...sim.DO_mgL);
+  const nh3Peak = isMC ? mc.scalars.nh3pk.mid : Math.max(...sim.NH3_mgL);
+  const nh4Peak = isMC ? (mc.scalars.nh4pk.mid * nFactorNH4) : Math.max(...sim.NH4_mgL) * nFactorNH4;
+  const no2Peak = isMC ? (mc.scalars.no2pk.mid * nFactorNO2) : Math.max(...sim.NO2_mgL) * nFactorNO2;
+  const no3Peak = isMC ? (mc.scalars.no3pk.mid * nFactorNO3) : Math.max(...sim.NO3_mgL) * nFactorNO3;
+  const co2Peak = isMC ? mc.scalars.co2pk.mid : Math.max(...sim.CO2_mgL);
+  const macroPeak = isMC ? mc.scalars.macroPk.mid : Math.max(...sim.macro_mgL);
+  const microPeak = isMC ? mc.scalars.microPk.mid : Math.max(...sim.micro_mgL);
+
+  const doClass = classify('min', doMin, 5, 2);
+  addTag({
+    label:'Dissolved oxygen (DO)',
+    tone: doClass.tone,
+    status: doClass.label,
+    summary:`min ${fmtVal(doMin, 'mg/L')}`,
+    details:[
+      `Modeled ${isMC ? 'median minimum' : 'minimum'}: ${fmtVal(doMin, 'mg/L')}.`,
+      fmtBandLine('min', 5, 2, 'mg/L'),
+      `Context: pH ${params.pH}, temperature ${params.Tnow}°C, volume ${params.volL} L.`
+    ]
+  });
+
+  const nh3Class = classify('max', nh3Peak, 0.02, 0.05);
+  addTag({
+    label:'NH₃ (unionized)',
+    tone: nh3Class.tone,
+    status: nh3Class.label,
+    summary:`peak ${fmtVal(nh3Peak, 'mg/L')}`,
+    details:[
+      `Modeled ${isMC ? 'median peak' : 'peak'}: ${fmtVal(nh3Peak, 'mg/L')}.`,
+      fmtBandLine('max', 0.02, 0.05, 'mg/L'),
+      `Unionized fraction depends on pH ${params.pH} and temperature ${params.Tnow}°C.`
+    ]
+  });
+
+  const nh4Label = params.nUnits === 'asIon' ? 'NH₄⁺ (total ammonia)' : 'NH₄-N (total ammonia)';
+  const nh4Good = 0.5 * nFactorNH4;
+  const nh4Warn = 1.0 * nFactorNH4;
+  const nh4Class = classify('max', nh4Peak, nh4Good, nh4Warn);
+  addTag({
+    label: nh4Label,
+    tone: nh4Class.tone,
+    status: nh4Class.label,
+    summary:`peak ${fmtVal(nh4Peak, 'mg/L')}`,
+    details:[
+      `Modeled ${isMC ? 'median peak' : 'peak'}: ${fmtVal(nh4Peak, 'mg/L')}.`,
+      fmtBandLine('max', nh4Good, nh4Warn, 'mg/L'),
+      `Reference assumes ${params.nUnits === 'asIon' ? 'ion' : 'N'} units.`
+    ]
+  });
 
   // --------------------------
   // Single-run flags
@@ -2911,16 +2986,31 @@ function setFlags(sim, params, mc){
     add('note', 'Supply generally keeps up', `Peak deficit is ${peakDef.v.toFixed(2)} g/day.`);
   }
 
-  if(baseArea > 0.5){
-    add('note', 'Cumulative deficit', `Integrated oxygen deficit area is ${baseArea.toFixed(2)} g. This is a rough “oxygen debt” proxy.`);
-  }
+  const co2Class = classify('max', co2Peak, 15, 30);
+  addTag({
+    label:'CO₂ (produced)',
+    tone: co2Class.tone,
+    status: co2Class.label,
+    summary:`peak ${fmtVal(co2Peak, 'mg/L')}`,
+    details:[
+      `Modeled ${isMC ? 'median peak' : 'peak'}: ${fmtVal(co2Peak, 'mg/L')}.`,
+      fmtBandLine('max', 15, 30, 'mg/L'),
+      `CO₂ spikes often track heavy feeding or respiration loads.`
+    ]
+  });
 
-  if(tUnder2 > 0){
-    add('warn', 'Time under 2 mg/L', `Time under 2 mg/L: ${(tUnder2*24).toFixed(1)} h (single run).`);
-  }
-  if(tUnder1 > 0){
-    add('danger', 'Time under 1 mg/L', `Time under 1 mg/L: ${(tUnder1*24).toFixed(1)} h (single run).`);
-  }
+  const macroClass = classify('max', macroPeak, 1.5, 3.0);
+  addTag({
+    label:'Macros (proxy)',
+    tone: macroClass.tone,
+    status: macroClass.label,
+    summary:`peak ${fmtVal(macroPeak, 'mg/L')}`,
+    details:[
+      `Modeled ${isMC ? 'median peak' : 'peak'}: ${fmtVal(macroPeak, 'mg/L')}.`,
+      fmtBandLine('max', 1.5, 3.0, 'mg/L'),
+      `Proxy nutrients help compare relative load across scenarios.`
+    ]
+  });
 
   if(nh3PeakValue > 0.10){
     add('danger', 'NH₃ toxicity risk', `Unionized NH₃ peaks near ${nh3PeakValue.toFixed(3)} mg/L. Consider lower pH, reduced load, or more nitrification capacity.`);
@@ -3076,18 +3166,6 @@ function recompute(){
 
     updateChemSeriesLabels(params.nUnits);
     buildLegendChem();
-    const nh4Label = el('nh4Label');
-    const no2Label = el('no2Label');
-    const no3Label = el('no3Label');
-    if(params.nUnits === 'asIon'){
-      if(nh4Label) nh4Label.textContent = 'NH₄⁺ peak';
-      if(no2Label) no2Label.textContent = 'NO₂⁻ peak';
-      if(no3Label) no3Label.textContent = 'NO₃⁻ peak';
-    }else{
-      if(nh4Label) nh4Label.textContent = 'NH₄-N peak';
-      if(no2Label) no2Label.textContent = 'NO₂-N peak';
-      if(no3Label) no3Label.textContent = 'NO₃-N peak';
-    }
 
     assertFinite('days', params.days);
     assertFinite('volL', params.volL);
@@ -3098,8 +3176,8 @@ function recompute(){
     setStage('Pellets', 'derive pellet count');
     const mEach = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
     const nPel = (mEach > 0) ? (params.pelletMass_g / mEach) : 0;
-    el('pelCount').textContent = `${nPel.toFixed(1)} pellets`;
-    el('pelEach').textContent = `${mEach.toFixed(4)} g each`;
+    setText('pelCount', `${nPel.toFixed(1)} pellets`);
+    setText('pelEach', `${mEach.toFixed(4)} g each`);
 
     // Base sim (used for breakdown lines + UI even in uncertainty mode)
     setStage('Simulation', 'run base sim');
@@ -3123,27 +3201,27 @@ function recompute(){
       DEBUG_STATE.lastScalars = mc.scalars;
 
       // Oxygenation meta (bands)
-      el('cStarOut').textContent = fmtBand(mc.scalars.Cstar, 'mg/L', 2);
-      el('otrOut').textContent   = fmtBand(mc.scalars.otrMax, 'g/day', 2);
-      el('klaOut').textContent   = fmtBand(mc.scalars.kLa, '1/day', 3);
+      setText('cStarOut', fmtBand(mc.scalars.Cstar, 'mg/L', 2));
+      setText('otrOut', fmtBand(mc.scalars.otrMax, 'g/day', 2));
+      setText('klaOut', fmtBand(mc.scalars.kLa, '1/day', 3));
 
       // DO min + risk
-      el('doMinOut').textContent = `${fmtBand(mc.scalars.minDO, 'mg/L', 2)}  @ day ${fmtBand(mc.scalars.minDO_day, '', 2).replace('  [','[')}`;
-      el('pUnder2Out').textContent = fmtPct(mc.probs.anyUnder2);
-      el('pUnder1Out').textContent = fmtPct(mc.probs.anyUnder1);
+      setText('doMinOut', `${fmtBand(mc.scalars.minDO, 'mg/L', 2)}  @ day ${fmtBand(mc.scalars.minDO_day, '', 2).replace('  [','[')}`);
+      setText('pUnder2Out', fmtPct(mc.probs.anyUnder2));
+      setText('pUnder1Out', fmtPct(mc.probs.anyUnder1));
 
       const nh4Stats = params.nUnits === 'asIon' ? convertStats(mc.scalars.nh4pk, CHEM.NH4_ion_per_N) : mc.scalars.nh4pk;
       const no2Stats = params.nUnits === 'asIon' ? convertStats(mc.scalars.no2pk, CHEM.NO2_ion_per_N) : mc.scalars.no2pk;
       const no3Stats = params.nUnits === 'asIon' ? convertStats(mc.scalars.no3pk, CHEM.NO3_ion_per_N) : mc.scalars.no3pk;
 
-      el('nh4Out').textContent = fmtBand(nh4Stats, 'mg/L', 3);
-      el('no2Out').textContent = fmtBand(no2Stats, 'mg/L', 3);
-      el('no3Out').textContent = fmtBand(no3Stats, 'mg/L', 3);
-      el('nh3Out').textContent = fmtBand(mc.scalars.nh3pk, 'mg/L', 3);
-      el('co2Out').textContent = fmtBand(mc.scalars.co2pk, 'mg/L', 2);
+      setText('nh4Out', fmtBand(nh4Stats, 'mg/L', 3));
+      setText('no2Out', fmtBand(no2Stats, 'mg/L', 3));
+      setText('no3Out', fmtBand(no3Stats, 'mg/L', 3));
+      setText('nh3Out', fmtBand(mc.scalars.nh3pk, 'mg/L', 3));
+      setText('co2Out', fmtBand(mc.scalars.co2pk, 'mg/L', 2));
       const macroStats = mc.scalars.macroPk;
       const microStats = mc.scalars.microPk;
-      el('nutrOut').textContent = `${fmtBand(macroStats, 'mg/L', 2)} • ${fmtBand(microStats, 'mg/L', 2)}`;
+      setText('nutrOut', `${fmtBand(macroStats, 'mg/L', 2)} • ${fmtBand(microStats, 'mg/L', 2)}`);
 
       // Plots with bands
       setStage('Plots', 'rate');
@@ -3209,9 +3287,9 @@ function recompute(){
       setStage('Mode', 'deterministic single run');
 
       // Deterministic (single)
-      el('cStarOut').textContent = `${oxy.Cstar.toFixed(2)} mg/L`;
-      el('otrOut').textContent   = `${oxy.OTR_max.toFixed(2)} g/day`;
-      el('klaOut').textContent   = `${oxy.kLa.toFixed(3)} 1/day`;
+      setText('cStarOut', `${oxy.Cstar.toFixed(2)} mg/L`);
+      setText('otrOut', `${oxy.OTR_max.toFixed(2)} g/day`);
+      setText('klaOut', `${oxy.kLa.toFixed(3)} 1/day`);
 
       // Min DO display
       let doMinValue = Infinity;
@@ -3233,12 +3311,12 @@ function recompute(){
       const co2Peak = Math.max(...baseSim.CO2_mgL);
       const macroPeak = Math.max(...baseSim.macro_mgL);
       const microPeak = Math.max(...baseSim.micro_mgL);
-      el('nh4Out').textContent = `${nh4Peak.toFixed(3)} mg/L`;
-      el('no2Out').textContent = `${no2Peak.toFixed(3)} mg/L`;
-      el('no3Out').textContent = `${no3Peak.toFixed(3)} mg/L`;
-      el('nh3Out').textContent = `${nh3Peak.toFixed(3)} mg/L`;
-      el('co2Out').textContent = `${co2Peak.toFixed(2)} mg/L`;
-      el('nutrOut').textContent = `${macroPeak.toFixed(2)} mg/L • ${microPeak.toFixed(2)} mg/L`;
+      setText('nh4Out', `${nh4Peak.toFixed(3)} mg/L`);
+      setText('no2Out', `${no2Peak.toFixed(3)} mg/L`);
+      setText('no3Out', `${no3Peak.toFixed(3)} mg/L`);
+      setText('nh3Out', `${nh3Peak.toFixed(3)} mg/L`);
+      setText('co2Out', `${co2Peak.toFixed(2)} mg/L`);
+      setText('nutrOut', `${macroPeak.toFixed(2)} mg/L • ${microPeak.toFixed(2)} mg/L`);
 
       // Draw plots
       setStage('Plots', 'rate');
