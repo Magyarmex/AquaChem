@@ -731,9 +731,19 @@ function ensureTooltip(){
 function clamp(x,a,b){ return Math.max(a, Math.min(b, x)); }
 
 function showError(err){
-  const box = el('errBox');
-  const txt = el('errText');
+  let box = el('errBox');
+  let txt = el('errText');
   const msg = (err && err.stack) ? err.stack : String(err);
+
+  if(!box || !txt){
+    box = document.createElement('div');
+    box.id = 'errBox';
+    box.className = 'errbox';
+    box.style.display = 'block';
+    box.innerHTML = `<b>Model error</b><pre id="errText"></pre>`;
+    document.body.appendChild(box);
+    txt = el('errText');
+  }
 
   // Visible error banner
   if(box) box.style.display = 'block';
@@ -902,6 +912,19 @@ lines.push(`surface=${p.lenCm}×${p.widCm} cm, blanket=${p.blanketPct}%, ripple=
 function assertFinite(name, v){
   if(!Number.isFinite(v)) throw new Error(`Non-finite value for ${name}: ${v}`);
   return v;
+}
+
+function installGlobalErrorHandlers(){
+  if(window.__o2planner_err_bound) return;
+  window.__o2planner_err_bound = true;
+  window.addEventListener('error', (event)=>{
+    const err = event?.error || new Error(event?.message || 'Unknown error');
+    showError(err);
+  });
+  window.addEventListener('unhandledrejection', (event)=>{
+    const err = event?.reason instanceof Error ? event.reason : new Error(String(event?.reason || 'Unhandled rejection'));
+    showError(err);
+  });
 }
 
 function linkRangeAndNumber(rangeEl, numEl, onChange){
@@ -1333,7 +1356,7 @@ function runSimulation(params){
     const dHet = dHet_base * tempF;
     const rNit = rNit_base * tempFNit;
     const dNit = dNit_base * tempFNit;
-    const rDen = rDen_base * tempF;
+    const rDen_grow = rDen_base * tempF;
     const dDen = dDen_base * tempF;
 
     // Apply pop events at this time slice
@@ -1501,13 +1524,13 @@ function runSimulation(params){
     const O2_no2 = r2 * CHEM.O2_per_gN_NO2_to_NO3;
 
     const fAnox = clamp(1 - DO/(kDoHet + DO), 0, 1);
-    const rDen = Math.min(Bden * kDenit * fAnox * NO3, NO3/dt);
-    NO3 = NO3 - rDen*dt;
-    const COD_den = Math.min(COD_bio, rDen * 2.5);
+    const rDen_flux = Math.min(Bden * kDenit * fAnox * NO3, NO3/dt);
+    NO3 = NO3 - rDen_flux*dt;
+    const COD_den = Math.min(COD_bio, rDen_flux * 2.5);
     COD_bio = Math.max(0, COD_bio - COD_den*dt);
     const CO2_den = COD_den;
     CO2_g += CO2_den * dt;
-    out.audit.no3_to_n2 += rDen * dt;
+    out.audit.no3_to_n2 += rDen_flux * dt;
     out.audit.co2_from_denit += CO2_den * dt;
 
     const demand = O2_carb + O2_prot + O2_fat + O2_endog + O2_nh4 + O2_no2;
@@ -1585,7 +1608,7 @@ function runSimulation(params){
     Bhet = clamp(Bhet + (rHet*fS*(1-Bhet) - dHet*Bhet)*dt, 0.0, 1.0);
     Bnit = clamp(Bnit + (rNit*fN*(nitCap-Bnit) - dNit*Bnit)*dt, 0.0, nitCap);
     const fDen = NO3 / (Kn + NO3);
-    Bden = clamp(Bden + (rDen*fDen*(denitCap-Bden) - dDen*Bden)*dt, 0.0, denitCap);
+    Bden = clamp(Bden + (rDen_grow*fDen*(denitCap-Bden) - dDen*Bden)*dt, 0.0, denitCap);
   }
 
   // cumulative arrays
@@ -3366,10 +3389,12 @@ function updateModeUI(){
 }
 
 function init(){
+  installGlobalErrorHandlers();
   loadState();
   try{ applyAllPresets(); }catch(_){}
 
   updateModeUI();
+  setDebugText(buildDebugSnapshot(['Init: handlers ready, awaiting recompute.']));
 
   // Link sliders
   linkRangeAndNumber(el('pelMass'), el('pelMassN'), ()=>{ scheduleRecompute(); });
