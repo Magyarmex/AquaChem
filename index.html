@@ -2861,11 +2861,11 @@ function setFlags(sim, params, mc){
     if(v < 1.0) tUnder1 += sim.meta.dt;
   }
 
-  let nh4Peak = 0, no2Peak = 0, no3Peak = 0, nh3Peak = 0;
+  let nh4Peak = 0, no2Peak = 0, no3Peak = 0, nh3PeakValue = 0;
   for(let i=0;i<sim.NH4_mgL.length;i++) if(sim.NH4_mgL[i] > nh4Peak) nh4Peak = sim.NH4_mgL[i];
   for(let i=0;i<sim.NO2_mgL.length;i++) if(sim.NO2_mgL[i] > no2Peak) no2Peak = sim.NO2_mgL[i];
   for(let i=0;i<sim.NO3_mgL.length;i++) if(sim.NO3_mgL[i] > no3Peak) no3Peak = sim.NO3_mgL[i];
-  for(let i=0;i<sim.NH3_mgL.length;i++) if(sim.NH3_mgL[i] > nh3Peak) nh3Peak = sim.NH3_mgL[i];
+  for(let i=0;i<sim.NH3_mgL.length;i++) if(sim.NH3_mgL[i] > nh3PeakValue) nh3PeakValue = sim.NH3_mgL[i];
   const denitN_mgL = (sim.audit.no3_to_n2 * 1000) / params.volL;
 
   // --------------------------
@@ -2980,21 +2980,11 @@ function setFlags(sim, params, mc){
     add('note', 'DO looks comfortable', `Min DO is ${doMinStats.v.toFixed(2)} mg/L at day ${doMinStats.day.toFixed(2)}.`);
   }
 
-  const no3Label = params.nUnits === 'asIon' ? 'NO₃⁻ (nitrate)' : 'NO₃-N (nitrate)';
-  const no3Good = 20 * nFactorNO3;
-  const no3Warn = 40 * nFactorNO3;
-  const no3Class = classify('max', no3Peak, no3Good, no3Warn);
-  addTag({
-    label: no3Label,
-    tone: no3Class.tone,
-    status: no3Class.label,
-    summary:`peak ${fmtVal(no3Peak, 'mg/L')}`,
-    details:[
-      `Modeled ${isMC ? 'median peak' : 'peak'}: ${fmtVal(no3Peak, 'mg/L')}.`,
-      fmtBandLine('max', no3Good, no3Warn, 'mg/L'),
-      `Higher nitrate builds gradually; plants or water changes lower it.`
-    ]
-  });
+  if(peakDef.v > 0.1){
+    add('warn', 'Demand exceeds supply', `Peak deficit is <b>${peakDef.v.toFixed(2)} g/day</b> at day ${peakDef.day.toFixed(2)}. Expect DO to trend downward around that window.`);
+  }else{
+    add('note', 'Supply generally keeps up', `Peak deficit is ${peakDef.v.toFixed(2)} g/day.`);
+  }
 
   const co2Class = classify('max', co2Peak, 15, 30);
   addTag({
@@ -3022,18 +3012,13 @@ function setFlags(sim, params, mc){
     ]
   });
 
-  const microClass = classify('max', microPeak, 0.6, 1.2);
-  addTag({
-    label:'Micros (proxy)',
-    tone: microClass.tone,
-    status: microClass.label,
-    summary:`peak ${fmtVal(microPeak, 'mg/L')}`,
-    details:[
-      `Modeled ${isMC ? 'median peak' : 'peak'}: ${fmtVal(microPeak, 'mg/L')}.`,
-      fmtBandLine('max', 0.6, 1.2, 'mg/L'),
-      `Proxy nutrients keep micronutrient spikes visible in the model.`
-    ]
-  });
+  if(nh3PeakValue > 0.10){
+    add('danger', 'NH₃ toxicity risk', `Unionized NH₃ peaks near ${nh3PeakValue.toFixed(3)} mg/L. Consider lower pH, reduced load, or more nitrification capacity.`);
+  }else if(nh3PeakValue > 0.05){
+    add('warn', 'NH₃ watch zone', `Unionized NH₃ peaks near ${nh3PeakValue.toFixed(3)} mg/L. Keep an eye on sensitive stock.`);
+  }else{
+    add('note', 'NH₃ stays low', `Unionized NH₃ peaks near ${nh3PeakValue.toFixed(3)} mg/L.`);
+  }
 
   DEBUG_STATE.lastTagSummary = {
     updated: new Date().toISOString(),
