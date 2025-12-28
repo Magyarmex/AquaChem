@@ -837,6 +837,7 @@ const DEBUG_STATE = {
   lastFlagsCount: null,
   lastUpdateISO: null,
   missingContainers: [],
+  initReadyState: null,
   errors: [],  // newest last
   warnings: []
 };
@@ -949,6 +950,11 @@ lines.push(`surface=${p.lenCm}×${p.widCm} cm, blanket=${p.blanketPct}%, ripple=
     lines.push('');
     lines.push('--- Recompute timing (last) ---');
     lines.push(`Total recompute: ${DEBUG_STATE.lastRecomputeMs.toFixed(1)} ms`);
+  }
+  if(DEBUG_STATE.initReadyState){
+    lines.push('');
+    lines.push('--- Init ---');
+    lines.push(`ReadyState at init: ${DEBUG_STATE.initReadyState}`);
   }
   if(DEBUG_STATE.lastChemCumInfo){
     lines.push('');
@@ -3627,7 +3633,12 @@ function init(){
   });
 
   // Events UI
-  el('addEventBtn').addEventListener('click', ()=>{
+  const addBtn = el('addEventBtn');
+  if(!addBtn){
+    addWarning('Missing add-event button (#addEventBtn).');
+    DEBUG_STATE.missingContainers.push({timeISO: new Date().toISOString(), id:'addEventBtn', context:'init'});
+  }else{
+    addBtn.addEventListener('click', ()=>{
     const day = Number(el('evDay').value);
     const pellets = Number(el('evPellets').value);
     const daysMax = Number(el('daysN').value);
@@ -3640,20 +3651,28 @@ function init(){
     saveState();
     renderEvents();
     scheduleRecompute();
-  });
+    });
+  }
 
-  el('clearEventsBtn').addEventListener('click', ()=>{
+  const clearBtn = el('clearEventsBtn');
+  if(!clearBtn){
+    addWarning('Missing clear-events button (#clearEventsBtn).');
+    DEBUG_STATE.missingContainers.push({timeISO: new Date().toISOString(), id:'clearEventsBtn', context:'init'});
+  }else{
+    clearBtn.addEventListener('click', ()=>{
     EVENTS = [];
     saveState();
     renderEvents();
     scheduleRecompute();
-  });
+    });
+  }
 
-  if(el('recomputeBtn')){
-    el('recomputeBtn').addEventListener('click', ()=>{
+  const recomputeBtn = el('recomputeBtn');
+  if(recomputeBtn){
+    recomputeBtn.addEventListener('click', ()=>{
       recompute();
       if(el('liveRecompute') && el('liveRecompute').value !== 'off'){
-        el('recomputeBtn').style.display = 'none';
+        recomputeBtn.style.display = 'none';
       }
     });
   }
@@ -3664,7 +3683,16 @@ function init(){
   recompute();
 }
 
-init();
+function boot(){
+  DEBUG_STATE.initReadyState = document.readyState;
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', init, {once:true});
+  }else{
+    init();
+  }
+}
+
+boot();
 
 </script>
 </body>
