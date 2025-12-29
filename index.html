@@ -1462,6 +1462,9 @@ function runSimulation(params){
   let microConsumed_g = 0;
   let co2Consumed_g = 0;
   let no3Denit_g = 0;
+  let phytoGrowthTotal = 0;
+  let phytoDecayTotal = 0;
+  let co2FloorHits = 0;
   let oxygenClampCount = 0;
   let plantLimitedSteps = 0;
 
@@ -1648,6 +1651,7 @@ function runSimulation(params){
   const photoO2_g_day_peak = (PHOTO_MODEL.o2_mg_g_day_peak * photoMass) / 1000;
   const macroUptakeRate_g_day = (FEED_PROFILE.modeling.macroUptake_mgL_per_g_photo_day * photoMass * params.volL) / 1000;
   const microUptakeRate_g_day = (FEED_PROFILE.modeling.microUptake_mgL_per_g_photo_day * photoMass * params.volL) / 1000;
+  const CO2_floor_g = (1.0 * params.volL) / 1000;
 
   for(let i=0;i<n;i++){
     const day = i*dt;
@@ -1785,17 +1789,20 @@ function runSimulation(params){
     // Biomass growth + nutrient consumption
     const S_tot = S.carb + S.prot + S.fat;
     const nutrientPool = macro_g + micro_g;
+    const inorgN_g = Math.max(0, NH4 + NO3);
     const foodIndex = clamp((S_tot + nutrientPool * 0.3) / (S_tot + nutrientPool * 0.3 + 0.25), 0, 1);
-    const phytoNutrientIndex = clamp(nutrientPool / (nutrientPool + 0.35), 0, 1);
-    const co2Index = clamp(CO2_g / (CO2_g + 0.2), 0, 1);
+    const phytoNutrientIndex = clamp((nutrientPool + inorgN_g * 0.6) / (nutrientPool + inorgN_g * 0.6 + 0.35), 0, 1);
+    const co2Index = clamp(CO2_g / (CO2_g + CO2_floor_g * 0.6), 0, 1);
 
     const heteroGrowth = heteroMass_g * HET_MODEL.growth_per_day * foodIndex * tempF * dt;
     const heteroDecay = heteroMass_g * HET_MODEL.decay_per_day * (1 - foodIndex) * dt;
     heteroMass_g = Math.max(0, heteroMass_g + heteroGrowth - heteroDecay);
 
     const phytoGrowth = phytoMass_g * PHOTO_MODEL.growth_per_day * lightFactor * phytoNutrientIndex * co2Index * dt;
-    const phytoDecay = phytoMass_g * PHOTO_MODEL.decay_per_day * (1 - lightFactor) * dt;
+    const phytoDecay = phytoMass_g * PHOTO_MODEL.decay_per_day * (1 - lightFactor) * (1 - phytoNutrientIndex * 0.5) * dt;
     phytoMass_g = Math.max(0, phytoMass_g + phytoGrowth - phytoDecay);
+    phytoGrowthTotal += phytoGrowth;
+    phytoDecayTotal += phytoDecay;
 
     const heteroMacroUptake_g = Math.min(macro_g, (HET_MODEL.macroUptake_mgL_per_g_day * heteroMass_g * params.volL / 1000) * foodIndex * dt);
     const heteroMicroUptake_g = Math.min(micro_g, (HET_MODEL.microUptake_mgL_per_g_day * heteroMass_g * params.volL / 1000) * foodIndex * dt);
@@ -1816,7 +1823,8 @@ function runSimulation(params){
     out.audit.micro_uptake += phytoMicroUptake_g;
 
     const co2GrowthCons_g = phytoGrowth * PHOTO_MODEL.co2_per_g_growth;
-    CO2_g = Math.max(0, CO2_g - co2GrowthCons_g);
+    CO2_g = Math.max(CO2_floor_g, CO2_g - co2GrowthCons_g);
+    if(CO2_g <= CO2_floor_g + 1e-9) co2FloorHits++;
     co2Consumed_g += co2GrowthCons_g;
 
     // Oxidation of solubles
@@ -1931,7 +1939,8 @@ function runSimulation(params){
     out.NH3_mgL[i] = nh3AsN * CHEM.NH3_ion_per_N;
 
     const co2PhotoCons_g = plant_g_day * CHEM.CO2_per_gO2 * dt;
-    CO2_g = Math.max(0, CO2_g - co2PhotoCons_g);
+    CO2_g = Math.max(CO2_floor_g, CO2_g - co2PhotoCons_g);
+    if(CO2_g <= CO2_floor_g + 1e-9) co2FloorHits++;
     co2Consumed_g += co2PhotoCons_g;
     out.CO2_mgL[i] = (CO2_g*1000)/params.volL;
 
@@ -1997,6 +2006,9 @@ function runSimulation(params){
   out.meta.feedEnd = pelFloat.carb + pelFloat.prot + pelFloat.fat + pelBot.carb + pelBot.prot + pelBot.fat + powBot.carb + powBot.prot + powBot.fat;
   out.meta.oxygenClampCount = oxygenClampCount;
   out.meta.plantLimitedSteps = plantLimitedSteps;
+  out.meta.phytoGrowthTotal = phytoGrowthTotal;
+  out.meta.phytoDecayTotal = phytoDecayTotal;
+  out.meta.co2FloorHits = co2FloorHits;
   if(initialN > 0 && Math.abs(out.audit.n_balance_end - initialN)/initialN > 0.15){
     addWarning('Nitrogen balance drift exceeds 15% — check kinetics or timestep.');
   }
@@ -2591,7 +2603,7 @@ function drawDOPlot(canvas, sim, overlay=null){
   const h = canvas.height = canvas.clientHeight * devicePixelRatio;
   ctx.clearRect(0,0,w,h);
 
-  const m = {l:56*devicePixelRatio, r:16*devicePixelRatio, t:30*devicePixelRatio, b:34*devicePixelRatio};
+  const m = {l:56*devicePixelRatio, r:56*devicePixelRatio, t:30*devicePixelRatio, b:34*devicePixelRatio};
   const pw = w - m.l - m.r;
   const ph = h - m.t - m.b;
 
@@ -3997,7 +4009,10 @@ function recompute(){
       heteroStart: baseSim.biomass?.hetero_g?.[0] ?? null,
       heteroEnd: baseSim.biomass?.hetero_g?.[baseSim.biomass?.hetero_g?.length - 1] ?? null,
       phytoStart: baseSim.biomass?.phyto_g?.[0] ?? null,
-      phytoEnd: baseSim.biomass?.phyto_g?.[baseSim.biomass?.phyto_g?.length - 1] ?? null
+      phytoEnd: baseSim.biomass?.phyto_g?.[baseSim.biomass?.phyto_g?.length - 1] ?? null,
+      phytoGrowthTotal: baseSim.meta.phytoGrowthTotal ?? null,
+      phytoDecayTotal: baseSim.meta.phytoDecayTotal ?? null,
+      co2FloorHits: baseSim.meta.co2FloorHits ?? null
     };
     if(baseSim.meta.chemCumInfo?.invalidCount){
       addWarning(`Chemistry cumulative series had ${baseSim.meta.chemCumInfo.invalidCount} non-finite samples; treated as 0 in the cumulative plot.`);
