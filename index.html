@@ -923,14 +923,14 @@ function buildFeedSchedule(params, pelletEach_g){
   return schedule;
 }
 
-function buildFeedPulse(feedSchedule, dt, days, windowDays){
+function buildFeedPulse(feedPlan, dt, days, windowDays){
   const n = Math.floor(days/dt) + 1;
   const pellets = new Float32Array(n);
   const powder = new Float32Array(n);
   const windowSteps = Math.max(1, Math.round(windowDays / dt));
   let totalPellets = 0;
   let totalPowder = 0;
-  for(const feed of feedSchedule){
+  for(const feed of feedPlan){
     if(!Number.isFinite(feed.day)) continue;
     const startIdx = clamp(Math.floor(feed.day / dt), 0, n - 1);
     const p = Number(feed.pellets || 0);
@@ -949,7 +949,7 @@ function buildFeedPulse(feedSchedule, dt, days, windowDays){
   return {pellets, powder, windowSteps, windowDays, totalPellets, totalPowder};
 }
 
-function renderFeedingCalendar(params, feedSchedule, popEvents){
+function renderFeedingCalendar(params, feedPlan, popEvents){
   const cal = el('feedCalendar');
   if(!cal){
     addWarning('Feeding calendar missing (#feedCalendar).');
@@ -966,7 +966,7 @@ function renderFeedingCalendar(params, feedSchedule, popEvents){
   cal.innerHTML = '';
   const labels = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const feedMap = new Map();
-  for(const f of feedSchedule){
+  for(const f of feedPlan){
     const idx = Math.floor(f.day);
     if(idx < 0 || idx >= days) continue;
     const prev = feedMap.get(idx) || {pellets:0, powder_g:0};
@@ -1904,9 +1904,13 @@ function runSimulation(params){
   };
 
   const pelletEachMass_g = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
-  const simFeedSchedule = params.feedSchedule || buildFeedSchedule(params, pelletEachMass_g);
+  let simFeedPlan = params.feedSchedule || buildFeedSchedule(params, pelletEachMass_g);
+  if(!Array.isArray(simFeedPlan)){
+    addWarning('Feed plan invalid; defaulting to empty schedule.');
+    simFeedPlan = [];
+  }
   const feedWindowHours = clamp(Number(params.feedWindowHours ?? 4), 0.5, 24);
-  const feedPulse = buildFeedPulse(simFeedSchedule, dt, params.days, feedWindowHours / 24);
+  const feedPulse = buildFeedPulse(simFeedPlan, dt, params.days, feedWindowHours / 24);
 
   // Events sorted
   const ev = [...params.events]
@@ -2432,6 +2436,11 @@ function runSimulation(params){
     totalPowder_g: feedPulse.totalPowder,
     windowHours: feedWindowHours,
     windowSteps: feedPulse.windowSteps
+  };
+  out.meta.feedPlanStats = {
+    entries: simFeedPlan.length,
+    pellets: simFeedPlan.reduce((acc, f)=>acc + (Number(f.pellets) || 0), 0),
+    powder_g: simFeedPlan.reduce((acc, f)=>acc + (Number(f.powder_g) || 0), 0)
   };
   out.meta.biomassFloors = {heteroFloor, phytoFloor, heteroHits:heteroFloorHits, phytoHits:phytoFloorHits};
   out.meta.co2FloorHits = co2FloorHits;
@@ -4003,8 +4012,8 @@ function setFlags(sim, params, mc){
   };
 
   const estPellets = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
-  const feedSchedule = params.feedSchedule || [];
-  const pelCount = feedSchedule.reduce((acc, f)=>acc + (Number(f.pellets) || 0), 0);
+  const feedPlan = params.feedSchedule || [];
+  const pelCount = feedPlan.reduce((acc, f)=>acc + (Number(f.pellets) || 0), 0);
   const eventTotal = (params.events || []).reduce((acc, e)=>acc + (Number(e.pellets) || 0), 0);
   if(eventTotal > pelCount + 1){
     add('warn', 'Pop events exceed pellets', `Total pops (${eventTotal.toFixed(0)}) exceed estimated pellet count (${pelCount.toFixed(0)}). The model caps pops automatically, but the schedule is probably too aggressive.`);
@@ -4433,10 +4442,10 @@ function recompute(){
     const perFeedMass_g = perFeedPellets * pelletEach_g;
     setText('pelCount', `${perFeedPellets.toFixed(0)} pellets`);
     setText('pelEach', `${pelletEach_g.toFixed(4)} g`);
-    const feedSchedule = buildFeedSchedule(params, pelletEach_g);
-    params.feedSchedule = feedSchedule;
-    DEBUG_STATE.lastFeedScheduleCount = feedSchedule.length;
-    renderFeedingCalendar(params, feedSchedule, EVENTS);
+    const feedPlan = buildFeedSchedule(params, pelletEach_g);
+    params.feedSchedule = feedPlan;
+    DEBUG_STATE.lastFeedScheduleCount = feedPlan.length;
+    renderFeedingCalendar(params, feedPlan, EVENTS);
 
     // Base sim (used for breakdown lines + UI even in uncertainty mode)
     setStage('Simulation', 'run base sim');
@@ -4571,28 +4580,6 @@ function recompute(){
         })),
         bandColors: Object.fromEntries(CHEM_SERIES.map(s=>[s.key, s.color])),
         bandPattern: true
-      });
-
-      setStage('Plots', 'biomass');
-      const bioBands = {
-        hetero_g: sanitizeBand(mc.q.bioBands?.hetero_g, baseSim.biomass.hetero_g, 'bio:hetero_g'),
-        phyto_g: sanitizeBand(mc.q.bioBands?.phyto_g, baseSim.biomass.phyto_g, 'bio:phyto_g')
-      };
-      const bioPctBands = {
-        hetero_pct: sanitizeBand(mc.q.bioPctBands?.hetero_pct, baseSim.biomass.hetero_pct, 'bio:hetero_pct'),
-        phyto_pct: sanitizeBand(mc.q.bioPctBands?.phyto_pct, baseSim.biomass.phyto_pct, 'bio:phyto_pct')
-      };
-      bandDiagnostics.bioInvalid += bioBands.hetero_g.invalid + bioBands.phyto_g.invalid + bioPctBands.hetero_pct.invalid + bioPctBands.phyto_pct.invalid;
-      bandDiagnostics.bioInverted += bioBands.hetero_g.inverted + bioBands.phyto_g.inverted + bioPctBands.hetero_pct.inverted + bioPctBands.phyto_pct.inverted;
-      bioGeom = drawBiomassPlot(el('bioCanvas'), baseSim, {
-        bioBands: {
-          hetero_g: bioBands.hetero_g.band,
-          phyto_g: bioBands.phyto_g.band
-        },
-        bioPctBands: {
-          hetero_pct: bioPctBands.hetero_pct.band,
-          phyto_pct: bioPctBands.phyto_pct.band
-        }
       });
       if(!mc.q.bioBands || !mc.q.bioPctBands){
         addWarning('Missing biomass uncertainty bands; check Monte Carlo aggregation.');
