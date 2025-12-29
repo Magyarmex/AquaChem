@@ -57,6 +57,118 @@
       backdrop-filter: blur(6px);
     }
     .card h2{margin:0 0 12px;font-size:14px;color:#dfe6ff;text-transform:uppercase;letter-spacing:.12em}
+    .left-panel{
+      position:relative;
+      background:linear-gradient(180deg,rgba(15,22,44,.98),rgba(12,18,38,.97));
+    }
+    .panel-section{
+      position:relative;
+      padding:14px 14px 12px 16px;
+      border-radius:16px;
+      background:linear-gradient(180deg,rgba(12,19,39,.92),rgba(9,14,30,.92));
+      border:1px solid rgba(122,162,255,.14);
+      box-shadow:0 12px 24px rgba(0,0,0,.28);
+      display:grid;
+      gap:10px;
+      overflow:hidden;
+    }
+    .panel-section::before{
+      content:"";
+      position:absolute;
+      left:0;
+      top:0;
+      bottom:0;
+      width:4px;
+      background:linear-gradient(180deg, rgba(122,162,255,.75), rgba(99,230,190,.35));
+      opacity:.7;
+    }
+    .panel-header{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding-left:8px;
+    }
+    .panel-title{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      font-size:13px;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+      color:#dfe6ff;
+      font-weight:700;
+    }
+    .panel-title .icon{
+      width:28px;
+      height:28px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      border-radius:10px;
+      background:rgba(122,162,255,.18);
+      border:1px solid rgba(122,162,255,.25);
+      font-size:14px;
+    }
+    .panel-sub{
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.45;
+      padding-left:8px;
+    }
+    .panel-badges{
+      display:flex;
+      gap:6px;
+      flex-wrap:wrap;
+    }
+    .badge{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:4px 8px;
+      border-radius:999px;
+      font-size:10px;
+      text-transform:uppercase;
+      letter-spacing:.12em;
+      border:1px solid transparent;
+      background:rgba(122,162,255,.12);
+      color:#dfe6ff;
+    }
+    .badge.warn{background:rgba(255,207,90,.18); border-color:rgba(255,207,90,.35); color:#fff3d1;}
+    .badge.ok{background:rgba(99,230,190,.16); border-color:rgba(99,230,190,.35); color:#d5fff1;}
+    .badge.note{background:rgba(122,162,255,.2); border-color:rgba(122,162,255,.35);}
+    .badge.alert{background:rgba(255,107,107,.18); border-color:rgba(255,107,107,.35); color:#ffd1d1;}
+    .panel-divider{height:1px;background:rgba(255,255,255,.08);margin:4px 0}
+    .panel-quick{
+      display:grid;
+      gap:10px;
+      padding:10px;
+      border-radius:16px;
+      background:linear-gradient(140deg, rgba(122,162,255,.16), rgba(99,230,190,.08));
+      border:1px solid rgba(122,162,255,.2);
+    }
+    .panel-quick .row{margin:0}
+    .panel-drawer{
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:12px;
+      padding:8px 10px;
+      background:rgba(0,0,0,.18);
+    }
+    .panel-drawer summary{font-size:12px;color:#dfe6ff;font-weight:600}
+    .panel-drawer .drawer-text{color:var(--muted);font-size:12px;line-height:1.45;margin-top:8px}
+    .left-panel .row label{font-size:11px;letter-spacing:.03em}
+    .left-panel input[type="number"],
+    .left-panel input[type="text"],
+    .left-panel select{padding:8px 10px;font-size:12px;border-radius:10px}
+    .control-active{
+      box-shadow:0 0 0 3px rgba(122,162,255,.18), 0 0 18px rgba(122,162,255,.22);
+      border-color:rgba(122,162,255,.6);
+    }
+    .left-panel .row input[type="range"]{min-width:180px}
+    .left-panel .grid2{gap:8px}
+    .left-panel .grid3{gap:8px}
+    .left-panel .small{font-size:11px}
+    .left-panel .note{font-size:11px}
     .grid2{display:grid;gap:10px;grid-template-columns:1fr 1fr;}
 
     .grid3{display:grid;gap:10px;grid-template-columns:1fr 1fr 1fr;}
@@ -164,17 +276,33 @@
     .tag-details{margin-top:8px;color:var(--muted);font-size:12px;line-height:1.45}
     .calendar{
       display:grid;
-      gap:12px;
-      margin-top:10px;
-    }
-    .calendar.compact{
       gap:10px;
+      margin-top:8px;
+    }
+    .calendar.tiles{
+      grid-template-columns:repeat(3, minmax(0, 1fr));
+    }
+    @media (max-width: 900px){
+      .calendar.tiles{grid-template-columns:repeat(2, minmax(0, 1fr));}
+    }
+    @media (max-width: 560px){
+      .calendar.tiles{grid-template-columns:1fr;}
     }
     .calendar-month{
       border:1px solid rgba(255,255,255,.12);
       border-radius:12px;
-      padding:10px;
+      padding:8px;
       background:rgba(0,0,0,.18);
+      display:grid;
+      gap:6px;
+      position:relative;
+    }
+    .calendar-month.expanded{
+      grid-column:1 / -1;
+      padding:12px;
+      background:linear-gradient(180deg, rgba(17,26,51,.96), rgba(10,16,34,.94));
+      border-color:rgba(122,162,255,.3);
+      box-shadow:0 18px 30px rgba(0,0,0,.35);
     }
     .calendar-header{
       display:flex;
@@ -190,36 +318,44 @@
       font-size:10px;
       letter-spacing:.04em;
     }
+    .calendar-header .month-actions{
+      display:flex;
+      gap:6px;
+      align-items:center;
+    }
+    .calendar-header .month-toggle{
+      border:1px solid rgba(122,162,255,.35);
+      background:rgba(122,162,255,.16);
+      color:#dfe6ff;
+      border-radius:999px;
+      padding:2px 8px;
+      font-size:9px;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+      cursor:pointer;
+    }
     .calendar-grid{
       display:grid;
       grid-template-columns: repeat(7, 1fr);
-      gap:6px;
-      margin-top:8px;
-    }
-    .calendar.compact .calendar-grid{
       gap:4px;
+      margin-top:4px;
     }
     .cal-cell{
       border:1px solid rgba(255,255,255,.12);
-      border-radius:10px;
-      padding:6px 6px;
+      border-radius:8px;
+      padding:4px 4px;
       background:rgba(0,0,0,.18);
-      min-height:54px;
+      min-height:36px;
       position:relative;
-      font-size:11px;
-    }
-    .calendar.compact .cal-cell{
-      min-height:42px;
-      font-size:10px;
-      padding:5px 5px;
+      font-size:9.5px;
     }
     .cal-cell.empty{
       background:transparent;
       border-color:transparent;
       box-shadow:none;
     }
-    .cal-cell .day-num{font-weight:600;color:#dfe6ff}
-    .cal-cell .day-meta{color:var(--muted);font-size:10px;margin-top:4px}
+    .cal-cell .day-num{font-weight:600;color:#dfe6ff;font-size:10px}
+    .cal-cell .day-meta{color:var(--muted);font-size:9px;margin-top:2px}
     .cal-cell.feed{background:rgba(99,230,190,.12); border-color:rgba(99,230,190,.4)}
     .cal-cell.pop{background:rgba(255,207,90,.14); border-color:rgba(255,207,90,.4)}
     .cal-cell.feed.pop{
@@ -250,6 +386,8 @@
     .btn.ghost:hover{background:rgba(255,255,255,.06)}
     details{border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:12px;background:rgba(0,0,0,.16)}
     details summary{cursor:pointer;color:#dfe6ff;font-weight:600;font-size:13px}
+    details.panel-drawer{border:1px solid rgba(255,255,255,.12);padding:8px 10px;background:rgba(0,0,0,.18)}
+    details.panel-drawer summary{font-size:12px}
     table{width:100%;border-collapse:collapse}
     th,td{padding:8px 6px;border-bottom:1px solid rgba(255,255,255,.08);font-size:12px;color:var(--muted)}
     tr:nth-child(even) td{background:rgba(255,255,255,.02)}
@@ -337,45 +475,58 @@
   <div class="card">
     <h2>Inputs</h2>
 
-    <div class="row">
-      <label>Pellets per feeding (count)</label>
-      <input id="pelMass" type="range" min="0" max="200" step="1" value="20"/>
-      <input id="pelMassN" type="number" min="0" max="500" step="1" value="20"/>
-    </div>
-    <div class="small" style="margin-top:-6px">
-      This rate ≈ <b id="pelCount">—</b> (<span id="pelEach">—</span> each).
-    </div>
-
-    <div class="row">
-      <label>Powder mass per feeding (as-fed, g)</label>
-      <input id="powMass" type="range" min="0" max="5" step="0.01" value="0.00"/>
-      <input id="powMassN" type="number" min="0" max="50" step="0.01" value="0.00"/>
-    </div>
-    <div class="row">
-      <label>Feeding interval (days)</label>
-      <input id="feedInterval" type="number" min="0.25" step="0.25" value="1"/>
-    </div>
-
-    <div class="row">
-      <label>Blanket cover (%) — uncovered = chimney</label>
-      <input id="blanket" type="range" min="0" max="100" step="1" value="80"/>
-      <input id="blanketN" type="number" min="0" max="100" step="1" value="80"/>
-    </div>
-
-    <div class="row">
-      <label>Simulation time (days)</label>
-      <input id="days" type="range" min="7" max="180" step="1" value="30"/>
-      <input id="daysN" type="number" min="1" max="365" step="1" value="30"/>
-    </div>
-
-    <details id="uncModeDetails" open style="margin-top:10px">
-      <summary>Uncertainty Mode (Monte Carlo)</summary>
-      <div class="small" style="margin-top:10px">
-        Default mode: the sim runs many plausible “nearby realities” and shows a band (not a single pretend-precise line).
-        Without a real DO measurement, this is the honest way to use the model.
+      <div class="row">
+        <label>Pellets per feeding (count)</label>
+        <input id="pelMass" type="range" min="0" max="200" step="1" value="20"/>
+        <input id="pelMassN" type="number" min="0" max="500" step="1" value="20"/>
+      </div>
+      <div class="small" style="margin-top:-6px">
+        This rate ≈ <b id="pelCount">—</b> (<span id="pelEach">—</span> each).
       </div>
 
-      <div class="grid2" style="margin-top:10px">
+      <div class="row">
+        <label>Powder mass per feeding (as-fed, g)</label>
+        <input id="powMass" type="range" min="0" max="5" step="0.01" value="0.00"/>
+        <input id="powMassN" type="number" min="0" max="50" step="0.01" value="0.00"/>
+      </div>
+
+      <div class="row">
+        <label>Feeding interval (days)</label>
+        <input id="feedInterval" type="number" min="0.25" step="0.25" value="1"/>
+      </div>
+
+      <div class="row">
+        <label>Blanket cover (%) — uncovered = chimney</label>
+        <input id="blanket" type="range" min="0" max="100" step="1" value="80"/>
+        <input id="blanketN" type="number" min="0" max="100" step="1" value="80"/>
+      </div>
+
+      <div class="row">
+        <label>Simulation time (days)</label>
+        <input id="days" type="range" min="7" max="180" step="1" value="30"/>
+        <input id="daysN" type="number" min="1" max="365" step="1" value="30"/>
+      </div>
+    </div>
+
+    <div class="panel-section" id="uncModeDetails" style="margin-top:12px">
+      <div class="panel-header">
+        <div class="panel-title"><span class="icon">🧭</span>Uncertainty Mode</div>
+        <div class="panel-badges">
+          <span class="badge warn">Uncertainty Mode</span>
+        </div>
+      </div>
+      <div class="panel-sub">
+        Runs multiple plausible realities and shows a confidence band instead of a single line.
+      </div>
+      <details class="panel-drawer">
+        <summary>What this means</summary>
+        <div class="drawer-text">
+          Default mode: the sim runs many plausible “nearby realities” and shows a band (not a single pretend-precise line).
+          Without a real DO measurement, this is the honest way to use the model.
+        </div>
+      </details>
+
+      <div class="grid2">
         <div class="row">
           <label>Run mode</label>
           <select id="runMode">
@@ -420,14 +571,14 @@
         </div>
       </div>
 
-      <div style="margin-top:10px">
+      <div>
         <button class="btn" id="recomputeBtn" style="display:none">Recompute</button>
       </div>
 
-      <div class="hr"></div>
+      <div class="panel-divider"></div>
 
       <div class="small"><b>What varies across runs:</b></div>
-      <div class="grid2" style="margin-top:8px">
+      <div class="grid2">
         <div class="row"><label><input id="uAir" type="checkbox" checked> Pump delivered airflow</label></div>
         <div class="row"><label><input id="uDiff" type="checkbox" checked> Bubble transfer efficiency</label></div>
         <div class="row"><label><input id="uSurf" type="checkbox" checked> Surface exchange (k values)</label></div>
@@ -437,333 +588,385 @@
         <div class="row"><label><input id="uInitDO" type="checkbox" checked> Initial DO</label></div>
       </div>
 
-      <div class="small" style="margin-top:8px">
-        The band is a <b>distribution</b>, not a promise. If you calibrate with real DO data later, the band shrinks and gets less “vibes, more physics”.
-      </div>
-    </details>
-
-
-
-    <div class="hr"></div>
-
-    <h2>Feeding calendar</h2>
-    <div class="note">
-      Feeding events add pellets + powder at your chosen interval. Green = feed day, yellow = pellet pop day.
-    </div>
-    <div class="calendar" id="feedCalendar"></div>
-
-    <div class="hr"></div>
-
-    <h2>Pop events (convert pellets → powder)</h2>
-    <div class="note">
-      Click the <span class="kbd">RATE</span> graph to add an event at that day, or use the table below.
-      Each event converts whole pellets into powder at that moment (mass is conserved).
-    </div>
-    <div class="grid3" style="margin-top:10px">
-      <div class="row">
-        <label>Event day</label>
-        <input id="evDay" type="number" min="0" step="0.1" value="3.0"/>
-      </div>
-      <div class="row">
-        <label>Pellets to pop</label>
-        <input id="evPellets" type="number" min="0" step="1" value="10"/>
-      </div>
-      <div class="row" style="justify-content:flex-end">
-        <button class="btn" id="addEventBtn">Add event</button>
-      </div>
-    </div>
-    <div style="margin-top:8px">
-      <button class="btn ghost" id="clearEventsBtn">Clear events</button>
+      <details class="panel-drawer">
+        <summary>What this means</summary>
+        <div class="drawer-text">
+          The band is a <b>distribution</b>, not a promise. If you calibrate with real DO data later, the band shrinks and gets less “vibes, more physics”.
+        </div>
+      </details>
     </div>
 
-    <div style="margin-top:10px; max-height:220px; overflow:auto;">
-      <table id="eventsTable">
-        <thead>
-          <tr><th>Day</th><th>Pellets to pop</th><th></th></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+    <div class="panel-section" style="margin-top:12px">
+      <div class="panel-header">
+        <div class="panel-title"><span class="icon">📅</span>Feeding Calendar</div>
+        <div class="panel-badges">
+          <span class="badge ok">Feeding Calendar</span>
+        </div>
+      </div>
+      <details class="panel-drawer">
+        <summary>What this means</summary>
+        <div class="drawer-text">
+          Feeding events add pellets + powder at your chosen interval. Green = feed day, yellow = pellet pop day.
+        </div>
+      </details>
+      <div class="calendar tiles" id="feedCalendar"></div>
     </div>
 
-    <div class="hr"></div>
-    <div class="errbox" id="errBox">
-      <b>Model error</b>
-      <div class="small" style="margin-top:6px">
-        If this repeats, open Dev / debug and copy the stack trace.
+    <div class="panel-section" style="margin-top:12px">
+      <div class="panel-header">
+        <div class="panel-title"><span class="icon">💥</span>Pop Events</div>
+        <div class="panel-badges">
+          <span class="badge warn">Pop Events</span>
+        </div>
       </div>
-      <pre id="errText"></pre>
+      <details class="panel-drawer">
+        <summary>What this means</summary>
+        <div class="drawer-text">
+          Click the <span class="kbd">RATE</span> graph to add an event at that day, or use the table below.
+          Each event converts whole pellets into powder at that moment (mass is conserved).
+        </div>
+      </details>
+      <div class="grid3">
+        <div class="row">
+          <label>Event day</label>
+          <input id="evDay" type="number" min="0" step="0.1" value="3.0"/>
+        </div>
+        <div class="row">
+          <label>Pellets to pop</label>
+          <input id="evPellets" type="number" min="0" step="1" value="10"/>
+        </div>
+        <div class="row" style="justify-content:flex-end">
+          <button class="btn" id="addEventBtn">Add event</button>
+        </div>
+      </div>
+      <div>
+        <button class="btn ghost" id="clearEventsBtn">Clear events</button>
+      </div>
+
+      <div style="max-height:220px; overflow:auto;">
+        <table id="eventsTable">
+          <thead>
+            <tr><th>Day</th><th>Pellets to pop</th><th></th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </div>
 
-    <details style="margin-top:12px" open>
-      <summary>Advanced: Environment & tank</summary>
-
-      <div class="grid2" style="margin-top:10px">
-        <div class="row">
-          <label>Tank water volume (L)</label>
-          <input id="volL" type="number" step="0.1" value="65.0"/>
-        </div>
-        <div class="row">
-          <label>Water temp (°C) at current blanket setting</label>
-          <input id="Tnow" type="number" step="0.1" value="22.0"/>
-        </div>
-
-        <div class="row">
-          <label>Water pH (for NH₃ fraction)</label>
-          <input id="pH" type="number" step="0.05" value="7.4"/>
-        </div>
-        <div class="row">
-          <label>Altitude (m)</label>
-          <input id="altM" type="number" step="10" value="2300"/>
-        </div>
-        <div class="row">
-          <label>TDS (mg/L)</label>
-          <input id="tds" type="number" step="10" value="660"/>
-        </div>
-
-        <div class="row">
-          <label>Tank length (cm)</label>
-          <input id="lenCm" type="number" step="0.1" value="78.0"/>
-        </div>
-        <div class="row">
-          <label>Tank width (cm)</label>
-          <input id="widCm" type="number" step="0.1" value="31.0"/>
-        </div>
-        <div class="row">
-          <label>Tank height (cm)</label>
-          <input id="tankHCm" type="number" step="0.1" value="48.0"/>
-        </div>
-        <div class="row">
-          <label>Water surface from bottom (cm)</label>
-          <input id="waterSurfCm" type="number" step="0.1" value="22.0"/>
-        </div>
-        <div class="row">
-          <label>Blanket gap above rim (cm)</label>
-          <input id="blanketGapCm" type="number" step="0.1" value="0.0"/>
-        </div>
-        <div class="row">
-          <label>Diffuser depth below surface (cm)</label>
-          <input id="diffDepthCm" type="number" step="0.1" value="17.0"/>
-        </div>
-        <div class="row">
-          <label>Water column heaters (0–2)</label>
-          <input id="heaters" type="number" step="1" min="0" max="2" value="0"/>
+    <div class="panel-section" style="margin-top:12px">
+      <div class="panel-header">
+        <div class="panel-title"><span class="icon">🧯</span>Model Status</div>
+        <div class="panel-badges">
+          <span class="badge alert">Alerts</span>
         </div>
       </div>
-    </details>
+      <div class="small" id="modelStatusNote">No errors reported yet.</div>
+      <div class="errbox" id="errBox">
+        <b>Model error</b>
+        <div class="small" style="margin-top:6px">
+          If this repeats, open Dev / debug and copy the stack trace.
+        </div>
+        <pre id="errText"></pre>
+      </div>
+    </div>
 
-    <details style="margin-top:12px" open>
-      <summary>Advanced: Aeration & surface exchange</summary>
-
-      <div class="grid2" style="margin-top:10px">
-        <div class="row">
-          <label>Air pump delivered flow (L/min)</label>
-          <input id="airFlow" type="number" step="0.1" value="4.0"/>
-        </div>
-        <div class="row">
-          <label>Surface ripples (% of surface)</label>
-          <input id="ripplePct" type="number" step="1" value="50"/>
-        </div>
-
-        <div class="row">
-          <label>Bubble transfer preset</label>
-          <select id="diffType">
-            <option value="airstone_med" selected>Typical airstones (medium bubbles)</option>
-            <option value="airstone_fine">Fine airstone (smaller bubbles)</option>
-            <option value="microbubble">Microbubble diffuser (very fine)</option>
-            <option value="wood">Wooden airstone (very fine, higher backpressure)</option>
-            <option value="custom">Custom</option>
-          </select>
-        </div>
-
-        <div class="row">
-          <label>Custom bubble efficiency: SOTE per meter (%)</label>
-          <input id="sotePerM" type="number" step="0.1" value="2.5"/>
-        </div>
-        <div class="small" style="margin-top:-6px; opacity:.85">
-          SOTE per meter is a <b>rough transfer efficiency</b> (how much O₂ in the air actually dissolves per meter of bubble travel).
-          If you’re unsure, use the preset — the uncertainty mode already widens results around it.
-        </div>
-
-        <div class="row" style="margin-top:10px">
-          <label>Surface exchange preset</label>
-          <select id="surfacePreset">
-            <option value="still">Still water (low exchange)</option>
-            <option value="typical" selected>Typical aquarium (some ripples)</option>
-            <option value="rippling">Strong ripples (good exchange)</option>
-            <option value="splashy">Splashy / fan / very agitated (very high)</option>
-            <option value="custom">Custom</option>
-          </select>
-        </div>
-
-        <div class="row">
-          <label>Surface k (calm) (m/day)</label>
-          <input id="kCalm" type="number" step="0.05" value="0.30"/>
-        </div>
-        <div class="row">
-          <label>Surface k (rippling) (m/day)</label>
-          <input id="kRipple" type="number" step="0.05" value="1.00"/>
-        </div>
-
-        <div class="row" style="margin-top:10px">
-          <label>Cover leakiness preset</label>
-          <select id="tightPreset">
-            <option value="open">No cover (open tank)</option>
-            <option value="loose_high" selected>Loose blanket (high above water)</option>
-            <option value="typical">Typical blanket (some restriction)</option>
-            <option value="near_sealed">Near-sealed lid (strong restriction)</option>
-            <option value="custom">Custom</option>
-          </select>
-        </div>
-        <div class="row">
-          <label>Leakiness number (0 drafty → 1 sealed)</label>
-          <input id="tight" type="number" step="0.05" min="0" max="1" value="0.25"/>
-        </div>
-
-        <div class="row" style="margin-top:10px">
-          <label>Aeration performance preset</label>
-          <select id="otrPreset">
-            <option value="typical" selected>Typical (as expected)</option>
-            <option value="under">Underperforming (backpressure / leaks)</option>
-            <option value="over">Overperforming (very efficient)</option>
-            <option value="custom">Custom</option>
-          </select>
-        </div>
-        <div class="row">
-          <label>Aeration performance factor</label>
-          <input id="otrCal" type="number" step="0.05" value="1.00"/>
+    <div class="panel-section" style="margin-top:12px">
+      <div class="panel-header">
+        <div class="panel-title"><span class="icon">🧪</span>Environment & Tank</div>
+        <div class="panel-badges">
+          <span class="badge note">Advanced</span>
         </div>
       </div>
+      <details class="panel-drawer" open>
+        <summary>Controls</summary>
+        <div class="grid2" style="margin-top:10px">
+          <div class="row">
+            <label>Tank water volume (L)</label>
+            <input id="volL" type="number" step="0.1" value="65.0"/>
+          </div>
+          <div class="row">
+            <label>Water temp (°C) at current blanket setting</label>
+            <input id="Tnow" type="number" step="0.1" value="22.0"/>
+          </div>
 
-      <div class="footer">
-        <b>How the oxygenation estimate works</b> (in plain talk):
-        <ul style="margin:6px 0 0 18px; padding:0; color:var(--muted)">
-          <li><b>Bubble side</b>: compute O₂ mass entering per day from the airflow (altitude affects pressure), then multiply by an efficiency fraction that scales with depth and diffuser type.</li>
-          <li><b>Surface side</b>: use a gas-film “speed” k (m/day) times surface area. Ripples get a higher k. Covered area gets k multiplied by a leak factor based on tightness + headspace ventilation.</li>
-          <li>Combine both into an <b>OTRmax</b> (g/day at DO≈0). Convert that into an inferred <b>kLa</b> so supply increases as DO drops: supply = kLa·(C*−DO)·V.</li>
-        </ul>
-      </div>
-    </details>
+          <div class="row">
+            <label>Water pH (for NH₃ fraction)</label>
+            <input id="pH" type="number" step="0.05" value="7.4"/>
+          </div>
+          <div class="row">
+            <label>Altitude (m)</label>
+            <input id="altM" type="number" step="10" value="2300"/>
+          </div>
+          <div class="row">
+            <label>TDS (mg/L)</label>
+            <input id="tds" type="number" step="10" value="660"/>
+          </div>
 
-    <details style="margin-top:12px" open>
-      <summary>Advanced: Biology & chemistry</summary>
+          <div class="row">
+            <label>Tank length (cm)</label>
+            <input id="lenCm" type="number" step="0.1" value="78.0"/>
+          </div>
+          <div class="row">
+            <label>Tank width (cm)</label>
+            <input id="widCm" type="number" step="0.1" value="31.0"/>
+          </div>
+          <div class="row">
+            <label>Tank height (cm)</label>
+            <input id="tankHCm" type="number" step="0.1" value="48.0"/>
+          </div>
+          <div class="row">
+            <label>Water surface from bottom (cm)</label>
+            <input id="waterSurfCm" type="number" step="0.1" value="22.0"/>
+          </div>
+          <div class="row">
+            <label>Blanket gap above rim (cm)</label>
+            <input id="blanketGapCm" type="number" step="0.1" value="0.0"/>
+          </div>
+          <div class="row">
+            <label>Diffuser depth below surface (cm)</label>
+            <input id="diffDepthCm" type="number" step="0.1" value="17.0"/>
+          </div>
+          <div class="row">
+            <label>Water column heaters (0–2)</label>
+            <input id="heaters" type="number" step="1" min="0" max="2" value="0"/>
+          </div>
+        </div>
+      </details>
+    </div>
 
-      <div class="grid2" style="margin-top:10px">
-        <div class="row">
-          <label>Initial DO assumption</label>
-          <select id="initDOPreset">
-            <option value="100">Near saturation (100%)</option>
-            <option value="95" selected>High (95%)</option>
-            <option value="85">Moderate (85%)</option>
-            <option value="70">Low (70%)</option>
-            <option value="custom">Custom</option>
-          </select>
-        </div>
-        <div class="row">
-          <label>Initial DO (% of local saturation)</label>
-          <input id="doInitPct" type="number" step="1" min="0" max="150" value="95"/>
-        </div>
-
-        <div class="row">
-          <label>Heterotroph biomass (g) — respiration inferred</label>
-          <input id="heteroMass" type="number" step="1" min="0" value="0"/>
-        </div>
-        <div class="row">
-          <label>Photosynthetic mass (g wet biomass)</label>
-          <input id="photoMass" type="number" step="1" min="0" value="0"/>
-        </div>
-        <div class="small" style="margin-top:-6px; opacity:.85">
-          Photosynthetic mass combines plants, algae, and phytoplankton. Oxygen production + nutrient uptake are inferred from this.
-        </div>
-
-        <div class="row">
-          <label>Diurnal temp amplitude (°C)</label>
-          <input id="tempAmp" type="number" step="0.1" min="0" value="0.6"/>
-        </div>
-        <div class="row">
-          <label>Lights on (hour 0–23)</label>
-          <input id="lightHour" type="number" step="1" min="0" max="23" value="9"/>
-        </div>
-
-        <div class="row">
-          <label>Enable oxygen limitation for nitrification</label>
-          <select id="o2Limit">
-            <option value="off">Off (demand not reduced when DO is low)</option>
-            <option value="on">On (nitrification slows as DO drops)</option>
-          </select>
-        </div>
-        <div class="row">
-          <label>Nitrifier DO half-saturation K (mg/L)</label>
-          <input id="kDoNit" type="number" step="0.05" value="0.50"/>
-        </div>
-        <div class="row">
-          <label>NH₄ half-saturation K (mg/L as N)</label>
-          <input id="kNH4Nit" type="number" step="0.05" value="0.40"/>
-        </div>
-        <div class="row">
-          <label>NO₂ half-saturation K (mg/L as N)</label>
-          <input id="kNO2Nit" type="number" step="0.05" value="0.25"/>
-        </div>
-        <div class="row">
-          <label>Nitrifier capacity (0–1)</label>
-          <input id="nitCap" type="number" step="0.05" min="0" max="1" value="0.80"/>
-        </div>
-        <div class="row">
-          <label>Nitrifier Q10 (temperature response)</label>
-          <input id="nitQ10" type="number" step="0.05" value="2.0"/>
-        </div>
-        <div class="row">
-          <label>Heterotroph DO half-saturation K (mg/L)</label>
-          <input id="kDoHet" type="number" step="0.05" value="0.80"/>
-        </div>
-        <div class="row">
-          <label>Refractory fraction (slow COD)</label>
-          <input id="slowFrac" type="number" step="0.05" min="0" max="0.9" value="0.25"/>
-        </div>
-        <div class="row">
-          <label>Biofilm thickness proxy (mm)</label>
-          <input id="biofilmMm" type="number" step="0.1" min="0" value="0.6"/>
-        </div>
-        <div class="row">
-          <label>Denitrification rate (1/day)</label>
-          <input id="kDenit" type="number" step="0.05" value="0.15"/>
-        </div>
-        <div class="row">
-          <label>Denitrifier capacity (0–1)</label>
-          <input id="denitCap" type="number" step="0.05" min="0" max="1" value="0.60"/>
-        </div>
-
-        <div class="row">
-          <label>Nitrogen display units</label>
-          <select id="nUnits">
-            <option value="asN" selected>as N (mg/L)</option>
-            <option value="asIon">as ion (mg/L)</option>
-          </select>
-        </div>
-        <div class="row">
-          <label>Chemistry audit (nerd mode)</label>
-          <input id="chemNerd" type="checkbox"/>
+    <div class="panel-section" style="margin-top:12px">
+      <div class="panel-header">
+        <div class="panel-title"><span class="icon">🌬️</span>Aeration & Surface Exchange</div>
+        <div class="panel-badges">
+          <span class="badge note">Advanced</span>
         </div>
       </div>
-    </details>
+      <details class="panel-drawer" open>
+        <summary>Controls</summary>
+        <div class="grid2" style="margin-top:10px">
+          <div class="row">
+            <label>Air pump delivered flow (L/min)</label>
+            <input id="airFlow" type="number" step="0.1" value="4.0"/>
+          </div>
+          <div class="row">
+            <label>Surface ripples (% of surface)</label>
+            <input id="ripplePct" type="number" step="1" value="50"/>
+          </div>
 
-    <details style="margin-top:12px" open>
-      <summary>Advanced: Pellet geometry</summary>
+          <div class="row">
+            <label>Bubble transfer preset</label>
+            <select id="diffType">
+              <option value="airstone_med" selected>Typical airstones (medium bubbles)</option>
+              <option value="airstone_fine">Fine airstone (smaller bubbles)</option>
+              <option value="microbubble">Microbubble diffuser (very fine)</option>
+              <option value="wood">Wooden airstone (very fine, higher backpressure)</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
 
-      <div class="grid2" style="margin-top:10px">
-        <div class="row">
-          <label>Pellet length (cm)</label>
-          <input id="pelLen" type="number" step="0.01" value="1.00" disabled title="Hardcoded: 1.00 cm"/>
+          <div class="row">
+            <label>Custom bubble efficiency: SOTE per meter (%)</label>
+            <input id="sotePerM" type="number" step="0.1" value="2.5"/>
+          </div>
+          <div class="small" style="margin-top:-6px; opacity:.85">
+            SOTE per meter is a <b>rough transfer efficiency</b> (how much O₂ in the air actually dissolves per meter of bubble travel).
+            If you’re unsure, use the preset — the uncertainty mode already widens results around it.
+          </div>
+
+          <div class="row" style="margin-top:10px">
+            <label>Surface exchange preset</label>
+            <select id="surfacePreset">
+              <option value="still">Still water (low exchange)</option>
+              <option value="typical" selected>Typical aquarium (some ripples)</option>
+              <option value="rippling">Strong ripples (good exchange)</option>
+              <option value="splashy">Splashy / fan / very agitated (very high)</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+
+          <div class="row">
+            <label>Surface k (calm) (m/day)</label>
+            <input id="kCalm" type="number" step="0.05" value="0.30"/>
+          </div>
+          <div class="row">
+            <label>Surface k (rippling) (m/day)</label>
+            <input id="kRipple" type="number" step="0.05" value="1.00"/>
+          </div>
+
+          <div class="row" style="margin-top:10px">
+            <label>Cover leakiness preset</label>
+            <select id="tightPreset">
+              <option value="open">No cover (open tank)</option>
+              <option value="loose_high" selected>Loose blanket (high above water)</option>
+              <option value="typical">Typical blanket (some restriction)</option>
+              <option value="near_sealed">Near-sealed lid (strong restriction)</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+          <div class="row">
+            <label>Leakiness number (0 drafty → 1 sealed)</label>
+            <input id="tight" type="number" step="0.05" min="0" max="1" value="0.25"/>
+          </div>
+
+          <div class="row" style="margin-top:10px">
+            <label>Aeration performance preset</label>
+            <select id="otrPreset">
+              <option value="typical" selected>Typical (as expected)</option>
+              <option value="under">Underperforming (backpressure / leaks)</option>
+              <option value="over">Overperforming (very efficient)</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+          <div class="row">
+            <label>Aeration performance factor</label>
+            <input id="otrCal" type="number" step="0.05" value="1.00"/>
+          </div>
         </div>
-        <div class="row">
-          <label>Pellet diameter (cm)</label>
-          <input id="pelDia" type="number" step="0.01" value="0.20" disabled title="Hardcoded: 0.20 cm"/>
+      </details>
+      <details class="panel-drawer">
+        <summary>What this means</summary>
+        <div class="drawer-text">
+          <b>Bubble side</b>: compute O₂ mass entering per day from the airflow (altitude affects pressure), then multiply by an efficiency fraction that scales with depth and diffuser type.
+          <br/><b>Surface side</b>: use a gas-film “speed” k (m/day) times surface area. Ripples get a higher k. Covered area gets k multiplied by a leak factor based on tightness + headspace ventilation.
+          <br/><b>OTRmax</b> combines both sides (g/day at DO≈0) and becomes an inferred <b>kLa</b> so supply increases as DO drops: supply = kLa·(C*−DO)·V.
         </div>
-        <div class="row">
-          <label>Pellet density (g/cm³)</label>
-          <input id="pelRho" type="number" step="0.01" value="0.55"/>
+      </details>
+    </div>
+
+    <div class="panel-section" style="margin-top:12px">
+      <div class="panel-header">
+        <div class="panel-title"><span class="icon">🧬</span>Biology & Chemistry</div>
+        <div class="panel-badges">
+          <span class="badge note">Advanced</span>
         </div>
       </div>
-    </details>
+      <details class="panel-drawer" open>
+        <summary>Controls</summary>
+        <div class="grid2" style="margin-top:10px">
+          <div class="row">
+            <label>Initial DO assumption</label>
+            <select id="initDOPreset">
+              <option value="100">Near saturation (100%)</option>
+              <option value="95" selected>High (95%)</option>
+              <option value="85">Moderate (85%)</option>
+              <option value="70">Low (70%)</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+          <div class="row">
+            <label>Initial DO (% of local saturation)</label>
+            <input id="doInitPct" type="number" step="1" min="0" max="150" value="95"/>
+          </div>
+
+          <div class="row">
+            <label>Heterotroph biomass (g) — respiration inferred</label>
+            <input id="heteroMass" type="number" step="1" min="0" value="0"/>
+          </div>
+          <div class="row">
+            <label>Photosynthetic mass (g wet biomass)</label>
+            <input id="photoMass" type="number" step="1" min="0" value="0"/>
+          </div>
+          <div class="small" style="margin-top:-6px; opacity:.85">
+            Photosynthetic mass combines plants, algae, and phytoplankton. Oxygen production + nutrient uptake are inferred from this.
+          </div>
+
+          <div class="row">
+            <label>Diurnal temp amplitude (°C)</label>
+            <input id="tempAmp" type="number" step="0.1" min="0" value="0.6"/>
+          </div>
+          <div class="row">
+            <label>Lights on (hour 0–23)</label>
+            <input id="lightHour" type="number" step="1" min="0" max="23" value="9"/>
+          </div>
+
+          <div class="row">
+            <label>Enable oxygen limitation for nitrification</label>
+            <select id="o2Limit">
+              <option value="off">Off (demand not reduced when DO is low)</option>
+              <option value="on">On (nitrification slows as DO drops)</option>
+            </select>
+          </div>
+          <div class="row">
+            <label>Nitrifier DO half-saturation K (mg/L)</label>
+            <input id="kDoNit" type="number" step="0.05" value="0.50"/>
+          </div>
+          <div class="row">
+            <label>NH₄ half-saturation K (mg/L as N)</label>
+            <input id="kNH4Nit" type="number" step="0.05" value="0.40"/>
+          </div>
+          <div class="row">
+            <label>NO₂ half-saturation K (mg/L as N)</label>
+            <input id="kNO2Nit" type="number" step="0.05" value="0.25"/>
+          </div>
+          <div class="row">
+            <label>Nitrifier capacity (0–1)</label>
+            <input id="nitCap" type="number" step="0.05" min="0" max="1" value="0.80"/>
+          </div>
+          <div class="row">
+            <label>Nitrifier Q10 (temperature response)</label>
+            <input id="nitQ10" type="number" step="0.05" value="2.0"/>
+          </div>
+          <div class="row">
+            <label>Heterotroph DO half-saturation K (mg/L)</label>
+            <input id="kDoHet" type="number" step="0.05" value="0.80"/>
+          </div>
+          <div class="row">
+            <label>Refractory fraction (slow COD)</label>
+            <input id="slowFrac" type="number" step="0.05" min="0" max="0.9" value="0.25"/>
+          </div>
+          <div class="row">
+            <label>Biofilm thickness proxy (mm)</label>
+            <input id="biofilmMm" type="number" step="0.1" min="0" value="0.6"/>
+          </div>
+          <div class="row">
+            <label>Denitrification rate (1/day)</label>
+            <input id="kDenit" type="number" step="0.05" value="0.15"/>
+          </div>
+          <div class="row">
+            <label>Denitrifier capacity (0–1)</label>
+            <input id="denitCap" type="number" step="0.05" min="0" max="1" value="0.60"/>
+          </div>
+
+          <div class="row">
+            <label>Nitrogen display units</label>
+            <select id="nUnits">
+              <option value="asN" selected>as N (mg/L)</option>
+              <option value="asIon">as ion (mg/L)</option>
+            </select>
+          </div>
+          <div class="row">
+            <label>Chemistry audit (nerd mode)</label>
+            <input id="chemNerd" type="checkbox"/>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <div class="panel-section" style="margin-top:12px">
+      <div class="panel-header">
+        <div class="panel-title"><span class="icon">🔬</span>Pellet Geometry</div>
+        <div class="panel-badges">
+          <span class="badge note">Advanced</span>
+        </div>
+      </div>
+      <details class="panel-drawer" open>
+        <summary>Controls</summary>
+        <div class="grid2" style="margin-top:10px">
+          <div class="row">
+            <label>Pellet length (cm)</label>
+            <input id="pelLen" type="number" step="0.01" value="1.00" disabled title="Hardcoded: 1.00 cm"/>
+          </div>
+          <div class="row">
+            <label>Pellet diameter (cm)</label>
+            <input id="pelDia" type="number" step="0.01" value="0.20" disabled title="Hardcoded: 0.20 cm"/>
+          </div>
+          <div class="row">
+            <label>Pellet density (g/cm³)</label>
+            <input id="pelRho" type="number" step="0.01" value="0.55"/>
+          </div>
+        </div>
+      </details>
+    </div>
 
   </div>
 
@@ -830,6 +1033,10 @@
   </div>
   <div class="hr"></div>
   <div class="small"><b>Last recompute diagnostics</b></div>
+  <div class="row" style="margin-top:8px; align-items:center;">
+    <button class="btn ghost" id="copyDebugBtn">Copy Debug Log</button>
+    <span class="copy-toast" id="copyDebugStatus" style="display:none"></span>
+  </div>
   <pre id="dbg" class="mono" style="white-space:pre-wrap; word-break:break-word; color:rgba(231,236,255,.82)"></pre>
 </details>
 
@@ -877,6 +1084,7 @@ const BIOMASS_SERIES = [
 
 let visibleRate = Object.fromEntries(RATE_SERIES.map(s=>[s.key, true]));
 let visibleChem = Object.fromEntries(CHEM_SERIES.map(s=>[s.key, true]));
+let calendarExpandedKey = null;
 
 function updateChemSeriesLabels(nUnits){
   if(nUnits === 'asIon'){
@@ -994,6 +1202,27 @@ function buildFeedPulse(feedPlan, dt, days, windowDays){
   return {pellets, powder, windowSteps, windowDays, totalPellets, totalPowder};
 }
 
+function setCalendarTileFocus(targetKey){
+  const nextKey = calendarExpandedKey === targetKey ? null : targetKey;
+  calendarExpandedKey = nextKey;
+  DEBUG_STATE.lastCalendarExpandedKey = calendarExpandedKey;
+  document.querySelectorAll('.calendar-month').forEach((month)=>{
+    const key = month.dataset.monthKey;
+    month.classList.toggle('expanded', Boolean(calendarExpandedKey && key === calendarExpandedKey));
+  });
+  syncCalendarToggleState();
+}
+
+function syncCalendarToggleState(){
+  const btns = document.querySelectorAll('[data-month-toggle]');
+  btns.forEach((btn)=>{
+    const key = btn.getAttribute('data-month-toggle');
+    const expanded = Boolean(calendarExpandedKey && key === calendarExpandedKey);
+    btn.textContent = expanded ? 'Collapse' : 'Expand';
+    btn.setAttribute('aria-pressed', expanded ? 'true' : 'false');
+  });
+}
+
 function renderFeedingCalendar(params, feedPlan, popEvents){
   const cal = el('feedCalendar');
   if(!cal){
@@ -1004,12 +1233,12 @@ function renderFeedingCalendar(params, feedPlan, popEvents){
   const days = Math.max(0, Math.ceil(Number(params.days ?? 0)));
   DEBUG_STATE.lastFeedCalendarDays = days;
   const compact = days > 45;
-  cal.classList.toggle('compact', compact);
+  cal.classList.toggle('tiles', true);
   const startDate = new Date();
   startDate.setHours(12, 0, 0, 0);
   DEBUG_STATE.lastFeedCalendarStartISO = startDate.toISOString();
   cal.innerHTML = '';
-  const labels = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const labels = ['S','M','T','W','T','F','S'];
   const feedMap = new Map();
   for(const f of feedPlan){
     const idx = Math.floor(f.day);
@@ -1051,11 +1280,36 @@ function renderFeedingCalendar(params, feedPlan, popEvents){
       monthCount++;
       const month = document.createElement('div');
       month.className = 'calendar-month';
+      month.dataset.monthKey = key;
+      if(calendarExpandedKey === key){
+        month.classList.add('expanded');
+      }
       const header = document.createElement('div');
       header.className = 'calendar-header';
       const stats = monthStats.get(key);
       const summary = stats ? `${stats.feedDays} feed • ${stats.popDays} pop` : '';
-      header.innerHTML = `<span>${stats ? stats.label : 'Month'}</span><span class="summary">${summary}</span>`;
+      const monthLabel = stats
+        ? dayDate.toLocaleString(undefined, {month:'short', year:'2-digit'})
+        : 'Month';
+      const labelSpan = document.createElement('span');
+      labelSpan.textContent = monthLabel;
+      const actionWrap = document.createElement('div');
+      actionWrap.className = 'month-actions';
+      const summarySpan = document.createElement('span');
+      summarySpan.className = 'summary';
+      summarySpan.textContent = summary;
+      const toggleBtn = document.createElement('button');
+      toggleBtn.className = 'month-toggle';
+      toggleBtn.type = 'button';
+      toggleBtn.setAttribute('data-month-toggle', key);
+      toggleBtn.addEventListener('click', (event)=>{
+        event.stopPropagation();
+        setCalendarTileFocus(key);
+      });
+      actionWrap.appendChild(summarySpan);
+      actionWrap.appendChild(toggleBtn);
+      header.appendChild(labelSpan);
+      header.appendChild(actionWrap);
       month.appendChild(header);
       monthGrid = document.createElement('div');
       monthGrid.className = 'calendar-grid';
@@ -1096,6 +1350,11 @@ function renderFeedingCalendar(params, feedPlan, popEvents){
   }
   DEBUG_STATE.lastFeedCalendarMonths = monthCount;
   DEBUG_STATE.lastFeedCalendarCompact = compact;
+  if(calendarExpandedKey && !cal.querySelector(`[data-month-key="${calendarExpandedKey}"]`)){
+    calendarExpandedKey = null;
+  }
+  DEBUG_STATE.lastCalendarExpandedKey = calendarExpandedKey;
+  syncCalendarToggleState();
 }
 
 /* =========================================================
@@ -1123,6 +1382,7 @@ function clamp(x,a,b){ return Math.max(a, Math.min(b, x)); }
 function showError(err){
   let box = el('errBox');
   let txt = el('errText');
+  const note = el('modelStatusNote');
   const msg = (err && err.stack) ? err.stack : String(err);
 
   if(!box || !txt){
@@ -1138,6 +1398,7 @@ function showError(err){
   // Visible error banner
   if(box) box.style.display = 'block';
   if(txt) txt.textContent = msg;
+  if(note) note.style.display = 'none';
 
   // Record into debug state
   try{
@@ -1167,8 +1428,10 @@ function showError(err){
 function clearError(){
   const box = el('errBox');
   const text = el('errText');
+  const note = el('modelStatusNote');
   if(box) box.style.display = 'none';
   if(text) text.textContent = '';
+  if(note) note.style.display = 'block';
 }
 
 
@@ -1200,6 +1463,13 @@ const DEBUG_STATE = {
   lastFeedCalendarMonths: null,
   lastFeedCalendarCompact: null,
   lastFeedCalendarStartISO: null,
+  lastCalendarExpandedKey: null,
+  panelOverflowPx: null,
+  panelOverflowLimitPx: 0,
+  panelOverflowWarnedISO: null,
+  lastPanelMeasureISO: null,
+  lastDebugCopyStatus: null,
+  lastDebugCopyError: null,
   lastUpdateISO: null,
   debounceQueued: 0,
   debounceMs: null,
@@ -1324,6 +1594,17 @@ lines.push(`surface=${p.lenCm}×${p.widCm} cm, blanket=${p.blanketPct}%, ripple=
     lines.push('');
     lines.push('--- Calendar (last) ---');
     lines.push(`days=${DEBUG_STATE.lastFeedCalendarDays}, months=${DEBUG_STATE.lastFeedCalendarMonths}, compact=${DEBUG_STATE.lastFeedCalendarCompact}, start=${DEBUG_STATE.lastFeedCalendarStartISO}`);
+    if(DEBUG_STATE.lastCalendarExpandedKey){
+      lines.push(`expanded=${DEBUG_STATE.lastCalendarExpandedKey}`);
+    }
+  }
+  if(Number.isFinite(DEBUG_STATE.panelOverflowPx)){
+    lines.push('');
+    lines.push('--- Panel overflow ---');
+    lines.push(`panelOverflowPx=${DEBUG_STATE.panelOverflowPx.toFixed(1)} (limit ${DEBUG_STATE.panelOverflowLimitPx}px)`);
+    if(DEBUG_STATE.lastPanelMeasureISO){
+      lines.push(`measured=${DEBUG_STATE.lastPanelMeasureISO}`);
+    }
   }
   if(DEBUG_STATE.lastTagSummary){
     lines.push('');
@@ -1354,6 +1635,14 @@ lines.push(`surface=${p.lenCm}×${p.widCm} cm, blanket=${p.blanketPct}%, ripple=
     lines.push(`Profile: ${DEBUG_STATE.lastFeedProfileId}`);
     if(DEBUG_STATE.lastFeedProfileStoredAt){
       lines.push(`Stored: ${DEBUG_STATE.lastFeedProfileStoredAt}`);
+    }
+  }
+  if(DEBUG_STATE.lastDebugCopyStatus){
+    lines.push('');
+    lines.push('--- Debug copy ---');
+    lines.push(`status=${DEBUG_STATE.lastDebugCopyStatus}`);
+    if(DEBUG_STATE.lastDebugCopyError){
+      lines.push(`error=${DEBUG_STATE.lastDebugCopyError}`);
     }
   }
   if(DEBUG_STATE.lastBiomassSummary){
@@ -1472,6 +1761,104 @@ function linkRangeAndNumber(rangeEl, numEl, onChange){
   const sync = (src, dst)=>{ dst.value = src.value; onChange(); };
   rangeEl.addEventListener("input", ()=>sync(rangeEl, numEl));
   numEl.addEventListener("input", ()=>sync(numEl, rangeEl));
+}
+
+function wireActiveControlGlow(){
+  const inputs = Array.from(document.querySelectorAll('input, select, textarea'));
+  if(!inputs.length) return;
+  inputs.forEach((input)=>{
+    if(input.__glowBound) return;
+    input.__glowBound = true;
+    input.addEventListener('focus', ()=>{
+      if(input.matches('input[type="range"]')) return;
+      input.classList.add('control-active');
+    });
+    input.addEventListener('blur', ()=>{
+      input.classList.remove('control-active');
+    });
+    input.addEventListener('change', ()=>{
+      if(input.matches('select')){
+        input.classList.add('control-active');
+        setTimeout(()=>input.classList.remove('control-active'), 450);
+      }
+    });
+  });
+}
+
+function measurePanelOverflow(){
+  const panel = document.querySelector('.left-panel');
+  if(!panel){
+    addWarning('Left panel missing for overflow metrics.');
+    DEBUG_STATE.missingContainers.push({timeISO: new Date().toISOString(), id:'left-panel', context:'measurePanelOverflow'});
+    return;
+  }
+  const panelHeight = panel.getBoundingClientRect().height;
+  const viewportHeight = window.innerHeight || 0;
+  const limit = Math.max(140, Math.round(viewportHeight * 0.18));
+  const overflow = Math.max(0, panelHeight - (viewportHeight - 24));
+  DEBUG_STATE.panelOverflowPx = overflow;
+  DEBUG_STATE.panelOverflowLimitPx = limit;
+  DEBUG_STATE.lastPanelMeasureISO = new Date().toISOString();
+  if(overflow > limit){
+    if(!DEBUG_STATE.panelOverflowWarnedISO){
+      addWarning(`Left panel exceeds viewport by ${overflow.toFixed(0)}px; consider collapsing drawers.`);
+      DEBUG_STATE.panelOverflowWarnedISO = new Date().toISOString();
+    }
+  }else{
+    DEBUG_STATE.panelOverflowWarnedISO = null;
+  }
+}
+
+function enableDebugCopyRoutine(){
+  const btn = el('copyDebugBtn');
+  const status = el('copyDebugStatus');
+  if(!btn || !status){
+    addWarning('Copy debug controls missing (#copyDebugBtn or #copyDebugStatus).');
+    return;
+  }
+  const announce = (message, isWarn=false)=>{
+    status.textContent = message;
+    status.classList.toggle('warn', isWarn);
+    status.style.display = 'inline-flex';
+    setTimeout(()=>{ status.style.display = 'none'; }, 2400);
+  };
+  if(btn.__copyBound) return;
+  btn.__copyBound = true;
+  btn.addEventListener('click', async ()=>{
+    const dbgText = el('dbg') ? el('dbg').textContent : '';
+    if(!dbgText || !dbgText.trim()){
+      DEBUG_STATE.lastDebugCopyStatus = 'empty';
+      DEBUG_STATE.lastDebugCopyError = 'Debug log empty';
+      addWarning('Debug log copy requested but debug log is empty.');
+      announce('Nothing to copy', true);
+      return;
+    }
+    try{
+      if(navigator.clipboard?.writeText){
+        await navigator.clipboard.writeText(dbgText);
+      }else{
+        const helper = document.createElement('textarea');
+        helper.value = dbgText;
+        helper.setAttribute('readonly', '');
+        helper.style.position = 'absolute';
+        helper.style.left = '-9999px';
+        document.body.appendChild(helper);
+        helper.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(helper);
+        if(!ok) throw new Error('execCommand copy failed');
+      }
+      DEBUG_STATE.lastDebugCopyStatus = 'copied';
+      DEBUG_STATE.lastDebugCopyError = null;
+      announce('Debug log copied');
+    }catch(err){
+      const message = err?.message || String(err);
+      DEBUG_STATE.lastDebugCopyStatus = 'failed';
+      DEBUG_STATE.lastDebugCopyError = message;
+      addWarning(`Debug log copy failed: ${message}`);
+      announce('Copy failed', true);
+    }
+  });
 }
 
 window.addEventListener('error', (e)=>{ try{ showError(e.error || e.message || e); }catch(_){ }});
@@ -1687,6 +2074,41 @@ const PHOTO_MODEL = {
   co2_per_g_growth: 1.5
 };
 
+const PHYTO_SPLIT = {
+  algae: 0.4,
+  plankton: 0.35,
+  plants: 0.25
+};
+
+const HET_SPLIT = {
+  biofilm: 0.65,
+  predator: 0.35
+};
+
+const PHYTO_COMPARTMENTS = {
+  algae: {
+    mu_max_per_day: 0.78,
+    decay_per_day: 0.08,
+    reserveFrac: 0.32,
+    reserveCapFrac: 0.28,
+    nightGrowthFrac: 0.18
+  },
+  plankton: {
+    mu_max_per_day: 0.72,
+    decay_per_day: 0.075,
+    reserveFrac: 0.3,
+    reserveCapFrac: 0.26,
+    nightGrowthFrac: 0.2
+  },
+  plants: {
+    mu_max_per_day: 0.32,
+    decay_per_day: 0.03,
+    reserveFrac: 0.62,
+    reserveCapFrac: 0.65,
+    nightGrowthFrac: 0.5
+  }
+};
+
 const FISH_MODEL = {
   o2_mg_g_day_base: 5.0,
   q10: 2.0,
@@ -1698,6 +2120,23 @@ const HET_MODEL = {
   decay_per_day: 0.08,
   macroUptake_mgL_per_g_day: 0.18,
   microUptake_mgL_per_g_day: 0.04
+};
+
+const TROPHIC_MODEL = {
+  biofilm: {
+    grazingMax_g_g_day: 0.16,
+    decay_per_day: 0.07,
+    yield: 0.48,
+    assimEff: 0.76,
+    lagDays: 0.5
+  },
+  predator: {
+    grazingMax_g_g_day: 0.1,
+    decay_per_day: 0.1,
+    yield: 0.42,
+    assimEff: 0.68,
+    lagDays: 0.7
+  }
 };
 
 const FRACTIONS = {
@@ -1838,18 +2277,43 @@ function runSimulation(params){
   let CO2_free_g = 0; // g free CO2 (aqueous)
   let macro_g = 0; // g (proxy)
   let micro_g = 0; // g (proxy)
-  let heteroMass_g = Math.max(0, Number(params.heteroMass ?? 0));
-  let phytoMass_g = Math.max(0, Number(params.photoMass ?? 0));
+  let phytoAlgae_g = Math.max(0, Number(params.phytoAlgae_g ?? (params.photoMass ?? 0) * PHYTO_SPLIT.algae));
+  let phytoPlankton_g = Math.max(0, Number(params.phytoPlankton_g ?? (params.photoMass ?? 0) * PHYTO_SPLIT.plankton));
+  let phytoPlants_g = Math.max(0, Number(params.phytoPlants_g ?? (params.photoMass ?? 0) * PHYTO_SPLIT.plants));
+  let phytoMass_g = Math.max(0, phytoAlgae_g + phytoPlankton_g + phytoPlants_g);
+  let biofilm_g = Math.max(0, Number(params.biofilm_g ?? (params.heteroMass ?? 0) * HET_SPLIT.biofilm));
+  let predator_g = Math.max(0, Number(params.predator_g ?? (params.heteroMass ?? 0) * HET_SPLIT.predator));
+  let heteroMass_g = Math.max(0, biofilm_g + predator_g);
   const heteroMass0 = heteroMass_g;
   const phytoMass0 = phytoMass_g;
-  let phytoOpen_g = phytoMass_g;
-  let phytoRefuge_g = 0;
+  const phytoAlgae0 = phytoAlgae_g;
+  const phytoPlankton0 = phytoPlankton_g;
+  const phytoPlants0 = phytoPlants_g;
+  const biofilm0 = biofilm_g;
+  const predator0 = predator_g;
+  let phytoAlgaeOpen_g = phytoAlgae_g;
+  let phytoAlgaeRefuge_g = 0;
+  let phytoPlanktonOpen_g = phytoPlankton_g;
+  let phytoPlanktonRefuge_g = 0;
+  let phytoAlgaeReserve_g = 0;
+  let phytoPlanktonReserve_g = 0;
+  let phytoPlantsReserve_g = 0;
   let phytoN_store_g = 0;
   let phytoP_store_g = 0;
   let heteroExtinctHits = 0;
   let phytoExtinctHits = 0;
+  let phytoAlgaeExtinctHits = 0;
+  let phytoPlanktonExtinctHits = 0;
+  let phytoPlantsExtinctHits = 0;
+  let biofilmExtinctHits = 0;
+  let predatorExtinctHits = 0;
   let heteroExtinctWarned = false;
   let phytoExtinctWarned = false;
+  let phytoAlgaeExtinctWarned = false;
+  let phytoPlanktonExtinctWarned = false;
+  let phytoPlantsExtinctWarned = false;
+  let biofilmExtinctWarned = false;
+  let predatorExtinctWarned = false;
   let macroConsumed_g = 0;
   let microConsumed_g = 0;
   let co2Consumed_g = 0;
@@ -1857,9 +2321,14 @@ function runSimulation(params){
   let heteroGrowthTotal = 0;
   let heteroConsumedTotal = 0;
   let phytoGrowthTotal = 0;
+  let phytoAlgaeGrowthTotal = 0;
+  let phytoPlanktonGrowthTotal = 0;
+  let phytoPlantsGrowthTotal = 0;
   let phytoConsumedTotal = 0;
   let phytoDecayTotal = 0;
   let phytoGrazedTotal = 0;
+  let biofilmGrazedTotal = 0;
+  let predatorGrazedTotal = 0;
   let phytoNightGrowthTotal = 0;
   let phytoReserveBuilt = 0;
   let phytoReserveUsed = 0;
@@ -1882,8 +2351,9 @@ function runSimulation(params){
   let oxygenDegasSteps = 0;
   let oxygenDegassed_g = 0;
   let grazingLimitedSteps = 0;
+  let predatorGrazingLimitedSteps = 0;
   let grazingShieldMin = 1;
-  let phytoReserve_g = 0;
+  let predatorShieldMin = 1;
   let co2AirIn_g = 0;
   let co2AirOut_g = 0;
   let bufferDepletionHits = 0;
@@ -1893,11 +2363,22 @@ function runSimulation(params){
   let co2FreeLast_mgL = 0;
   let dicMin_mgL = Infinity;
   let dicLast_mgL = 0;
-  let grazerActivity = 0.15;
-  let grazerActivityMin = 1;
-  let laggedConsumptionTotal = 0;
+  let biofilmActivity = 0.2;
+  let biofilmActivityMin = 1;
+  let predatorActivity = 0.15;
+  let predatorActivityMin = 1;
+  let laggedBiofilmConsumptionTotal = 0;
+  let laggedPredatorConsumptionTotal = 0;
   let grazingLagCollapseHits = 0;
+  let predatorLagCollapseHits = 0;
   let biomassNonFiniteHits = 0;
+  let phytoAlgaeNonFiniteHits = 0;
+  let phytoPlanktonNonFiniteHits = 0;
+  let phytoPlantsNonFiniteHits = 0;
+  let biofilmNonFiniteHits = 0;
+  let predatorNonFiniteHits = 0;
+  let biofilmStableCollapseHits = 0;
+  let predatorStableCollapseHits = 0;
 
   // Activity states (dimensionless 0..1)
   let Bhet = 0.04;
@@ -1929,29 +2410,26 @@ function runSimulation(params){
   const biofilmRef_g = Math.max(5, params.volL * 0.05);
   const biofilmMult = clamp(0.3 + Math.sqrt(biofilmMass_g / biofilmRef_g), 0.3, 2.5);
   const kDenit = Math.max(0, Number(params.kDenit ?? 0));
-  const heteroMass = Number(params.heteroMass ?? 0);
-  const photoMass = Number(params.photoMass ?? 0);
+  const heteroMass = heteroMass_g;
+  const photoMass = phytoMass_g;
   const tempAmp = Number(params.tempAmp ?? 0);
   const lightHour = Number(params.lightHour ?? 0);
   const macroRelease = FEED_PROFILE.modeling.macroRelease_mgL_per_g;
   const microRelease = FEED_PROFILE.modeling.microRelease_mgL_per_g;
-  const grazingHalfSat_g = Math.max(0.5, phytoMass0 * 0.25);
-  const grazingMax_g_g_day = 0.12;
-  const phytoReserveCapFrac = 0.4;
-  const phytoReserveFrac = 0.45;
-  const phytoNightGrowthFrac = 0.35;
+  const biofilmGrazingHalfSat_g = Math.max(0.5, (phytoAlgae_g + phytoPlankton_g) * 0.25);
+  const predatorGrazingHalfSat_g = Math.max(0.3, biofilm_g * 0.3);
   const phytoRefugiaFrac = 0.18;
   const phytoRecruitFrac = 0.04;
-  const grazingAssimEff = 0.8;
   const phytoStoreNCapFrac = 0.45;
   const phytoStorePCapFrac = 0.25;
   const phytoStoreNFrac = 0.7;
   const phytoStorePFrac = 0.3;
   const refugeExchangeRate = 0.12;
-  const grazingLagDays = 0.6;
 
-  phytoRefuge_g = phytoMass_g * phytoRefugiaFrac;
-  phytoOpen_g = Math.max(0, phytoMass_g - phytoRefuge_g);
+  phytoAlgaeRefuge_g = phytoAlgae_g * phytoRefugiaFrac;
+  phytoAlgaeOpen_g = Math.max(0, phytoAlgae_g - phytoAlgaeRefuge_g);
+  phytoPlanktonRefuge_g = phytoPlankton_g * phytoRefugiaFrac;
+  phytoPlanktonOpen_g = Math.max(0, phytoPlankton_g - phytoPlanktonRefuge_g);
 
   // Outputs
   const out = {
@@ -2009,6 +2487,12 @@ function runSimulation(params){
       micro_release:0,
       micro_uptake:0,
       phyto_grazed:0,
+      phyto_algae_grazed:0,
+      phyto_plankton_grazed:0,
+      biofilm_grazed:0,
+      predator_grazed:0,
+      biofilm_grazing_waste:0,
+      predator_grazing_waste:0,
       n_balance_init:0,
       n_balance_end:0,
       c_balance_init:0,
@@ -2030,10 +2514,19 @@ function runSimulation(params){
         microUptake_mgL_per_g_photo_day: FEED_PROFILE.modeling.microUptake_mgL_per_g_photo_day,
         copperFractionOfMicro: FEED_PROFILE.modeling.copperFractionOfMicro
       },
+      phytoCompartments: {
+        algae: {...PHYTO_COMPARTMENTS.algae, mass_g: phytoAlgae_g},
+        plankton: {...PHYTO_COMPARTMENTS.plankton, mass_g: phytoPlankton_g},
+        plants: {...PHYTO_COMPARTMENTS.plants, mass_g: phytoPlants_g}
+      },
       heteroModel: {
         heteroMass_g: heteroMass,
         o2_mg_g_day_base: FISH_MODEL.o2_mg_g_day_base,
         q10: FISH_MODEL.q10
+      },
+      trophicModel: {
+        biofilm: {...TROPHIC_MODEL.biofilm, mass_g: biofilm_g},
+        predator: {...TROPHIC_MODEL.predator, mass_g: predator_g}
       },
       feedStart:0,
       feedEnd:0,
@@ -2041,10 +2534,10 @@ function runSimulation(params){
       maxSupply:0,
       biofilmMass_g: biofilmMass_g,
       biofilmMult: biofilmMult,
-      grazingHalfSat_g: grazingHalfSat_g,
-      grazingMax_g_g_day: grazingMax_g_g_day,
-      phytoReserveCapFrac: phytoReserveCapFrac,
-      phytoNightGrowthFrac: phytoNightGrowthFrac,
+      biofilmGrazingHalfSat_g: biofilmGrazingHalfSat_g,
+      predatorGrazingHalfSat_g: predatorGrazingHalfSat_g,
+      biofilmGrazingMax_g_g_day: TROPHIC_MODEL.biofilm.grazingMax_g_g_day,
+      predatorGrazingMax_g_g_day: TROPHIC_MODEL.predator.grazingMax_g_g_day,
       phytoRefugiaFrac: phytoRefugiaFrac,
       phytoRecruitFrac: phytoRecruitFrac
     }
@@ -2301,7 +2794,7 @@ function runSimulation(params){
     out.audit.micro_release += microAdd_g;
 
     // Biomass growth + nutrient consumption
-    phytoMass_g = Math.max(0, phytoOpen_g + phytoRefuge_g);
+    phytoMass_g = Math.max(0, phytoAlgaeOpen_g + phytoAlgaeRefuge_g + phytoPlanktonOpen_g + phytoPlanktonRefuge_g + phytoPlants_g);
     let S_tot = S.carb + S.prot + S.fat;
     let nutrientPool = macro_g + micro_g;
     let inorgN_g = Math.max(0, NH4 + NO3);
@@ -2360,63 +2853,174 @@ function runSimulation(params){
     const nIndex = clamp(nAvailTotal / (nAvailTotal + 0.35), 0, 1);
     const pIndex = clamp(pAvailTotal / (pAvailTotal + 0.18), 0, 1);
     const phytoNutrientIndex = Math.min(nIndex, pIndex);
-    const phytoMuMax = PHOTO_MODEL.mu_max_per_day * tempF * (0.4 + 0.6 * phytoNutrientIndex);
     const storeCapFactor = clamp(storeFillPct / 0.6, 0, 1);
-    const phytoMuEff = phytoMuMax * lightFactor * co2Index * storeCapFactor;
+
+    const algaeMuMax = PHYTO_COMPARTMENTS.algae.mu_max_per_day * tempF * (0.4 + 0.6 * phytoNutrientIndex);
+    const planktonMuMax = PHYTO_COMPARTMENTS.plankton.mu_max_per_day * tempF * (0.4 + 0.6 * phytoNutrientIndex);
+    const plantsMuMax = PHYTO_COMPARTMENTS.plants.mu_max_per_day * tempF * (0.4 + 0.6 * phytoNutrientIndex);
+    const algaeMuEff = algaeMuMax * lightFactor * co2Index * storeCapFactor;
+    const planktonMuEff = planktonMuMax * lightFactor * co2Index * storeCapFactor;
+    const plantsMuEff = plantsMuMax * lightFactor * co2Index * storeCapFactor;
+
     phytoStoreFillLast = storeFillPct;
-    phytoMuMaxLast = phytoMuMax;
-    phytoMuEffLast = phytoMuEff;
-    if(lightFactor > 0.2 && phytoMuEff < phytoMuMax * lightFactor * co2Index * 0.9){
-      phytoMuCapHits++;
+    phytoMuMaxLast = phytoMass_g > 1e-9
+      ? (algaeMuMax * phytoAlgae_g + planktonMuMax * phytoPlankton_g + plantsMuMax * phytoPlants_g) / phytoMass_g
+      : 0;
+    phytoMuEffLast = phytoMass_g > 1e-9
+      ? (algaeMuEff * phytoAlgae_g + planktonMuEff * phytoPlankton_g + plantsMuEff * phytoPlants_g) / phytoMass_g
+      : 0;
+    if(lightFactor > 0.2){
+      if(algaeMuEff < algaeMuMax * lightFactor * co2Index * 0.9) phytoMuCapHits++;
+      if(planktonMuEff < planktonMuMax * lightFactor * co2Index * 0.9) phytoMuCapHits++;
+      if(plantsMuEff < plantsMuMax * lightFactor * co2Index * 0.9) phytoMuCapHits++;
     }
 
-    const phytoRescueFactor = phytoMass0 > 0 ? clamp(1 - (phytoMass_g / phytoMass0), 0, 1) : 0;
-    const phytoRecruitRaw = phytoMass0 * phytoRecruitFrac * phytoRescueFactor * lightFactor * phytoNutrientIndex * co2Index * dt;
-    let phytoGrowthRaw = phytoMass_g * phytoMuEff * dt + phytoRecruitRaw;
-    phytoRecruitTotal += phytoRecruitRaw;
-    const reserveAdd = phytoGrowthRaw * phytoReserveFrac;
-    phytoGrowthRaw -= reserveAdd;
-    phytoReserve_g += reserveAdd;
-    phytoReserveBuilt += reserveAdd;
-    const reserveCap = Math.max(0, phytoMass_g * phytoReserveCapFrac);
-    const reserveOverflow = Math.max(0, phytoReserve_g - reserveCap);
-    if(reserveOverflow > 0){
-      phytoReserve_g = reserveCap;
-      phytoGrowthRaw += reserveOverflow;
+    const algaeRescueFactor = phytoAlgae0 > 0 ? clamp(1 - (phytoAlgae_g / phytoAlgae0), 0, 1) : 0;
+    const planktonRescueFactor = phytoPlankton0 > 0 ? clamp(1 - (phytoPlankton_g / phytoPlankton0), 0, 1) : 0;
+    const plantsRescueFactor = phytoPlants0 > 0 ? clamp(1 - (phytoPlants_g / phytoPlants0), 0, 1) : 0;
+    const algaeRecruit = phytoAlgae0 * phytoRecruitFrac * algaeRescueFactor * lightFactor * phytoNutrientIndex * co2Index * dt;
+    const planktonRecruit = phytoPlankton0 * phytoRecruitFrac * planktonRescueFactor * lightFactor * phytoNutrientIndex * co2Index * dt;
+    const plantsRecruit = phytoPlants0 * phytoRecruitFrac * plantsRescueFactor * lightFactor * phytoNutrientIndex * co2Index * dt;
+    phytoRecruitTotal += algaeRecruit + planktonRecruit + plantsRecruit;
+
+    let algaeGrowthRaw = phytoAlgae_g * algaeMuEff * dt + algaeRecruit;
+    let planktonGrowthRaw = phytoPlankton_g * planktonMuEff * dt + planktonRecruit;
+    let plantsGrowthRaw = phytoPlants_g * plantsMuEff * dt + plantsRecruit;
+
+    const algaeReserveAdd = algaeGrowthRaw * PHYTO_COMPARTMENTS.algae.reserveFrac;
+    const planktonReserveAdd = planktonGrowthRaw * PHYTO_COMPARTMENTS.plankton.reserveFrac;
+    const plantsReserveAdd = plantsGrowthRaw * PHYTO_COMPARTMENTS.plants.reserveFrac;
+    algaeGrowthRaw -= algaeReserveAdd;
+    planktonGrowthRaw -= planktonReserveAdd;
+    plantsGrowthRaw -= plantsReserveAdd;
+    phytoAlgaeReserve_g += algaeReserveAdd;
+    phytoPlanktonReserve_g += planktonReserveAdd;
+    phytoPlantsReserve_g += plantsReserveAdd;
+    phytoReserveBuilt += algaeReserveAdd + planktonReserveAdd + plantsReserveAdd;
+
+    const algaeReserveCap = Math.max(0, phytoAlgae_g * PHYTO_COMPARTMENTS.algae.reserveCapFrac);
+    const planktonReserveCap = Math.max(0, phytoPlankton_g * PHYTO_COMPARTMENTS.plankton.reserveCapFrac);
+    const plantsReserveCap = Math.max(0, phytoPlants_g * PHYTO_COMPARTMENTS.plants.reserveCapFrac);
+    const algaeReserveOverflow = Math.max(0, phytoAlgaeReserve_g - algaeReserveCap);
+    const planktonReserveOverflow = Math.max(0, phytoPlanktonReserve_g - planktonReserveCap);
+    const plantsReserveOverflow = Math.max(0, phytoPlantsReserve_g - plantsReserveCap);
+    if(algaeReserveOverflow > 0){
+      phytoAlgaeReserve_g = algaeReserveCap;
+      algaeGrowthRaw += algaeReserveOverflow;
     }
-    const phytoNightPotential = phytoMass_g * phytoMuMax * phytoNightGrowthFrac * (1 - lightFactor) * co2Index * storeCapFactor * dt;
-    const reserveUsePlanned = Math.min(phytoReserve_g, phytoNightPotential);
+    if(planktonReserveOverflow > 0){
+      phytoPlanktonReserve_g = planktonReserveCap;
+      planktonGrowthRaw += planktonReserveOverflow;
+    }
+    if(plantsReserveOverflow > 0){
+      phytoPlantsReserve_g = plantsReserveCap;
+      plantsGrowthRaw += plantsReserveOverflow;
+    }
+
+    const algaeNightPotential = phytoAlgae_g * algaeMuMax * PHYTO_COMPARTMENTS.algae.nightGrowthFrac * (1 - lightFactor) * co2Index * storeCapFactor * dt;
+    const planktonNightPotential = phytoPlankton_g * planktonMuMax * PHYTO_COMPARTMENTS.plankton.nightGrowthFrac * (1 - lightFactor) * co2Index * storeCapFactor * dt;
+    const plantsNightPotential = phytoPlants_g * plantsMuMax * PHYTO_COMPARTMENTS.plants.nightGrowthFrac * (1 - lightFactor) * co2Index * storeCapFactor * dt;
+    const algaeReserveUsePlanned = Math.min(phytoAlgaeReserve_g, algaeNightPotential);
+    const planktonReserveUsePlanned = Math.min(phytoPlanktonReserve_g, planktonNightPotential);
+    const plantsReserveUsePlanned = Math.min(phytoPlantsReserve_g, plantsNightPotential);
+
     const phytoYield = 0.55;
-    const phytoPotential = phytoGrowthRaw + reserveUsePlanned;
-    const phytoRequired = phytoPotential / phytoYield;
-    const nDemand = phytoRequired * phytoStoreNFrac;
-    const pDemand = phytoRequired * phytoStorePFrac;
+    const algaePotential = algaeGrowthRaw + algaeReserveUsePlanned;
+    const planktonPotential = planktonGrowthRaw + planktonReserveUsePlanned;
+    const plantsPotential = plantsGrowthRaw + plantsReserveUsePlanned;
+    const algaeRequired = algaePotential / phytoYield;
+    const planktonRequired = planktonPotential / phytoYield;
+    const plantsRequired = plantsPotential / phytoYield;
+    const phytoRequiredTotal = algaeRequired + planktonRequired + plantsRequired;
+    const nDemand = phytoRequiredTotal * phytoStoreNFrac;
+    const pDemand = phytoRequiredTotal * phytoStorePFrac;
     const nutrientScale = Math.min(
       1,
       nAvailTotal / Math.max(1e-9, nDemand),
       pAvailTotal / Math.max(1e-9, pDemand)
     );
-    const phytoConsumed = phytoRequired * nutrientScale;
-    const phytoGrowth = phytoConsumed * phytoYield;
-    const phytoReserveUseActual = clamp(phytoGrowth - phytoGrowthRaw, 0, reserveUsePlanned);
-    if(phytoReserveUseActual > 0){
-      phytoReserve_g = Math.max(0, phytoReserve_g - phytoReserveUseActual);
-      phytoReserveUsed += phytoReserveUseActual;
-      phytoNightGrowthTotal += phytoReserveUseActual;
+
+    const algaeConsumed = algaeRequired * nutrientScale;
+    const planktonConsumed = planktonRequired * nutrientScale;
+    const plantsConsumed = plantsRequired * nutrientScale;
+    const algaeGrowth = algaeConsumed * phytoYield;
+    const planktonGrowth = planktonConsumed * phytoYield;
+    const plantsGrowth = plantsConsumed * phytoYield;
+
+    const algaeReserveUseActual = clamp(algaeGrowth - algaeGrowthRaw, 0, algaeReserveUsePlanned);
+    const planktonReserveUseActual = clamp(planktonGrowth - planktonGrowthRaw, 0, planktonReserveUsePlanned);
+    const plantsReserveUseActual = clamp(plantsGrowth - plantsGrowthRaw, 0, plantsReserveUsePlanned);
+    if(algaeReserveUseActual > 0){
+      phytoAlgaeReserve_g = Math.max(0, phytoAlgaeReserve_g - algaeReserveUseActual);
+      phytoReserveUsed += algaeReserveUseActual;
+      phytoNightGrowthTotal += algaeReserveUseActual;
     }
-    const reserveUnused = reserveUsePlanned - phytoReserveUseActual;
-    if(reserveUnused > 0){
-      phytoReserve_g += reserveUnused;
+    if(planktonReserveUseActual > 0){
+      phytoPlanktonReserve_g = Math.max(0, phytoPlanktonReserve_g - planktonReserveUseActual);
+      phytoReserveUsed += planktonReserveUseActual;
+      phytoNightGrowthTotal += planktonReserveUseActual;
     }
-    if(nutrientScale < 1 && (phytoN_store_g + phytoP_store_g) <= 1e-8 && phytoPotential > 1e-9){
+    if(plantsReserveUseActual > 0){
+      phytoPlantsReserve_g = Math.max(0, phytoPlantsReserve_g - plantsReserveUseActual);
+      phytoReserveUsed += plantsReserveUseActual;
+      phytoNightGrowthTotal += plantsReserveUseActual;
+    }
+    const algaeReserveUnused = algaeReserveUsePlanned - algaeReserveUseActual;
+    const planktonReserveUnused = planktonReserveUsePlanned - planktonReserveUseActual;
+    const plantsReserveUnused = plantsReserveUsePlanned - plantsReserveUseActual;
+    if(algaeReserveUnused > 0) phytoAlgaeReserve_g += algaeReserveUnused;
+    if(planktonReserveUnused > 0) phytoPlanktonReserve_g += planktonReserveUnused;
+    if(plantsReserveUnused > 0) phytoPlantsReserve_g += plantsReserveUnused;
+    if(nutrientScale < 1 && (phytoN_store_g + phytoP_store_g) <= 1e-8 && phytoRequiredTotal > 1e-9){
       phytoStoreDepleteHits++;
     }
-    const phytoDecay = 0;
-    const phytoTotal = phytoOpen_g + phytoRefuge_g;
-    const refugeShare = phytoTotal > 1e-9 ? (phytoRefuge_g / phytoTotal) : phytoRefugiaFrac;
-    phytoRefuge_g = Math.max(0, phytoRefuge_g + phytoGrowth * refugeShare - phytoDecay * refugeShare);
-    phytoOpen_g = Math.max(0, phytoOpen_g + phytoGrowth * (1 - refugeShare) - phytoDecay * (1 - refugeShare));
-    phytoMass_g = phytoOpen_g + phytoRefuge_g;
+
+    const algaeDecay = phytoAlgae_g * PHYTO_COMPARTMENTS.algae.decay_per_day * tempF * dt;
+    const planktonDecay = phytoPlankton_g * PHYTO_COMPARTMENTS.plankton.decay_per_day * tempF * dt;
+    const plantsDecay = phytoPlants_g * PHYTO_COMPARTMENTS.plants.decay_per_day * tempF * dt;
+
+    const algaeTotal = phytoAlgaeOpen_g + phytoAlgaeRefuge_g;
+    const planktonTotal = phytoPlanktonOpen_g + phytoPlanktonRefuge_g;
+    const algaeRefugeShare = algaeTotal > 1e-9 ? (phytoAlgaeRefuge_g / algaeTotal) : phytoRefugiaFrac;
+    const planktonRefugeShare = planktonTotal > 1e-9 ? (phytoPlanktonRefuge_g / planktonTotal) : phytoRefugiaFrac;
+    phytoAlgaeRefuge_g = Math.max(0, phytoAlgaeRefuge_g + algaeGrowth * algaeRefugeShare - algaeDecay * algaeRefugeShare);
+    phytoAlgaeOpen_g = Math.max(0, phytoAlgaeOpen_g + algaeGrowth * (1 - algaeRefugeShare) - algaeDecay * (1 - algaeRefugeShare));
+    phytoPlanktonRefuge_g = Math.max(0, phytoPlanktonRefuge_g + planktonGrowth * planktonRefugeShare - planktonDecay * planktonRefugeShare);
+    phytoPlanktonOpen_g = Math.max(0, phytoPlanktonOpen_g + planktonGrowth * (1 - planktonRefugeShare) - planktonDecay * (1 - planktonRefugeShare));
+    phytoPlants_g = Math.max(0, phytoPlants_g + plantsGrowth - plantsDecay);
+
+    phytoAlgae_g = phytoAlgaeOpen_g + phytoAlgaeRefuge_g;
+    phytoPlankton_g = phytoPlanktonOpen_g + phytoPlanktonRefuge_g;
+    phytoMass_g = phytoAlgae_g + phytoPlankton_g + phytoPlants_g;
+
+    phytoGrowthTotal += algaeGrowth + planktonGrowth + plantsGrowth;
+    phytoAlgaeGrowthTotal += algaeGrowth;
+    phytoPlanktonGrowthTotal += planktonGrowth;
+    phytoPlantsGrowthTotal += plantsGrowth;
+    phytoConsumedTotal += algaeConsumed + planktonConsumed + plantsConsumed;
+    phytoDecayTotal += algaeDecay + planktonDecay + plantsDecay;
+
+    if(phytoAlgae_g <= 1e-9){
+      phytoAlgaeExtinctHits++;
+      if(!phytoAlgaeExtinctWarned && params.runMode !== 'uncertainty'){
+        addWarning('Phyto algae biomass reached 0 g; algae compartment extinct.');
+        phytoAlgaeExtinctWarned = true;
+      }
+    }
+    if(phytoPlankton_g <= 1e-9){
+      phytoPlanktonExtinctHits++;
+      if(!phytoPlanktonExtinctWarned && params.runMode !== 'uncertainty'){
+        addWarning('Phyto plankton biomass reached 0 g; plankton compartment extinct.');
+        phytoPlanktonExtinctWarned = true;
+      }
+    }
+    if(phytoPlants_g <= 1e-9){
+      phytoPlantsExtinctHits++;
+      if(!phytoPlantsExtinctWarned && params.runMode !== 'uncertainty'){
+        addWarning('Phyto plants biomass reached 0 g; plant compartment extinct.');
+        phytoPlantsExtinctWarned = true;
+      }
+    }
     if(phytoMass_g <= 1e-9){
       phytoExtinctHits++;
       if(!phytoExtinctWarned && params.runMode !== 'uncertainty'){
@@ -2424,17 +3028,38 @@ function runSimulation(params){
         phytoExtinctWarned = true;
       }
     }
-    phytoGrowthTotal += phytoGrowth;
-    phytoConsumedTotal += phytoConsumed;
-    phytoDecayTotal += phytoDecay;
-    if(!Number.isFinite(phytoMass_g)){
-      addWarning('Phyto mass became non-finite; resetting to 0.');
+
+    if(!Number.isFinite(phytoAlgae_g)){
+      addWarning('Phyto algae mass became non-finite; resetting to 0.');
       biomassNonFiniteHits++;
-      phytoMass_g = 0;
+      phytoAlgaeNonFiniteHits++;
+      phytoAlgae_g = 0;
+      phytoAlgaeOpen_g = 0;
+      phytoAlgaeRefuge_g = 0;
+      phytoAlgaeReserve_g = 0;
     }
-    if(phytoConsumed > 0){
-      let nNeed = phytoConsumed * phytoStoreNFrac;
-      let pNeed = phytoConsumed * phytoStorePFrac;
+    if(!Number.isFinite(phytoPlankton_g)){
+      addWarning('Phyto plankton mass became non-finite; resetting to 0.');
+      biomassNonFiniteHits++;
+      phytoPlanktonNonFiniteHits++;
+      phytoPlankton_g = 0;
+      phytoPlanktonOpen_g = 0;
+      phytoPlanktonRefuge_g = 0;
+      phytoPlanktonReserve_g = 0;
+    }
+    if(!Number.isFinite(phytoPlants_g)){
+      addWarning('Phyto plants mass became non-finite; resetting to 0.');
+      biomassNonFiniteHits++;
+      phytoPlantsNonFiniteHits++;
+      phytoPlants_g = 0;
+      phytoPlantsReserve_g = 0;
+    }
+    phytoMass_g = phytoAlgae_g + phytoPlankton_g + phytoPlants_g;
+
+    const phytoConsumedStep = algaeConsumed + planktonConsumed + plantsConsumed;
+    if(phytoConsumedStep > 0){
+      let nNeed = phytoConsumedStep * phytoStoreNFrac;
+      let pNeed = phytoConsumedStep * phytoStorePFrac;
       const nExternalAvail = macro_g + inorgN_g * 0.6;
       const nFromExternal = Math.min(nNeed, nExternalAvail);
       if(nFromExternal > 0){
@@ -2478,26 +3103,103 @@ function runSimulation(params){
     nutrientPool = macro_g + micro_g;
     inorgN_g = Math.max(0, NH4 + NO3);
     S_tot = S.carb + S.prot + S.fat;
-    const grazablePhyto_g = Math.max(0, phytoOpen_g);
-    const grazerTarget = grazablePhyto_g / (grazablePhyto_g + grazingHalfSat_g);
-    const grazerBlend = clamp(grazingLagDays > 1e-6 ? (dt / grazingLagDays) : 1, 0, 1);
-    grazerActivity = clamp(grazerActivity + (grazerTarget - grazerActivity) * grazerBlend, 0, 1);
-    grazerActivityMin = Math.min(grazerActivityMin, grazerActivity);
-    if(grazerTarget > 0.5 && grazerActivity < 0.1){
+    const grazableAlgae_g = Math.max(0, phytoAlgaeOpen_g);
+    const grazablePlankton_g = Math.max(0, phytoPlanktonOpen_g);
+    const grazablePhyto_g = grazableAlgae_g + grazablePlankton_g;
+    const biofilmTarget = grazablePhyto_g / (grazablePhyto_g + biofilmGrazingHalfSat_g);
+    const biofilmBlend = clamp(TROPHIC_MODEL.biofilm.lagDays > 1e-6 ? (dt / TROPHIC_MODEL.biofilm.lagDays) : 1, 0, 1);
+    biofilmActivity = clamp(biofilmActivity + (biofilmTarget - biofilmActivity) * biofilmBlend, 0, 1);
+    biofilmActivityMin = Math.min(biofilmActivityMin, biofilmActivity);
+    if(biofilmTarget > 0.5 && biofilmActivity < 0.1){
       grazingLagCollapseHits++;
     }
-    const grazingShield = grazablePhyto_g / (grazablePhyto_g + Math.max(phytoMass0 * 0.2, 0.5));
+    const grazingShield = grazablePhyto_g / (grazablePhyto_g + Math.max((phytoAlgae0 + phytoPlankton0) * 0.2, 0.5));
     grazingShieldMin = Math.min(grazingShieldMin, grazingShield);
-    const grazingSatiation = 1 - Math.exp(-grazablePhyto_g / Math.max(phytoMass0 * 0.5, 1));
-    const grazeRate_g_day = heteroMass_g * grazingMax_g_g_day * grazerActivity * grazingShield * grazingSatiation * tempF;
-    const heteroYield = 0.45;
-    const heteroAvailable = grazablePhyto_g;
-    const heteroConsumed = Math.min(grazeRate_g_day * dt, heteroAvailable);
-    if(heteroConsumed < (grazeRate_g_day * dt) - 1e-9) grazingLimitedSteps++;
-    laggedConsumptionTotal += heteroConsumed;
-    const heteroGrowth = heteroConsumed * heteroYield * grazingAssimEff;
-    const heteroDecay = heteroMass_g * HET_MODEL.decay_per_day * (1 - grazerActivity) * dt;
-    heteroMass_g = Math.max(0, heteroMass_g + heteroGrowth - heteroDecay);
+    const grazingSatiation = 1 - Math.exp(-grazablePhyto_g / Math.max((phytoAlgae0 + phytoPlankton0) * 0.5, 1));
+    const biofilmGrazeRate_g_day = biofilm_g * TROPHIC_MODEL.biofilm.grazingMax_g_g_day * biofilmActivity * grazingShield * grazingSatiation * tempF;
+    const biofilmConsumed = Math.min(biofilmGrazeRate_g_day * dt, grazablePhyto_g);
+    if(biofilmConsumed < (biofilmGrazeRate_g_day * dt) - 1e-9) grazingLimitedSteps++;
+    laggedBiofilmConsumptionTotal += biofilmConsumed;
+    const biofilmGrowth = biofilmConsumed * TROPHIC_MODEL.biofilm.yield * TROPHIC_MODEL.biofilm.assimEff;
+    const biofilmDecay = biofilm_g * TROPHIC_MODEL.biofilm.decay_per_day * (1 - biofilmActivity) * dt;
+    biofilm_g = Math.max(0, biofilm_g + biofilmGrowth - biofilmDecay);
+
+    let algaeGrazed = 0;
+    let planktonGrazed = 0;
+    if(biofilmConsumed > 0){
+      const algaeShare = grazablePhyto_g > 1e-9 ? (grazableAlgae_g / grazablePhyto_g) : 0;
+      algaeGrazed = biofilmConsumed * algaeShare;
+      planktonGrazed = biofilmConsumed - algaeGrazed;
+      phytoAlgaeOpen_g = Math.max(0, phytoAlgaeOpen_g - algaeGrazed);
+      phytoPlanktonOpen_g = Math.max(0, phytoPlanktonOpen_g - planktonGrazed);
+      phytoGrazedTotal += biofilmConsumed;
+      biofilmGrazedTotal += biofilmConsumed;
+      out.audit.phyto_grazed += biofilmConsumed;
+      out.audit.phyto_algae_grazed += algaeGrazed;
+      out.audit.phyto_plankton_grazed += planktonGrazed;
+      const biofilmWaste = Math.max(0, biofilmConsumed - biofilmGrowth);
+      if(biofilmWaste > 0){
+        S.carb += biofilmWaste * FRACTIONS.carb;
+        S.prot += biofilmWaste * FRACTIONS.protein;
+        S.fat  += biofilmWaste * FRACTIONS.fat;
+        NH4 += biofilmWaste * FRACTIONS.protein * CHEM.gN_per_g_protein * 0.2;
+        out.audit.biofilm_grazing_waste += biofilmWaste;
+      }
+    }
+
+    if(biofilm_g <= 1e-9){
+      biofilmExtinctHits++;
+      if(!biofilmExtinctWarned && params.runMode !== 'uncertainty'){
+        addWarning('Biofilm biomass reached 0 g; biofilm grazers extinct.');
+        biofilmExtinctWarned = true;
+      }
+    }
+
+    const predatorTarget = biofilm_g / (biofilm_g + predatorGrazingHalfSat_g);
+    const predatorBlend = clamp(TROPHIC_MODEL.predator.lagDays > 1e-6 ? (dt / TROPHIC_MODEL.predator.lagDays) : 1, 0, 1);
+    predatorActivity = clamp(predatorActivity + (predatorTarget - predatorActivity) * predatorBlend, 0, 1);
+    predatorActivityMin = Math.min(predatorActivityMin, predatorActivity);
+    if(predatorTarget > 0.5 && predatorActivity < 0.1){
+      predatorLagCollapseHits++;
+    }
+    const predatorShield = biofilm_g / (biofilm_g + Math.max(biofilm0 * 0.2, 0.4));
+    predatorShieldMin = Math.min(predatorShieldMin, predatorShield);
+    const predatorSatiation = 1 - Math.exp(-biofilm_g / Math.max(biofilm0 * 0.5, 0.6));
+    const predatorGrazeRate_g_day = predator_g * TROPHIC_MODEL.predator.grazingMax_g_g_day * predatorActivity * predatorShield * predatorSatiation * tempF;
+    const predatorConsumed = Math.min(predatorGrazeRate_g_day * dt, biofilm_g);
+    if(predatorConsumed < (predatorGrazeRate_g_day * dt) - 1e-9) predatorGrazingLimitedSteps++;
+    laggedPredatorConsumptionTotal += predatorConsumed;
+    biofilm_g = Math.max(0, biofilm_g - predatorConsumed);
+
+    const predatorGrowth = predatorConsumed * TROPHIC_MODEL.predator.yield * TROPHIC_MODEL.predator.assimEff;
+    const predatorDecay = predator_g * TROPHIC_MODEL.predator.decay_per_day * (1 - predatorActivity) * dt;
+    predator_g = Math.max(0, predator_g + predatorGrowth - predatorDecay);
+
+    if(predatorConsumed > 0){
+      predatorGrazedTotal += predatorConsumed;
+      out.audit.biofilm_grazed += predatorConsumed;
+      out.audit.predator_grazed += predatorConsumed;
+      const predatorWaste = Math.max(0, predatorConsumed - predatorGrowth);
+      if(predatorWaste > 0){
+        S.carb += predatorWaste * FRACTIONS.carb;
+        S.prot += predatorWaste * FRACTIONS.protein;
+        S.fat  += predatorWaste * FRACTIONS.fat;
+        NH4 += predatorWaste * FRACTIONS.protein * CHEM.gN_per_g_protein * 0.2;
+        out.audit.predator_grazing_waste += predatorWaste;
+      }
+    }
+
+    if(predator_g <= 1e-9){
+      predatorExtinctHits++;
+      if(!predatorExtinctWarned && params.runMode !== 'uncertainty'){
+        addWarning('Predator biomass reached 0 g; predator compartment extinct.');
+        predatorExtinctWarned = true;
+      }
+    }
+
+    heteroMass_g = biofilm_g + predator_g;
+    heteroConsumedTotal += biofilmConsumed + predatorConsumed;
+    heteroGrowthTotal += biofilmGrowth + predatorGrowth;
     if(heteroMass_g <= 1e-9){
       heteroExtinctHits++;
       if(!heteroExtinctWarned && params.runMode !== 'uncertainty'){
@@ -2505,45 +3207,63 @@ function runSimulation(params){
         heteroExtinctWarned = true;
       }
     }
-    heteroGrowthTotal += heteroGrowth;
-    heteroConsumedTotal += heteroConsumed;
-    if(!Number.isFinite(heteroMass_g)){
-      addWarning('Heterotroph mass became non-finite; resetting to 0.');
+
+    if(!Number.isFinite(biofilm_g)){
+      addWarning('Biofilm mass became non-finite; resetting to 0.');
       biomassNonFiniteHits++;
-      heteroMass_g = 0;
+      biofilmNonFiniteHits++;
+      biofilm_g = 0;
     }
-    if(heteroConsumed > 0){
-      phytoOpen_g = Math.max(0, phytoOpen_g - heteroConsumed);
-      phytoMass_g = phytoOpen_g + phytoRefuge_g;
-      phytoGrazedTotal += heteroConsumed;
-      out.audit.phyto_grazed += heteroConsumed;
-      const grazingWaste = Math.max(0, heteroConsumed - heteroGrowth);
-      if(grazingWaste > 0){
-        S.carb += grazingWaste * FRACTIONS.carb;
-        S.prot += grazingWaste * FRACTIONS.protein;
-        S.fat  += grazingWaste * FRACTIONS.fat;
-        NH4 += grazingWaste * FRACTIONS.protein * CHEM.gN_per_g_protein * 0.2;
-      }
+    if(!Number.isFinite(predator_g)){
+      addWarning('Predator mass became non-finite; resetting to 0.');
+      biomassNonFiniteHits++;
+      predatorNonFiniteHits++;
+      predator_g = 0;
+    }
+    heteroMass_g = biofilm_g + predator_g;
+
+    if(heteroMass_g > heteroMass0 * 0.6){
+      if(biofilm_g <= 1e-9) biofilmStableCollapseHits++;
+      if(predator_g <= 1e-9) predatorStableCollapseHits++;
     }
 
-    const refugeTarget = phytoMass_g * phytoRefugiaFrac;
-    const refugeDelta_g_day = (refugeTarget - phytoRefuge_g) * refugeExchangeRate;
-    const refugeExchange_g = refugeDelta_g_day * dt;
-    if(refugeExchange_g > 0){
-      const move = Math.min(refugeExchange_g, phytoOpen_g);
-      phytoOpen_g -= move;
-      phytoRefuge_g += move;
-    }else if(refugeExchange_g < 0){
-      const move = Math.min(-refugeExchange_g, phytoRefuge_g);
-      phytoRefuge_g -= move;
-      phytoOpen_g += move;
+    const algaeRefugeTarget = (phytoAlgaeOpen_g + phytoAlgaeRefuge_g) * phytoRefugiaFrac;
+    const planktonRefugeTarget = (phytoPlanktonOpen_g + phytoPlanktonRefuge_g) * phytoRefugiaFrac;
+    const algaeRefugeDelta_g_day = (algaeRefugeTarget - phytoAlgaeRefuge_g) * refugeExchangeRate;
+    const planktonRefugeDelta_g_day = (planktonRefugeTarget - phytoPlanktonRefuge_g) * refugeExchangeRate;
+    const algaeExchange_g = algaeRefugeDelta_g_day * dt;
+    const planktonExchange_g = planktonRefugeDelta_g_day * dt;
+    if(algaeExchange_g > 0){
+      const move = Math.min(algaeExchange_g, phytoAlgaeOpen_g);
+      phytoAlgaeOpen_g -= move;
+      phytoAlgaeRefuge_g += move;
+    }else if(algaeExchange_g < 0){
+      const move = Math.min(-algaeExchange_g, phytoAlgaeRefuge_g);
+      phytoAlgaeRefuge_g -= move;
+      phytoAlgaeOpen_g += move;
     }
-    phytoMass_g = phytoOpen_g + phytoRefuge_g;
-    refugeExchangeLast = Math.abs(refugeDelta_g_day);
-    refugeFractionLast = phytoMass_g > 1e-9 ? (phytoRefuge_g / phytoMass_g) : 0;
+    if(planktonExchange_g > 0){
+      const move = Math.min(planktonExchange_g, phytoPlanktonOpen_g);
+      phytoPlanktonOpen_g -= move;
+      phytoPlanktonRefuge_g += move;
+    }else if(planktonExchange_g < 0){
+      const move = Math.min(-planktonExchange_g, phytoPlanktonRefuge_g);
+      phytoPlanktonRefuge_g -= move;
+      phytoPlanktonOpen_g += move;
+    }
+    phytoAlgae_g = phytoAlgaeOpen_g + phytoAlgaeRefuge_g;
+    phytoPlankton_g = phytoPlanktonOpen_g + phytoPlanktonRefuge_g;
+    phytoMass_g = phytoAlgae_g + phytoPlankton_g + phytoPlants_g;
+    const refugeTotal = phytoAlgaeRefuge_g + phytoPlanktonRefuge_g;
+    const refugeTotalMass = (phytoAlgaeOpen_g + phytoAlgaeRefuge_g + phytoPlanktonOpen_g + phytoPlanktonRefuge_g);
+    refugeExchangeLast = Math.abs(algaeRefugeDelta_g_day) + Math.abs(planktonRefugeDelta_g_day);
+    refugeFractionLast = refugeTotalMass > 1e-9 ? (refugeTotal / refugeTotalMass) : 0;
     if(refugeFractionLast < 0.05) refugeEmptyHits++;
     if(refugeFractionLast > 0.6) refugeOverrunHits++;
 
+    const phytoDecay = algaeDecay + planktonDecay + plantsDecay;
+    const heteroDecay = biofilmDecay + predatorDecay;
+    const phytoGrowthStep = algaeGrowth + planktonGrowth + plantsGrowth;
     const decayMass = heteroDecay + phytoDecay;
     if(decayMass > 0){
       const decayReturnMass = decayMass * 0.35;
@@ -2559,7 +3279,7 @@ function runSimulation(params){
       NH4 += decayReturnMass * FRACTIONS.protein * CHEM.gN_per_g_protein * 0.3;
     }
 
-    const co2GrowthCons_g = phytoGrowth * PHOTO_MODEL.co2_per_g_growth;
+    const co2GrowthCons_g = phytoGrowthStep * PHOTO_MODEL.co2_per_g_growth;
     DIC_g = Math.max(0, DIC_g - co2GrowthCons_g);
     if(CO2_free_g <= 1e-9) co2ZeroHits++;
     co2Consumed_g += co2GrowthCons_g;
@@ -2791,12 +3511,22 @@ function runSimulation(params){
   out.meta.heteroGrowthTotal = heteroGrowthTotal;
   out.meta.heteroConsumedTotal = heteroConsumedTotal;
   out.meta.phytoGrowthTotal = phytoGrowthTotal;
+  out.meta.phytoAlgaeGrowthTotal = phytoAlgaeGrowthTotal;
+  out.meta.phytoPlanktonGrowthTotal = phytoPlanktonGrowthTotal;
+  out.meta.phytoPlantsGrowthTotal = phytoPlantsGrowthTotal;
   out.meta.phytoConsumedTotal = phytoConsumedTotal;
   out.meta.phytoDecayTotal = phytoDecayTotal;
   out.meta.phytoGrazedTotal = phytoGrazedTotal;
+  out.meta.biofilmGrazedTotal = biofilmGrazedTotal;
+  out.meta.predatorGrazedTotal = predatorGrazedTotal;
   out.meta.phytoNightGrowthTotal = phytoNightGrowthTotal;
   out.meta.phytoReserveBuilt = phytoReserveBuilt;
   out.meta.phytoReserveUsed = phytoReserveUsed;
+  out.meta.phytoAlgae_g = phytoAlgae_g;
+  out.meta.phytoPlankton_g = phytoPlankton_g;
+  out.meta.phytoPlants_g = phytoPlants_g;
+  out.meta.biofilm_g = biofilm_g;
+  out.meta.predator_g = predator_g;
   out.meta.phytoStoreFillPct = phytoStoreFillLast;
   out.meta.phytoStoreN_g = phytoN_store_g;
   out.meta.phytoStoreP_g = phytoP_store_g;
@@ -2810,17 +3540,30 @@ function runSimulation(params){
   out.meta.refugeExchange_g_day = refugeExchangeLast;
   out.meta.refugeEmptyHits = refugeEmptyHits;
   out.meta.refugeOverrunHits = refugeOverrunHits;
-  out.meta.grazerActivityLast = grazerActivity;
-  out.meta.grazerActivityMin = grazerActivityMin;
-  out.meta.laggedConsumptionTotal = laggedConsumptionTotal;
+  out.meta.biofilmActivityLast = biofilmActivity;
+  out.meta.biofilmActivityMin = biofilmActivityMin;
+  out.meta.predatorActivityLast = predatorActivity;
+  out.meta.predatorActivityMin = predatorActivityMin;
+  out.meta.laggedBiofilmConsumptionTotal = laggedBiofilmConsumptionTotal;
+  out.meta.laggedPredatorConsumptionTotal = laggedPredatorConsumptionTotal;
   out.meta.grazingLagCollapseHits = grazingLagCollapseHits;
+  out.meta.predatorLagCollapseHits = predatorLagCollapseHits;
   out.meta.biomassNonFiniteHits = biomassNonFiniteHits;
+  out.meta.phytoAlgaeNonFiniteHits = phytoAlgaeNonFiniteHits;
+  out.meta.phytoPlanktonNonFiniteHits = phytoPlanktonNonFiniteHits;
+  out.meta.phytoPlantsNonFiniteHits = phytoPlantsNonFiniteHits;
+  out.meta.biofilmNonFiniteHits = biofilmNonFiniteHits;
+  out.meta.predatorNonFiniteHits = predatorNonFiniteHits;
   out.meta.phytoRecruitTotal = phytoRecruitTotal;
   out.meta.co2ZeroHits = co2ZeroHits;
   out.meta.co2DegasSteps = co2DegasSteps;
   out.meta.co2Degassed_g = co2Degassed_g;
   out.meta.grazingLimitedSteps = grazingLimitedSteps;
+  out.meta.predatorGrazingLimitedSteps = predatorGrazingLimitedSteps;
   out.meta.grazingShieldMin = grazingShieldMin;
+  out.meta.predatorShieldMin = predatorShieldMin;
+  out.meta.biofilmStableCollapseHits = biofilmStableCollapseHits;
+  out.meta.predatorStableCollapseHits = predatorStableCollapseHits;
   out.meta.co2AirIn_g = co2AirIn_g;
   out.meta.co2AirOut_g = co2AirOut_g;
   out.meta.alkalinity_mgL = alkalinity_mgL;
@@ -2844,7 +3587,15 @@ function runSimulation(params){
     pellets: simFeedPlan.reduce((acc, f)=>acc + (Number(f.pellets) || 0), 0),
     powder_g: simFeedPlan.reduce((acc, f)=>acc + (Number(f.powder_g) || 0), 0)
   };
-  out.meta.biomassExtinction = {heteroHits:heteroExtinctHits, phytoHits:phytoExtinctHits};
+  out.meta.biomassExtinction = {
+    heteroHits: heteroExtinctHits,
+    phytoHits: phytoExtinctHits,
+    phytoAlgaeHits: phytoAlgaeExtinctHits,
+    phytoPlanktonHits: phytoPlanktonExtinctHits,
+    phytoPlantsHits: phytoPlantsExtinctHits,
+    biofilmHits: biofilmExtinctHits,
+    predatorHits: predatorExtinctHits
+  };
   if(feedAddedN_g > 0 && Math.abs(out.audit.n_balance_end - feedAddedN_g)/feedAddedN_g > 0.15){
     addWarning('Nitrogen balance drift exceeds 15% — check kinetics or timestep.');
   }
@@ -2865,6 +3616,15 @@ function runSimulation(params){
   }
   if(grazingLagCollapseHits > 0 && params.runMode !== 'uncertainty'){
     addWarning(`Grazer activity lagged behind prey for ${grazingLagCollapseHits} steps; expect delayed grazing response.`);
+  }
+  if(predatorLagCollapseHits > 0 && params.runMode !== 'uncertainty'){
+    addWarning(`Predator response lagged behind biofilm for ${predatorLagCollapseHits} steps; predator buildup may be delayed.`);
+  }
+  if(biofilmStableCollapseHits > 0 && params.runMode !== 'uncertainty'){
+    addWarning(`Biofilm collapsed for ${biofilmStableCollapseHits} steps while total heterotroph mass stayed elevated.`);
+  }
+  if(predatorStableCollapseHits > 0 && params.runMode !== 'uncertainty'){
+    addWarning(`Predator collapsed for ${predatorStableCollapseHits} steps while total heterotroph mass stayed elevated.`);
   }
   if(phytoMuCapHits > 0 && params.runMode !== 'uncertainty'){
     addWarning(`Effective phyto growth was capped by nutrients/stores in ${phytoMuCapHits} steps.`);
@@ -4812,6 +5572,13 @@ function getParams(){
   p.denitCap = clamp(Number.isFinite(p.denitCap) ? p.denitCap : 1.0, 0, 1);
   p.lightHour = clamp(Number.isFinite(p.lightHour) ? p.lightHour : 8, 0, 23);
   p.photoMass = clamp(Number.isFinite(p.photoMass) ? p.photoMass : 0, 0, 100000);
+  const phytoTotal = p.photoMass;
+  const heteroTotal = Number.isFinite(p.heteroMass) ? p.heteroMass : 0;
+  p.phytoAlgae_g = Math.max(0, phytoTotal * PHYTO_SPLIT.algae);
+  p.phytoPlankton_g = Math.max(0, phytoTotal * PHYTO_SPLIT.plankton);
+  p.phytoPlants_g = Math.max(0, phytoTotal * PHYTO_SPLIT.plants);
+  p.biofilm_g = Math.max(0, heteroTotal * HET_SPLIT.biofilm);
+  p.predator_g = Math.max(0, heteroTotal * HET_SPLIT.predator);
   return p;
 }
 
@@ -4893,6 +5660,7 @@ function recompute(){
     params.feedSchedule = feedPlan;
     DEBUG_STATE.lastFeedScheduleCount = feedPlan.length;
     renderFeedingCalendar(params, feedPlan, EVENTS);
+    measurePanelOverflow();
 
     // Base sim (used for breakdown lines + UI even in uncertainty mode)
     setStage('Simulation', 'run base sim');
@@ -4916,11 +5684,16 @@ function recompute(){
       heteroGrowthTotal: baseSim.meta.heteroGrowthTotal ?? null,
       heteroConsumedTotal: baseSim.meta.heteroConsumedTotal ?? null,
       phytoGrowthTotal: baseSim.meta.phytoGrowthTotal ?? null,
+      phytoAlgaeGrowthTotal: baseSim.meta.phytoAlgaeGrowthTotal ?? null,
+      phytoPlanktonGrowthTotal: baseSim.meta.phytoPlanktonGrowthTotal ?? null,
+      phytoPlantsGrowthTotal: baseSim.meta.phytoPlantsGrowthTotal ?? null,
       phytoConsumedTotal: baseSim.meta.phytoConsumedTotal ?? null,
       phytoDecayTotal: baseSim.meta.phytoDecayTotal ?? null,
       tempSmoothRange: baseSim.meta.tempSmoothRange ?? null,
       co2ZeroHits: baseSim.meta.co2ZeroHits ?? null,
       phytoGrazedTotal: baseSim.meta.phytoGrazedTotal ?? null,
+      biofilmGrazedTotal: baseSim.meta.biofilmGrazedTotal ?? null,
+      predatorGrazedTotal: baseSim.meta.predatorGrazedTotal ?? null,
       oxygenDegassed_g: baseSim.meta.oxygenDegassed_g ?? null
     };
     if(params.photoMass > 0 && (baseSim.meta.phytoConsumedTotal ?? 0) <= 1e-6){
@@ -5117,15 +5890,24 @@ function recompute(){
       if(baseSim.meta.heteroGrowthTotal != null || baseSim.meta.phytoGrowthTotal != null){
         dbg.push(`Biomass totals: hetero +${(baseSim.meta.heteroGrowthTotal ?? 0).toFixed(2)} g (consumed ${(baseSim.meta.heteroConsumedTotal ?? 0).toFixed(2)} g), phyto +${(baseSim.meta.phytoGrowthTotal ?? 0).toFixed(2)} g (consumed ${(baseSim.meta.phytoConsumedTotal ?? 0).toFixed(2)} g)`);
       }
-      if(baseSim.meta.biomassExtinction){
-        dbg.push(`Biomass extinctions: hetero ${baseSim.meta.biomassExtinction.heteroHits} steps, phyto ${baseSim.meta.biomassExtinction.phytoHits} steps`);
+      if(baseSim.meta.phytoAlgae_g != null || baseSim.meta.biofilm_g != null){
+        const phytoTotal = (baseSim.meta.phytoAlgae_g ?? 0) + (baseSim.meta.phytoPlankton_g ?? 0) + (baseSim.meta.phytoPlants_g ?? 0);
+        const heteroTotal = (baseSim.meta.biofilm_g ?? 0) + (baseSim.meta.predator_g ?? 0);
+        const phytoDenom = phytoTotal > 1e-9 ? phytoTotal : 1;
+        const heteroDenom = heteroTotal > 1e-9 ? heteroTotal : 1;
+        dbg.push(`Phyto split: algae ${(baseSim.meta.phytoAlgae_g ?? 0).toFixed(2)} g (${(100*(baseSim.meta.phytoAlgae_g ?? 0)/phytoDenom).toFixed(1)}%), plankton ${(baseSim.meta.phytoPlankton_g ?? 0).toFixed(2)} g (${(100*(baseSim.meta.phytoPlankton_g ?? 0)/phytoDenom).toFixed(1)}%), plants ${(baseSim.meta.phytoPlants_g ?? 0).toFixed(2)} g (${(100*(baseSim.meta.phytoPlants_g ?? 0)/phytoDenom).toFixed(1)}%)`);
+        dbg.push(`Hetero split: biofilm ${(baseSim.meta.biofilm_g ?? 0).toFixed(2)} g (${(100*(baseSim.meta.biofilm_g ?? 0)/heteroDenom).toFixed(1)}%), predator ${(baseSim.meta.predator_g ?? 0).toFixed(2)} g (${(100*(baseSim.meta.predator_g ?? 0)/heteroDenom).toFixed(1)}%)`);
       }
-      dbg.push(`Grazing limits: ${baseSim.meta.grazingLimitedSteps ?? 0} steps • max ${baseSim.meta.grazingMax_g_g_day.toFixed(2)} g/g/day`);
+      if(baseSim.meta.biomassExtinction){
+        dbg.push(`Biomass extinctions: hetero ${baseSim.meta.biomassExtinction.heteroHits} steps, phyto ${baseSim.meta.biomassExtinction.phytoHits} steps • algae ${baseSim.meta.biomassExtinction.phytoAlgaeHits} • plankton ${baseSim.meta.biomassExtinction.phytoPlanktonHits} • plants ${baseSim.meta.biomassExtinction.phytoPlantsHits} • biofilm ${baseSim.meta.biomassExtinction.biofilmHits} • predator ${baseSim.meta.biomassExtinction.predatorHits}`);
+      }
+      dbg.push(`Grazing limits: biofilm ${baseSim.meta.grazingLimitedSteps ?? 0} steps • max ${(baseSim.meta.biofilmGrazingMax_g_g_day ?? 0).toFixed(2)} g/g/day; predator ${baseSim.meta.predatorGrazingLimitedSteps ?? 0} steps • max ${(baseSim.meta.predatorGrazingMax_g_g_day ?? 0).toFixed(2)} g/g/day`);
       dbg.push(`Phyto reserve: built ${baseSim.meta.phytoReserveBuilt.toFixed(2)} g • used ${baseSim.meta.phytoReserveUsed.toFixed(2)} g • night growth ${baseSim.meta.phytoNightGrowthTotal.toFixed(2)} g`);
-      dbg.push(`Phyto recruitment: ${(baseSim.meta.phytoRecruitTotal ?? 0).toFixed(2)} g • refugia ${baseSim.meta.phytoRefugiaFrac.toFixed(2)} • grazing shield min ${(baseSim.meta.grazingShieldMin ?? 0).toFixed(2)}`);
+      dbg.push(`Phyto recruitment: ${(baseSim.meta.phytoRecruitTotal ?? 0).toFixed(2)} g • refugia ${baseSim.meta.phytoRefugiaFrac.toFixed(2)} • grazing shield min ${(baseSim.meta.grazingShieldMin ?? 0).toFixed(2)} • predator shield min ${(baseSim.meta.predatorShieldMin ?? 0).toFixed(2)}`);
       dbg.push('Biomass dynamics:');
       dbg.push(`  CO2 free ${(baseSim.meta.co2FreeLast_mgL ?? 0).toFixed(2)} mg/L • buffer capacity ${(baseSim.meta.bufferCapacityLast ?? 0).toFixed(2)} • phyto store fill ${((baseSim.meta.phytoStoreFillPct ?? 0) * 100).toFixed(1)}%`);
-      dbg.push(`  refuge fraction ${(baseSim.meta.refugeFractionLast ?? 0).toFixed(2)} • grazer activity ${(baseSim.meta.grazerActivityLast ?? 0).toFixed(2)} • lagged consumption ${(baseSim.meta.laggedConsumptionTotal ?? 0).toFixed(2)} g`);
+      dbg.push(`  refuge fraction ${(baseSim.meta.refugeFractionLast ?? 0).toFixed(2)} • biofilm activity ${(baseSim.meta.biofilmActivityLast ?? 0).toFixed(2)} • predator activity ${(baseSim.meta.predatorActivityLast ?? 0).toFixed(2)}`);
+      dbg.push(`  lagged grazing: biofilm ${(baseSim.meta.laggedBiofilmConsumptionTotal ?? 0).toFixed(2)} g • predator ${(baseSim.meta.laggedPredatorConsumptionTotal ?? 0).toFixed(2)} g`);
       dbg.push(`O2 degassed: ${(baseSim.meta.oxygenDegassed_g ?? 0).toFixed(3)} g (steps ${baseSim.meta.oxygenDegasSteps ?? 0})`);
       dbg.push(`CO2 init: ${(baseSim.meta.co2Init_mgL ?? 0).toFixed(2)} mg/L • sat ${(baseSim.meta.co2Sat_mgL ?? 0).toFixed(2)} mg/L • zero hits ${baseSim.meta.co2ZeroHits ?? 0} • degas ${baseSim.meta.co2DegasSteps ?? 0} • air in ${(baseSim.meta.co2AirIn_g ?? 0).toFixed(2)} g • air out ${(baseSim.meta.co2AirOut_g ?? 0).toFixed(2)} g`);
       dbg.push(`Denit: k=${params.kDenit} 1/day • cap=${params.denitCap}`);
@@ -5228,15 +6010,24 @@ function recompute(){
       if(baseSim.meta.heteroGrowthTotal != null || baseSim.meta.phytoGrowthTotal != null){
         dbg.push(`Biomass totals: hetero +${(baseSim.meta.heteroGrowthTotal ?? 0).toFixed(2)} g (consumed ${(baseSim.meta.heteroConsumedTotal ?? 0).toFixed(2)} g), phyto +${(baseSim.meta.phytoGrowthTotal ?? 0).toFixed(2)} g (consumed ${(baseSim.meta.phytoConsumedTotal ?? 0).toFixed(2)} g)`);
       }
-      if(baseSim.meta.biomassExtinction){
-        dbg.push(`Biomass extinctions: hetero ${baseSim.meta.biomassExtinction.heteroHits} steps, phyto ${baseSim.meta.biomassExtinction.phytoHits} steps`);
+      if(baseSim.meta.phytoAlgae_g != null || baseSim.meta.biofilm_g != null){
+        const phytoTotal = (baseSim.meta.phytoAlgae_g ?? 0) + (baseSim.meta.phytoPlankton_g ?? 0) + (baseSim.meta.phytoPlants_g ?? 0);
+        const heteroTotal = (baseSim.meta.biofilm_g ?? 0) + (baseSim.meta.predator_g ?? 0);
+        const phytoDenom = phytoTotal > 1e-9 ? phytoTotal : 1;
+        const heteroDenom = heteroTotal > 1e-9 ? heteroTotal : 1;
+        dbg.push(`Phyto split: algae ${(baseSim.meta.phytoAlgae_g ?? 0).toFixed(2)} g (${(100*(baseSim.meta.phytoAlgae_g ?? 0)/phytoDenom).toFixed(1)}%), plankton ${(baseSim.meta.phytoPlankton_g ?? 0).toFixed(2)} g (${(100*(baseSim.meta.phytoPlankton_g ?? 0)/phytoDenom).toFixed(1)}%), plants ${(baseSim.meta.phytoPlants_g ?? 0).toFixed(2)} g (${(100*(baseSim.meta.phytoPlants_g ?? 0)/phytoDenom).toFixed(1)}%)`);
+        dbg.push(`Hetero split: biofilm ${(baseSim.meta.biofilm_g ?? 0).toFixed(2)} g (${(100*(baseSim.meta.biofilm_g ?? 0)/heteroDenom).toFixed(1)}%), predator ${(baseSim.meta.predator_g ?? 0).toFixed(2)} g (${(100*(baseSim.meta.predator_g ?? 0)/heteroDenom).toFixed(1)}%)`);
       }
-      dbg.push(`Grazing limits: ${baseSim.meta.grazingLimitedSteps ?? 0} steps • max ${baseSim.meta.grazingMax_g_g_day.toFixed(2)} g/g/day`);
+      if(baseSim.meta.biomassExtinction){
+        dbg.push(`Biomass extinctions: hetero ${baseSim.meta.biomassExtinction.heteroHits} steps, phyto ${baseSim.meta.biomassExtinction.phytoHits} steps • algae ${baseSim.meta.biomassExtinction.phytoAlgaeHits} • plankton ${baseSim.meta.biomassExtinction.phytoPlanktonHits} • plants ${baseSim.meta.biomassExtinction.phytoPlantsHits} • biofilm ${baseSim.meta.biomassExtinction.biofilmHits} • predator ${baseSim.meta.biomassExtinction.predatorHits}`);
+      }
+      dbg.push(`Grazing limits: biofilm ${baseSim.meta.grazingLimitedSteps ?? 0} steps • max ${(baseSim.meta.biofilmGrazingMax_g_g_day ?? 0).toFixed(2)} g/g/day; predator ${baseSim.meta.predatorGrazingLimitedSteps ?? 0} steps • max ${(baseSim.meta.predatorGrazingMax_g_g_day ?? 0).toFixed(2)} g/g/day`);
       dbg.push(`Phyto reserve: built ${baseSim.meta.phytoReserveBuilt.toFixed(2)} g • used ${baseSim.meta.phytoReserveUsed.toFixed(2)} g • night growth ${baseSim.meta.phytoNightGrowthTotal.toFixed(2)} g`);
-      dbg.push(`Phyto recruitment: ${(baseSim.meta.phytoRecruitTotal ?? 0).toFixed(2)} g • refugia ${baseSim.meta.phytoRefugiaFrac.toFixed(2)} • grazing shield min ${(baseSim.meta.grazingShieldMin ?? 0).toFixed(2)}`);
+      dbg.push(`Phyto recruitment: ${(baseSim.meta.phytoRecruitTotal ?? 0).toFixed(2)} g • refugia ${baseSim.meta.phytoRefugiaFrac.toFixed(2)} • grazing shield min ${(baseSim.meta.grazingShieldMin ?? 0).toFixed(2)} • predator shield min ${(baseSim.meta.predatorShieldMin ?? 0).toFixed(2)}`);
       dbg.push('Biomass dynamics:');
       dbg.push(`  CO2 free ${(baseSim.meta.co2FreeLast_mgL ?? 0).toFixed(2)} mg/L • buffer capacity ${(baseSim.meta.bufferCapacityLast ?? 0).toFixed(2)} • phyto store fill ${((baseSim.meta.phytoStoreFillPct ?? 0) * 100).toFixed(1)}%`);
-      dbg.push(`  refuge fraction ${(baseSim.meta.refugeFractionLast ?? 0).toFixed(2)} • grazer activity ${(baseSim.meta.grazerActivityLast ?? 0).toFixed(2)} • lagged consumption ${(baseSim.meta.laggedConsumptionTotal ?? 0).toFixed(2)} g`);
+      dbg.push(`  refuge fraction ${(baseSim.meta.refugeFractionLast ?? 0).toFixed(2)} • biofilm activity ${(baseSim.meta.biofilmActivityLast ?? 0).toFixed(2)} • predator activity ${(baseSim.meta.predatorActivityLast ?? 0).toFixed(2)}`);
+      dbg.push(`  lagged grazing: biofilm ${(baseSim.meta.laggedBiofilmConsumptionTotal ?? 0).toFixed(2)} g • predator ${(baseSim.meta.laggedPredatorConsumptionTotal ?? 0).toFixed(2)} g`);
       dbg.push(`O2 degassed: ${(baseSim.meta.oxygenDegassed_g ?? 0).toFixed(3)} g (steps ${baseSim.meta.oxygenDegasSteps ?? 0})`);
       dbg.push(`CO2 init: ${(baseSim.meta.co2Init_mgL ?? 0).toFixed(2)} mg/L • sat ${(baseSim.meta.co2Sat_mgL ?? 0).toFixed(2)} mg/L • zero hits ${baseSim.meta.co2ZeroHits ?? 0} • degas ${baseSim.meta.co2DegasSteps ?? 0} • air in ${(baseSim.meta.co2AirIn_g ?? 0).toFixed(2)} g • air out ${(baseSim.meta.co2AirOut_g ?? 0).toFixed(2)} g`);
       dbg.push(`Denit: k=${params.kDenit} 1/day • cap=${params.denitCap}`);
@@ -5446,6 +6237,13 @@ function init(){
 
   updateModeUI();
   setDebugText(buildDebugSnapshot(['Init: handlers ready, awaiting recompute.']));
+  wireActiveControlGlow();
+  enableDebugCopyRoutine();
+  measurePanelOverflow();
+  if(!window.__panelOverflowBound){
+    window.__panelOverflowBound = true;
+    window.addEventListener('resize', ()=>measurePanelOverflow());
+  }
 
   // Link sliders
   linkRangeAndNumber(el('pelMass'), el('pelMassN'), ()=>{ scheduleRecompute(); });
