@@ -1718,15 +1718,9 @@ function runSimulation(params){
     macro: new Array(n).fill(0),
     micro: new Array(n).fill(0),
   };
-  out.chemProd = {
-    nh4: new Array(n).fill(0),
-    nh3: new Array(n).fill(0),
-    no2: new Array(n).fill(0),
-    no3: new Array(n).fill(0),
-    co2: new Array(n).fill(0),
-    macro: new Array(n).fill(0),
-    micro: new Array(n).fill(0),
-  };
+
+  const mEachFeed = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
+  const feedSchedule = params.feedSchedule || buildFeedSchedule(params, mEachFeed);
 
   const mEach = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
   const feedSchedule = params.feedSchedule || buildFeedSchedule(params, mEach);
@@ -1813,7 +1807,7 @@ function runSimulation(params){
       const feedPellets = Math.max(0, Math.round(Number(f.pellets || 0)));
       const feedPowder_g = Math.max(0, Number(f.powder_g || 0));
       if(feedPellets > 0){
-        const feedMass = feedPellets * mEach;
+        const feedMass = feedPellets * mEachFeed;
         pelFloat.carb += feedMass * FRACTIONS.carb;
         pelFloat.prot += feedMass * FRACTIONS.protein;
         pelFloat.fat += feedMass * FRACTIONS.fat;
@@ -1827,7 +1821,7 @@ function runSimulation(params){
         feedAddedC_g += feedPowder_g;
         feedAddedN_g += feedPowder_g * FRACTIONS.protein * CHEM.gN_per_g_protein;
       }
-      feeds[feedIdx].mass_g = feedPellets * mEach + feedPowder_g;
+      feeds[feedIdx].mass_g = feedPellets * mEachFeed + feedPowder_g;
       feeds[feedIdx].n_g = feedAddedN_g;
       feedIdx++;
     }
@@ -1835,7 +1829,7 @@ function runSimulation(params){
     // Apply pop events at this time slice
     while(evIdx < ev.length && ev[evIdx].day <= day + dt/2){
       const e = ev[evIdx];
-      const popMass_asfed = e.pellets * mEach;
+      const popMass_asfed = e.pellets * mEachFeed;
       const popComp = {
         carb: popMass_asfed * FRACTIONS.carb,
         prot: popMass_asfed * FRACTIONS.protein,
