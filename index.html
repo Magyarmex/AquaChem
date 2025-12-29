@@ -1518,6 +1518,7 @@ const DEBUG_STATE = {
   lastDebugCopyError: null,
   lastUpdateISO: null,
   lastOxyMissingCount: 0,
+  lastMCSeriesFallbacks: null,
   debounceQueued: 0,
   debounceMs: null,
   missingContainers: [],
@@ -4974,10 +4975,29 @@ function runMonteCarlo(baseParams){
   };
 
   const tmp = new Array(runs);
+  let mcMissingRows = 0;
+  let mcMissingValues = 0;
+  const mcSeriesFallbacks = new Set();
 
-  function fillQ(srcRuns, out){
+  function fillQ(srcRuns, out, fallbackSeries, label){
     for(let i=0;i<n;i++){
-      for(let r=0;r<runs;r++) tmp[r] = srcRuns[r][i];
+      for(let r=0;r<runs;r++){
+        const row = srcRuns[r];
+        if(!row || !Array.isArray(row)){
+          mcMissingRows += 1;
+          if(label) mcSeriesFallbacks.add(label);
+          tmp[r] = fallbackSeries ? fallbackSeries[i] : 0;
+          continue;
+        }
+        const value = row[i];
+        if(!Number.isFinite(value)){
+          mcMissingValues += 1;
+          if(label) mcSeriesFallbacks.add(label);
+          tmp[r] = fallbackSeries ? fallbackSeries[i] : 0;
+          continue;
+        }
+        tmp[r] = value;
+      }
       tmp.sort((a,b)=>a-b);
       out.lo[i]  = quantileFromSorted(tmp, qLo);
       out.mid[i] = quantileFromSorted(tmp, 0.5);
@@ -4985,20 +5005,31 @@ function runMonteCarlo(baseParams){
     }
   }
 
-  fillQ(DO_runs, qDO);
+  fillQ(DO_runs, qDO, baseSim.DO_mgL, 'DO');
   for(const s of RATE_SERIES){
-    fillQ(rate_runs[s.key], qRate[s.key]);
+    fillQ(rate_runs[s.key], qRate[s.key], baseSim.rate[s.key], `rate:${s.key}`);
   }
-  fillQ(cum_runs, qCum);
+  fillQ(cum_runs, qCum, baseSim.cum.total, 'cum:total');
   for(const s of CHEM_SERIES){
-    fillQ(chem_runs[s.key], qChem[s.key]);
-    fillQ(chem_prod_runs[s.key], qChemProd[s.key]);
-    fillQ(chem_cum_runs[s.key], qChemCum[s.key]);
+    fillQ(chem_runs[s.key], qChem[s.key], baseSim.chem[s.key], `chem:${s.key}`);
+    fillQ(chem_prod_runs[s.key], qChemProd[s.key], baseSim.chemProd[s.key], `chemProd:${s.key}`);
+    fillQ(chem_cum_runs[s.key], qChemCum[s.key], baseSim.chemProdCum[s.key], `chemCum:${s.key}`);
   }
-  fillQ(bio_runs.hetero_g, qBio.hetero_g);
-  fillQ(bio_runs.phyto_g, qBio.phyto_g);
-  fillQ(bio_runs.hetero_pct, qBioPct.hetero_pct);
-  fillQ(bio_runs.phyto_pct, qBioPct.phyto_pct);
+  fillQ(bio_runs.hetero_g, qBio.hetero_g, baseSim.biomass.hetero_g, 'bio:hetero_g');
+  fillQ(bio_runs.phyto_g, qBio.phyto_g, baseSim.biomass.phyto_g, 'bio:phyto_g');
+  fillQ(bio_runs.hetero_pct, qBioPct.hetero_pct, baseSim.biomass.hetero_pct, 'bio:hetero_pct');
+  fillQ(bio_runs.phyto_pct, qBioPct.phyto_pct, baseSim.biomass.phyto_pct, 'bio:phyto_pct');
+
+  if(mcMissingRows > 0 || mcMissingValues > 0){
+    DEBUG_STATE.lastMCSeriesFallbacks = {
+      rows: mcMissingRows,
+      values: mcMissingValues,
+      series: Array.from(mcSeriesFallbacks)
+    };
+    addWarning(`Monte Carlo series fallback used for ${mcMissingRows} rows and ${mcMissingValues} values; check series outputs.`);
+  }else{
+    DEBUG_STATE.lastMCSeriesFallbacks = null;
+  }
 
   // Scalar bands
   const sMinDO = scalarStats(minDO, qLo, qHi);
@@ -6725,6 +6756,7 @@ function recompute(){
   setStage('recompute', 'start');
   DEBUG_STATE.warnings = [];
   DEBUG_STATE.lastOxyMissingCount = 0;
+  DEBUG_STATE.lastMCSeriesFallbacks = null;
   const recomputeStart = performance.now();
 
   try{
