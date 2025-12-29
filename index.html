@@ -1718,6 +1718,18 @@ function runSimulation(params){
     macro: new Array(n).fill(0),
     micro: new Array(n).fill(0),
   };
+  out.chemProd = {
+    nh4: new Array(n).fill(0),
+    nh3: new Array(n).fill(0),
+    no2: new Array(n).fill(0),
+    no3: new Array(n).fill(0),
+    co2: new Array(n).fill(0),
+    macro: new Array(n).fill(0),
+    micro: new Array(n).fill(0),
+  };
+
+  const mEach = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
+  const feedSchedule = params.feedSchedule || buildFeedSchedule(params, mEach);
 
   const mEach = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
   const feedSchedule = params.feedSchedule || buildFeedSchedule(params, mEach);
