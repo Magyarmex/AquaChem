@@ -257,6 +257,9 @@
     <div class="small" style="margin-top:-6px">
       This rate ≈ <b id="pelCount">—</b> (<span id="pelEach">—</span> each).
     </div>
+    <div class="small" style="margin-top:-6px">
+      Provided feed mass ≈ <b id="pelCount">—</b> (<span id="pelEach">—</span> each).
+    </div>
 
     <div class="row">
       <label>Powder mass per feeding (as-fed, g)</label>
@@ -4265,6 +4268,15 @@ function recompute(){
         bandColors: Object.fromEntries(CHEM_SERIES.map(s=>[s.key, s.color])),
         bandPattern: true
       });
+
+      setStage('Plots', 'biomass');
+      bioGeom = drawBiomassPlot(el('bioCanvas'), baseSim, {
+        bioBands: mc.q.bioBands,
+        bioPctBands: mc.q.bioPctBands
+      });
+      if(!mc.q.bioBands || !mc.q.bioPctBands){
+        addWarning('Missing biomass uncertainty bands; check Monte Carlo aggregation.');
+      }
 
       setStage('Plots', 'biomass');
       bioGeom = drawBiomassPlot(el('bioCanvas'), baseSim, {
