@@ -4581,35 +4581,42 @@ function recompute(){
         bandColors: Object.fromEntries(CHEM_SERIES.map(s=>[s.key, s.color])),
         bandPattern: true
       });
-      if(!mc.q.bioBands || !mc.q.bioPctBands){
-        addWarning('Missing biomass uncertainty bands; check Monte Carlo aggregation.');
-      }
-      DEBUG_STATE.lastBandDiagnostics = bandDiagnostics;
-
       setStage('Plots', 'biomass');
-      const bioBands = {
+      const missingBioBands = [];
+      ['hetero_g', 'phyto_g'].forEach(key=>{
+        if(!mc.q.bioBands?.[key]?.hi){
+          missingBioBands.push(`bioBands.${key}`);
+        }
+      });
+      ['hetero_pct', 'phyto_pct'].forEach(key=>{
+        if(!mc.q.bioPctBands?.[key]?.hi){
+          missingBioBands.push(`bioPctBands.${key}`);
+        }
+      });
+      DEBUG_STATE.lastMissingBioBands = missingBioBands;
+      if(missingBioBands.length){
+        addWarning(`Missing biomass uncertainty bands for: ${missingBioBands.join(', ')}`);
+      }
+      const bioBandRanges = {
         hetero_g: sanitizeBand(mc.q.bioBands?.hetero_g, baseSim.biomass.hetero_g, 'bio:hetero_g'),
         phyto_g: sanitizeBand(mc.q.bioBands?.phyto_g, baseSim.biomass.phyto_g, 'bio:phyto_g')
       };
-      const bioPctBands = {
+      const bioPctBandRanges = {
         hetero_pct: sanitizeBand(mc.q.bioPctBands?.hetero_pct, baseSim.biomass.hetero_pct, 'bio:hetero_pct'),
         phyto_pct: sanitizeBand(mc.q.bioPctBands?.phyto_pct, baseSim.biomass.phyto_pct, 'bio:phyto_pct')
       };
-      bandDiagnostics.bioInvalid += bioBands.hetero_g.invalid + bioBands.phyto_g.invalid + bioPctBands.hetero_pct.invalid + bioPctBands.phyto_pct.invalid;
-      bandDiagnostics.bioInverted += bioBands.hetero_g.inverted + bioBands.phyto_g.inverted + bioPctBands.hetero_pct.inverted + bioPctBands.phyto_pct.inverted;
+      bandDiagnostics.bioInvalid += bioBandRanges.hetero_g.invalid + bioBandRanges.phyto_g.invalid + bioPctBandRanges.hetero_pct.invalid + bioPctBandRanges.phyto_pct.invalid;
+      bandDiagnostics.bioInverted += bioBandRanges.hetero_g.inverted + bioBandRanges.phyto_g.inverted + bioPctBandRanges.hetero_pct.inverted + bioPctBandRanges.phyto_pct.inverted;
       bioGeom = drawBiomassPlot(el('bioCanvas'), baseSim, {
         bioBands: {
-          hetero_g: bioBands.hetero_g.band,
-          phyto_g: bioBands.phyto_g.band
+          hetero_g: bioBandRanges.hetero_g.band,
+          phyto_g: bioBandRanges.phyto_g.band
         },
         bioPctBands: {
-          hetero_pct: bioPctBands.hetero_pct.band,
-          phyto_pct: bioPctBands.phyto_pct.band
+          hetero_pct: bioPctBandRanges.hetero_pct.band,
+          phyto_pct: bioPctBandRanges.phyto_pct.band
         }
       });
-      if(!mc.q.bioBands || !mc.q.bioPctBands){
-        addWarning('Missing biomass uncertainty bands; check Monte Carlo aggregation.');
-      }
       DEBUG_STATE.lastBandDiagnostics = bandDiagnostics;
 
       setStage('Flags', 'evaluate');
