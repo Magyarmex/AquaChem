@@ -277,6 +277,45 @@
     .hr{height:1px;background:rgba(255,255,255,.10);margin:10px 0}
     .errbox{border:1px solid rgba(255,107,107,.35);background:rgba(255,107,107,.08);padding:10px;border-radius:12px;color:#ffd1d1;font-size:12px;display:none}
     .errbox pre{margin:8px 0 0;white-space:pre-wrap;word-break:break-word;color:#ffd1d1}
+    .recompute-toast{
+      position:fixed;
+      top:86px;
+      right:20px;
+      display:flex;
+      align-items:center;
+      gap:8px;
+      padding:6px 12px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.16);
+      background:rgba(9,14,30,.86);
+      color:var(--muted);
+      font-size:12px;
+      letter-spacing:.02em;
+      box-shadow:var(--shadow);
+      opacity:0;
+      transform:translateY(-4px);
+      pointer-events:none;
+      transition:opacity .2s ease, transform .2s ease;
+      z-index:20;
+    }
+    .recompute-toast.is-active{
+      opacity:1;
+      transform:translateY(0);
+    }
+    .recompute-toast .spinner{
+      width:12px;
+      height:12px;
+      border-radius:50%;
+      border:2px solid rgba(255,255,255,.25);
+      border-top-color:var(--accent);
+      animation:spin .8s linear infinite;
+    }
+    @keyframes spin{
+      to{ transform:rotate(360deg); }
+    }
+    @media (max-width: 640px){
+      .recompute-toast{top:72px; right:12px;}
+    }
   </style>
 </head>
 <body>
@@ -291,6 +330,10 @@
 </header>
 
 <div class="wrap">
+  <div class="recompute-toast" id="recomputeToast" role="status" aria-live="polite" aria-hidden="true">
+    <span class="spinner" aria-hidden="true"></span>
+    <span>Recomputing…</span>
+  </div>
   <div class="card">
     <h2>Inputs</h2>
 
@@ -1158,6 +1201,8 @@ const DEBUG_STATE = {
   lastFeedCalendarCompact: null,
   lastFeedCalendarStartISO: null,
   lastUpdateISO: null,
+  debounceQueued: 0,
+  debounceMs: null,
   missingContainers: [],
   initReadyState: null,
   errors: [],  // newest last
@@ -1359,6 +1404,14 @@ lines.push(`surface=${p.lenCm}×${p.widCm} cm, blanket=${p.blanketPct}%, ripple=
     lines.push('');
     lines.push('--- Recompute timing (last) ---');
     lines.push(`Total recompute: ${DEBUG_STATE.lastRecomputeMs.toFixed(1)} ms`);
+  }
+  if(Number.isFinite(DEBUG_STATE.debounceQueued) || Number.isFinite(DEBUG_STATE.debounceMs)){
+    lines.push('');
+    lines.push('--- Debounce ---');
+    lines.push(`Queued recomputes: ${Number.isFinite(DEBUG_STATE.debounceQueued) ? DEBUG_STATE.debounceQueued : 0}`);
+    if(Number.isFinite(DEBUG_STATE.debounceMs)){
+      lines.push(`Delay: ${DEBUG_STATE.debounceMs} ms`);
+    }
   }
   if(DEBUG_STATE.initReadyState){
     lines.push('');
@@ -4790,8 +4843,21 @@ function resolveChemSeries(sim, mode){
   return {series: sim.chem, titleSuffix:'(net)'}; // bio
 }
 
+function setRecomputeBubbleState(isActive){
+  const bubble = el('recomputeToast');
+  if(!bubble) return;
+  bubble.classList.toggle('is-active', !!isActive);
+  bubble.setAttribute('aria-hidden', isActive ? 'false' : 'true');
+}
+
 function recompute(){
   clearError();
+  if(debounceTimerId !== null){
+    clearTimeout(debounceTimerId);
+    debounceTimerId = null;
+  }
+  DEBUG_STATE.debounceQueued = 0;
+  setRecomputeBubbleState(true);
   setStage('recompute', 'start');
   DEBUG_STATE.warnings = [];
   const recomputeStart = performance.now();
@@ -5217,6 +5283,7 @@ function recompute(){
     setStage('Interactions', 'init canvases');
     initCanvasInteractions();
 
+    setRecomputeBubbleState(false);
     setStage('recompute', 'done');
     DEBUG_STATE.lastRecomputeMs = performance.now() - recomputeStart;
     if(DEBUG_STATE.lastRecomputeMs > 800){
@@ -5224,6 +5291,10 @@ function recompute(){
     }
 
   }catch(err){
+    setStage('recompute', 'error');
+    setRecomputeBubbleState(false);
+    addWarning(`Recompute failed: ${err?.message || err}`);
+    console.warn('Recompute failed:', err);
     showError(err);
   }
 }
@@ -5336,16 +5407,28 @@ function applyAllPresets(){
 /* =========================================================
    Init
 ========================================================= */
-let recomputeTimer = null;
+let debounceTimerId = null;
 function scheduleRecompute(){
   const mode = el('liveRecompute') ? el('liveRecompute').value : 'on';
   if(mode === 'off'){
     if(el('recomputeBtn')) el('recomputeBtn').style.display = 'inline-block';
+    DEBUG_STATE.debounceQueued = 0;
+    DEBUG_STATE.debounceMs = null;
     return;
   }
   if(el('recomputeBtn')) el('recomputeBtn').style.display = 'none';
-  clearTimeout(recomputeTimer);
-  recomputeTimer = setTimeout(()=>recompute(), 150);
+  const debounceDelayMs = 1000;
+  DEBUG_STATE.debounceMs = debounceDelayMs;
+  if(debounceTimerId !== null){
+    DEBUG_STATE.debounceQueued = (DEBUG_STATE.debounceQueued || 0) + 1;
+  }else{
+    DEBUG_STATE.debounceQueued = 1;
+  }
+  clearTimeout(debounceTimerId);
+  debounceTimerId = setTimeout(()=>{
+    DEBUG_STATE.debounceQueued = 0;
+    recompute();
+  }, debounceDelayMs);
 }
 
 function updateModeUI(){
