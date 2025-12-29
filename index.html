@@ -69,8 +69,11 @@
       .grid3{grid-template-columns:1fr;}
       .grid4{grid-template-columns:1fr;}
     }
-    .row{display:flex;gap:12px;align-items:center}
-    .row label{flex:1;color:var(--muted);font-size:12px;letter-spacing:.02em}
+    .row{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}
+    .row label{flex:1 1 180px;min-width:160px;color:var(--muted);font-size:12px;letter-spacing:.02em}
+    .row input[type="range"]{flex:1 1 220px;min-width:220px}
+    .row input[type="number"]{flex:0 0 140px}
+    .row select{flex:1 1 220px;min-width:220px}
     input[type="range"]{width:100%}
     input[type="number"], input[type="text"], select{
       background:#0a1024;border:1px solid rgba(122,162,255,.26);color:var(--text);
@@ -256,9 +259,6 @@
     </div>
     <div class="small" style="margin-top:-6px">
       This rate ≈ <b id="pelCount">—</b> (<span id="pelEach">—</span> each).
-    </div>
-    <div class="small" style="margin-top:-6px">
-      Provided feed mass ≈ <b id="pelCount">—</b> (<span id="pelEach">—</span> each).
     </div>
 
     <div class="row">
@@ -1718,6 +1718,18 @@ function runSimulation(params){
     macro: new Array(n).fill(0),
     micro: new Array(n).fill(0),
   };
+  out.chemProd = {
+    nh4: new Array(n).fill(0),
+    nh3: new Array(n).fill(0),
+    no2: new Array(n).fill(0),
+    no3: new Array(n).fill(0),
+    co2: new Array(n).fill(0),
+    macro: new Array(n).fill(0),
+    micro: new Array(n).fill(0),
+  };
+
+  const mEach = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
+  const feedSchedule = params.feedSchedule || buildFeedSchedule(params, mEach);
 
   const mEach = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
   const feedSchedule = params.feedSchedule || buildFeedSchedule(params, mEach);
@@ -1944,28 +1956,80 @@ function runSimulation(params){
     const phytoNutrientIndex = clamp((nutrientPool + inorgN_g * 0.6) / (nutrientPool + inorgN_g * 0.6 + 0.35), 0, 1);
     const co2Index = clamp(CO2_g / (CO2_g + CO2_floor_g * 0.6), 0, 1);
 
-    const heteroGrowth = heteroMass_g * HET_MODEL.growth_per_day * foodIndex * tempF * dt;
+    const heteroGrowthRaw = heteroMass_g * HET_MODEL.growth_per_day * foodIndex * tempF * dt;
+    const heteroYield = 0.45;
+    const heteroAvailable = S_tot + nutrientPool;
+    const heteroRequired = heteroGrowthRaw / heteroYield;
+    const heteroConsumed = Math.min(heteroRequired, heteroAvailable);
+    const heteroGrowth = heteroConsumed * heteroYield;
     const heteroDecay = heteroMass_g * HET_MODEL.decay_per_day * (1 - foodIndex) * dt;
     heteroMass_g = Math.max(0, heteroMass_g + heteroGrowth - heteroDecay);
+    if(!Number.isFinite(heteroMass_g)){
+      addWarning('Heterotroph mass became non-finite; resetting to 0.');
+      heteroMass_g = 0;
+    }
+    if(heteroConsumed > 0){
+      const shareS = S_tot > 0 ? (S_tot / heteroAvailable) : 0;
+      const takeS = heteroConsumed * shareS;
+      const takeNutr = heteroConsumed - takeS;
+      if(takeS > 0){
+        const sTot = S_tot || 1;
+        S.carb = Math.max(0, S.carb - takeS * (S.carb / sTot));
+        S.prot = Math.max(0, S.prot - takeS * (S.prot / sTot));
+        S.fat = Math.max(0, S.fat - takeS * (S.fat / sTot));
+      }
+      if(takeNutr > 0){
+        const nTot = nutrientPool || 1;
+        macro_g = Math.max(0, macro_g - takeNutr * (macro_g / nTot));
+        micro_g = Math.max(0, micro_g - takeNutr * (micro_g / nTot));
+      }
+    }
 
-    const phytoGrowth = phytoMass_g * PHOTO_MODEL.growth_per_day * lightFactor * phytoNutrientIndex * co2Index * dt;
+    const phytoGrowthRaw = phytoMass_g * PHOTO_MODEL.growth_per_day * lightFactor * phytoNutrientIndex * co2Index * dt;
+    const phytoYield = 0.55;
+    const phytoAvailable = nutrientPool + inorgN_g * 0.6;
+    const phytoRequired = phytoGrowthRaw / phytoYield;
+    const phytoConsumed = Math.min(phytoRequired, phytoAvailable);
+    const phytoGrowth = phytoConsumed * phytoYield;
     const phytoDecay = phytoMass_g * PHOTO_MODEL.decay_per_day * (1 - lightFactor) * (1 - phytoNutrientIndex * 0.5) * dt;
     phytoMass_g = Math.max(0, phytoMass_g + phytoGrowth - phytoDecay);
     phytoGrowthTotal += phytoGrowth;
     phytoDecayTotal += phytoDecay;
+    if(!Number.isFinite(phytoMass_g)){
+      addWarning('Phyto mass became non-finite; resetting to 0.');
+      phytoMass_g = 0;
+    }
+    if(phytoConsumed > 0){
+      const shareNutr = nutrientPool > 0 ? (nutrientPool / phytoAvailable) : 0;
+      const takeNutr = phytoConsumed * shareNutr;
+      const takeInorg = phytoConsumed - takeNutr;
+      if(takeNutr > 0){
+        const nTot = nutrientPool || 1;
+        macro_g = Math.max(0, macro_g - takeNutr * (macro_g / nTot));
+        micro_g = Math.max(0, micro_g - takeNutr * (micro_g / nTot));
+      }
+      if(takeInorg > 0){
+        const inTot = inorgN_g || 1;
+        const takeNH4 = Math.min(NH4, takeInorg * (NH4 / inTot));
+        const takeNO3 = Math.min(NO3, takeInorg * (NO3 / inTot));
+        NH4 = Math.max(0, NH4 - takeNH4);
+        NO3 = Math.max(0, NO3 - takeNO3);
+      }
+    }
 
     const decayMass = heteroDecay + phytoDecay;
     if(decayMass > 0){
-      const decayMacro_g = (macroRelease * decayMass * params.volL) / 1000;
-      const decayMicro_g = (microRelease * decayMass * params.volL) / 1000;
+      const decayReturnMass = decayMass * 0.35;
+      const decayMacro_g = (macroRelease * decayReturnMass * params.volL) / 1000;
+      const decayMicro_g = (microRelease * decayReturnMass * params.volL) / 1000;
       macro_g += decayMacro_g;
       micro_g += decayMicro_g;
       out.audit.macro_release += decayMacro_g;
       out.audit.micro_release += decayMicro_g;
-      S.carb += decayMass * FRACTIONS.carb;
-      S.prot += decayMass * FRACTIONS.protein;
-      S.fat  += decayMass * FRACTIONS.fat;
-      NH4 += decayMass * FRACTIONS.protein * CHEM.gN_per_g_protein * 0.3;
+      S.carb += decayReturnMass * FRACTIONS.carb;
+      S.prot += decayReturnMass * FRACTIONS.protein;
+      S.fat  += decayReturnMass * FRACTIONS.fat;
+      NH4 += decayReturnMass * FRACTIONS.protein * CHEM.gN_per_g_protein * 0.3;
     }
 
     const heteroMacroUptake_g = Math.min(macro_g, (HET_MODEL.macroUptake_mgL_per_g_day * heteroMass_g * params.volL / 1000) * foodIndex * dt);
@@ -4268,15 +4332,6 @@ function recompute(){
         bandColors: Object.fromEntries(CHEM_SERIES.map(s=>[s.key, s.color])),
         bandPattern: true
       });
-
-      setStage('Plots', 'biomass');
-      bioGeom = drawBiomassPlot(el('bioCanvas'), baseSim, {
-        bioBands: mc.q.bioBands,
-        bioPctBands: mc.q.bioPctBands
-      });
-      if(!mc.q.bioBands || !mc.q.bioPctBands){
-        addWarning('Missing biomass uncertainty bands; check Monte Carlo aggregation.');
-      }
 
       setStage('Plots', 'biomass');
       bioGeom = drawBiomassPlot(el('bioCanvas'), baseSim, {
