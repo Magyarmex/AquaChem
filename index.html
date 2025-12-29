@@ -311,10 +311,10 @@
       margin-top:6px;
     }
     .calendar.tiles{
-      grid-template-columns:repeat(3, minmax(0, 1fr));
+      grid-template-columns:repeat(2, minmax(0, 1fr));
     }
     @media (max-width: 900px){
-      .calendar.tiles{grid-template-columns:repeat(2, minmax(0, 1fr));}
+      .calendar.tiles{grid-template-columns:1fr;}
     }
     @media (max-width: 560px){
       .calendar.tiles{grid-template-columns:1fr;}
@@ -1382,6 +1382,8 @@ function renderFeedingCalendar(params, feedPlan, popEvents){
   const calWidth = cal.getBoundingClientRect().width;
   DEBUG_STATE.lastCalendarTileWidth = Number.isFinite(calWidth) ? (calWidth / Math.max(1, monthCount)) : null;
   DEBUG_STATE.lastCalendarMetaHidden = true;
+  const columnCount = getComputedStyle(cal).gridTemplateColumns.split(' ').length;
+  DEBUG_STATE.lastCalendarColumns = Number.isFinite(columnCount) ? columnCount : null;
   if(Number.isFinite(DEBUG_STATE.lastCalendarTileWidth) && DEBUG_STATE.lastCalendarTileWidth < 180){
     if(!DEBUG_STATE.lastCalendarTileWarnedISO){
       addWarning('Calendar tiles are narrow; consider expanding a month for readability.');
@@ -1506,6 +1508,7 @@ const DEBUG_STATE = {
   lastCalendarExpandedKey: null,
   lastCalendarTileWidth: null,
   lastCalendarMetaHidden: null,
+  lastCalendarColumns: null,
   lastCalendarTileWarnedISO: null,
   panelOverflowPx: null,
   panelOverflowLimitPx: 0,
@@ -1645,6 +1648,9 @@ lines.push(`surface=${p.lenCm}×${p.widCm} cm, blanket=${p.blanketPct}%, ripple=
     }
     if(DEBUG_STATE.lastCalendarMetaHidden != null){
       lines.push(`metaHidden=${DEBUG_STATE.lastCalendarMetaHidden ? 'yes' : 'no'}`);
+    }
+    if(Number.isFinite(DEBUG_STATE.lastCalendarColumns)){
+      lines.push(`columns=${DEBUG_STATE.lastCalendarColumns}`);
     }
   }
   if(Number.isFinite(DEBUG_STATE.panelOverflowPx)){
