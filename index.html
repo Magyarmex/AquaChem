@@ -1903,6 +1903,11 @@ function runSimulation(params){
     micro: new Array(n).fill(0),
   };
 
+  const pelletEachMass_g = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
+  const feedSchedule = params.feedSchedule || buildFeedSchedule(params, pelletEachMass_g);
+  const feedWindowHours = clamp(Number(params.feedWindowHours ?? 4), 0.5, 24);
+  const feedPulse = buildFeedPulse(feedSchedule, dt, params.days, feedWindowHours / 24);
+
   const pelletEachFeed_g = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
   const feedSchedule = params.feedSchedule || buildFeedSchedule(params, pelletEachFeed_g);
   const feedWindowHours = clamp(Number(params.feedWindowHours ?? 4), 0.5, 24);
@@ -1997,7 +2002,7 @@ function runSimulation(params){
     const feedPellets = Math.max(0, feedPulse.pellets[i] || 0);
     const feedPowder_g = Math.max(0, feedPulse.powder[i] || 0);
     if(feedPellets > 0){
-      const feedMass = feedPellets * pelletEachFeed_g;
+      const feedMass = feedPellets * pelletEachMass_g;
       pelFloat.carb += feedMass * FRACTIONS.carb;
       pelFloat.prot += feedMass * FRACTIONS.protein;
       pelFloat.fat += feedMass * FRACTIONS.fat;
@@ -2015,7 +2020,7 @@ function runSimulation(params){
     // Apply pop events at this time slice
     while(evIdx < ev.length && ev[evIdx].day <= day + dt/2){
       const e = ev[evIdx];
-      const popMass_asfed = e.pellets * pelletEachFeed_g;
+      const popMass_asfed = e.pellets * pelletEachMass_g;
       const popComp = {
         carb: popMass_asfed * FRACTIONS.carb,
         prot: popMass_asfed * FRACTIONS.protein,
@@ -4577,6 +4582,32 @@ function recompute(){
         bandColors: Object.fromEntries(CHEM_SERIES.map(s=>[s.key, s.color])),
         bandPattern: true
       });
+
+      setStage('Plots', 'biomass');
+      const bioBands = {
+        hetero_g: sanitizeBand(mc.q.bioBands?.hetero_g, baseSim.biomass.hetero_g, 'bio:hetero_g'),
+        phyto_g: sanitizeBand(mc.q.bioBands?.phyto_g, baseSim.biomass.phyto_g, 'bio:phyto_g')
+      };
+      const bioPctBands = {
+        hetero_pct: sanitizeBand(mc.q.bioPctBands?.hetero_pct, baseSim.biomass.hetero_pct, 'bio:hetero_pct'),
+        phyto_pct: sanitizeBand(mc.q.bioPctBands?.phyto_pct, baseSim.biomass.phyto_pct, 'bio:phyto_pct')
+      };
+      bandDiagnostics.bioInvalid += bioBands.hetero_g.invalid + bioBands.phyto_g.invalid + bioPctBands.hetero_pct.invalid + bioPctBands.phyto_pct.invalid;
+      bandDiagnostics.bioInverted += bioBands.hetero_g.inverted + bioBands.phyto_g.inverted + bioPctBands.hetero_pct.inverted + bioPctBands.phyto_pct.inverted;
+      bioGeom = drawBiomassPlot(el('bioCanvas'), baseSim, {
+        bioBands: {
+          hetero_g: bioBands.hetero_g.band,
+          phyto_g: bioBands.phyto_g.band
+        },
+        bioPctBands: {
+          hetero_pct: bioPctBands.hetero_pct.band,
+          phyto_pct: bioPctBands.phyto_pct.band
+        }
+      });
+      if(!mc.q.bioBands || !mc.q.bioPctBands){
+        addWarning('Missing biomass uncertainty bands; check Monte Carlo aggregation.');
+      }
+      DEBUG_STATE.lastBandDiagnostics = bandDiagnostics;
 
       setStage('Plots', 'biomass');
       const bioBands = {
