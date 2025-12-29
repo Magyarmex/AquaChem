@@ -1517,6 +1517,7 @@ const DEBUG_STATE = {
   lastDebugCopyStatus: null,
   lastDebugCopyError: null,
   lastUpdateISO: null,
+  lastOxyMissingCount: 0,
   debounceQueued: 0,
   debounceMs: null,
   missingContainers: [],
@@ -4296,6 +4297,7 @@ function runSimulation(params){
     },
     meta: {
       dt,
+      oxy,
       feedStart:0,
       feedEnd:0,
       maxDemand:0,
@@ -4890,6 +4892,14 @@ function runMonteCarlo(baseParams){
     }
 
     const sim = runSimulation(p);
+    const oxyMeta = sim.meta?.oxy;
+    if(!oxyMeta){
+      if(DEBUG_STATE.lastOxyMissingCount === 0){
+        addWarning('Missing oxygenation metadata during Monte Carlo; falling back to recomputed oxygen stats.');
+      }
+      DEBUG_STATE.lastOxyMissingCount += 1;
+    }
+    const oxySafe = oxyMeta || oxygenationModel(p);
     DO_runs[r]  = sim.DO_mgL;
     for(const s of RATE_SERIES){
       rate_runs[s.key][r] = sim.rate[s.key];
@@ -4942,9 +4952,9 @@ function runMonteCarlo(baseParams){
     microPk[r] = mI;
     storeMin[r] = Number.isFinite(storeFloor) ? storeFloor : 0;
 
-    otrMax[r] = sim.meta.oxy.OTR_max;
-    kLa[r] = sim.meta.oxy.kLa;
-    Cstar[r] = sim.meta.oxy.Cstar;
+    otrMax[r] = oxySafe.OTR_max;
+    kLa[r] = oxySafe.kLa;
+    Cstar[r] = oxySafe.Cstar;
   }
 
   // Quantile arrays (time series)
@@ -6714,6 +6724,7 @@ function recompute(){
   setRecomputeBubbleState(true);
   setStage('recompute', 'start');
   DEBUG_STATE.warnings = [];
+  DEBUG_STATE.lastOxyMissingCount = 0;
   const recomputeStart = performance.now();
 
   try{
