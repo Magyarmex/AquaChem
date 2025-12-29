@@ -1694,6 +1694,17 @@ function sinkingHazard(day){
   return 1 / Math.max(3 - day, 0.05);
 }
 
+function estimateBiofilmMass(params){
+  const len = Math.max(0, Number(params.lenCm ?? 0));
+  const wid = Math.max(0, Number(params.widCm ?? 0));
+  const tankH = Math.max(0, Number(params.tankHCm ?? 0));
+  const waterDepth = clamp(Number(params.waterSurfCm ?? tankH), 0, tankH);
+  const area_cm2 = (len * wid) + 2 * (len * waterDepth + wid * waterDepth);
+  const thickness_cm = Math.max(0, Number(params.biofilmMm ?? 0)) / 10;
+  const density_g_cm3 = 0.12; // wet biofilm solids-equivalent density
+  return Math.max(0, area_cm2 * thickness_cm * density_g_cm3);
+}
+
 function runSimulation(params){
   // dt: keep ~1200 points for smooth plots
   const targetPts = 1200;
@@ -1891,6 +1902,11 @@ function runSimulation(params){
     macro: new Array(n).fill(0),
     micro: new Array(n).fill(0),
   };
+
+  const pelletEachFeed_g = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
+  const feedSchedule = params.feedSchedule || buildFeedSchedule(params, pelletEachFeed_g);
+  const feedWindowHours = clamp(Number(params.feedWindowHours ?? 4), 0.5, 24);
+  const feedPulse = buildFeedPulse(feedSchedule, dt, params.days, feedWindowHours / 24);
 
   const pelletEachFeed_g = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
   const feedSchedule = params.feedSchedule || buildFeedSchedule(params, pelletEachFeed_g);
