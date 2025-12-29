@@ -4638,6 +4638,32 @@ function recompute(){
       }
       DEBUG_STATE.lastBandDiagnostics = bandDiagnostics;
 
+      setStage('Plots', 'biomass');
+      const bioBandSet = {
+        hetero_g: sanitizeBand(mc.q.bioBands?.hetero_g, baseSim.biomass.hetero_g, 'bio:hetero_g'),
+        phyto_g: sanitizeBand(mc.q.bioBands?.phyto_g, baseSim.biomass.phyto_g, 'bio:phyto_g')
+      };
+      const bioPctBandSet = {
+        hetero_pct: sanitizeBand(mc.q.bioPctBands?.hetero_pct, baseSim.biomass.hetero_pct, 'bio:hetero_pct'),
+        phyto_pct: sanitizeBand(mc.q.bioPctBands?.phyto_pct, baseSim.biomass.phyto_pct, 'bio:phyto_pct')
+      };
+      bandDiagnostics.bioInvalid += bioBandSet.hetero_g.invalid + bioBandSet.phyto_g.invalid + bioPctBandSet.hetero_pct.invalid + bioPctBandSet.phyto_pct.invalid;
+      bandDiagnostics.bioInverted += bioBandSet.hetero_g.inverted + bioBandSet.phyto_g.inverted + bioPctBandSet.hetero_pct.inverted + bioPctBandSet.phyto_pct.inverted;
+      bioGeom = drawBiomassPlot(el('bioCanvas'), baseSim, {
+        bioBands: {
+          hetero_g: bioBandSet.hetero_g.band,
+          phyto_g: bioBandSet.phyto_g.band
+        },
+        bioPctBands: {
+          hetero_pct: bioPctBandSet.hetero_pct.band,
+          phyto_pct: bioPctBandSet.phyto_pct.band
+        }
+      });
+      if(!mc.q.bioBands || !mc.q.bioPctBands){
+        addWarning('Missing biomass uncertainty bands; check Monte Carlo aggregation.');
+      }
+      DEBUG_STATE.lastBandDiagnostics = bandDiagnostics;
+
       setStage('Flags', 'evaluate');
       setFlags(baseSim, params, mc);
 
