@@ -826,7 +826,7 @@ function buildCumulativeSeries(seriesDict, dt){
   return {series, info:{invalidCount, totals, dt}};
 }
 
-function buildFeedSchedule(params, mEach){
+function buildFeedSchedule(params, pelletEach_g){
   const interval = Number(params.feedIntervalDays ?? 0);
   const pelletsPerFeed = Math.max(0, Math.round(Number(params.feedPellets ?? 0)));
   const powderPerFeed_g = Math.max(0, Number(params.feedPowder_g ?? 0));
@@ -840,7 +840,7 @@ function buildFeedSchedule(params, mEach){
       day,
       pellets: pelletsPerFeed,
       powder_g: powderPerFeed_g,
-      mass_g: pelletsPerFeed * mEach + powderPerFeed_g
+      mass_g: pelletsPerFeed * pelletEach_g + powderPerFeed_g
     });
     day += interval;
   }
@@ -1719,14 +1719,8 @@ function runSimulation(params){
     micro: new Array(n).fill(0),
   };
 
-  const mEachFeed = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
-  const feedSchedule = params.feedSchedule || buildFeedSchedule(params, mEachFeed);
-
-  const mEach = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
-  const feedSchedule = params.feedSchedule || buildFeedSchedule(params, mEach);
-
-  const mEach = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
-  const feedSchedule = params.feedSchedule || buildFeedSchedule(params, mEach);
+  const pelletEachFeed_g = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
+  const feedSchedule = params.feedSchedule || buildFeedSchedule(params, pelletEachFeed_g);
 
   // Events sorted
   const ev = [...params.events]
@@ -1807,7 +1801,7 @@ function runSimulation(params){
       const feedPellets = Math.max(0, Math.round(Number(f.pellets || 0)));
       const feedPowder_g = Math.max(0, Number(f.powder_g || 0));
       if(feedPellets > 0){
-        const feedMass = feedPellets * mEachFeed;
+        const feedMass = feedPellets * pelletEachFeed_g;
         pelFloat.carb += feedMass * FRACTIONS.carb;
         pelFloat.prot += feedMass * FRACTIONS.protein;
         pelFloat.fat += feedMass * FRACTIONS.fat;
@@ -1821,7 +1815,7 @@ function runSimulation(params){
         feedAddedC_g += feedPowder_g;
         feedAddedN_g += feedPowder_g * FRACTIONS.protein * CHEM.gN_per_g_protein;
       }
-      feeds[feedIdx].mass_g = feedPellets * mEachFeed + feedPowder_g;
+      feeds[feedIdx].mass_g = feedPellets * pelletEachFeed_g + feedPowder_g;
       feeds[feedIdx].n_g = feedAddedN_g;
       feedIdx++;
     }
@@ -1829,7 +1823,7 @@ function runSimulation(params){
     // Apply pop events at this time slice
     while(evIdx < ev.length && ev[evIdx].day <= day + dt/2){
       const e = ev[evIdx];
-      const popMass_asfed = e.pellets * mEachFeed;
+      const popMass_asfed = e.pellets * pelletEachFeed_g;
       const popComp = {
         carb: popMass_asfed * FRACTIONS.carb,
         prot: popMass_asfed * FRACTIONS.protein,
@@ -3246,9 +3240,9 @@ function buildLegendBio(){
 let EVENTS = [];
 
 function maxPelletCountFromInputs(){
-  const mEach = pelletMassEach(Number(el('pelLen')?.value || 1.0), Number(el('pelDia')?.value || 0.2), Number(el('pelRho')?.value || 0.55));
+  const pelletEach_g = pelletMassEach(Number(el('pelLen')?.value || 1.0), Number(el('pelDia')?.value || 0.2), Number(el('pelRho')?.value || 0.55));
   const totalMass = Number(el('pelMassN')?.value || 0);
-  return mEach > 0 ? totalMass / mEach : 0;
+  return pelletEach_g > 0 ? totalMass / pelletEach_g : 0;
 }
 
 function normalizeEvents(){
@@ -4215,12 +4209,12 @@ function recompute(){
 
     // Pellet derived quantities + feeding schedule
     setStage('Pellets', 'derive pellet count');
-    const mEach = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
+    const pelletEach_g = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
     const perFeedPellets = Math.max(0, Math.round(Number(params.feedPellets || 0)));
-    const perFeedMass_g = perFeedPellets * mEach;
+    const perFeedMass_g = perFeedPellets * pelletEach_g;
     setText('pelCount', `${perFeedPellets.toFixed(0)} pellets`);
-    setText('pelEach', `${mEach.toFixed(4)} g`);
-    const feedSchedule = buildFeedSchedule(params, mEach);
+    setText('pelEach', `${pelletEach_g.toFixed(4)} g`);
+    const feedSchedule = buildFeedSchedule(params, pelletEach_g);
     params.feedSchedule = feedSchedule;
     DEBUG_STATE.lastFeedScheduleCount = feedSchedule.length;
     renderFeedingCalendar(params, feedSchedule, EVENTS);
