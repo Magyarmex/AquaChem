@@ -819,7 +819,9 @@ const CHEM_SERIES = [
   {key:"nh3", name:"NH₃ (unionized)", color:"#ff8fab"},
   {key:"no2", name:"NO₂", color:"#a29bfe"},
   {key:"no3", name:"NO₃", color:"#63e6be"},
-  {key:"co2", name:"CO₂ (produced)", color:"#54a0ff"},
+  {key:"co2", name:"CO₂ free", color:"#54a0ff"},
+  {key:"dic", name:"DIC (buffered)", color:"#48dbfb"},
+  {key:"store", name:"Nutrient stores", color:"#feca57"},
   {key:"micro", name:"Micros (proxy)", color:"#b8c0ff"},
 ];
 
@@ -1626,7 +1628,7 @@ const PHOTO_MODEL = {
   co2_consumption_per_gO2: 1.0,
   q10: 2.0,
   refTempC: 25,
-  growth_per_day: 0.25,
+  mu_max_per_day: 0.55,
   decay_per_day: 0.05,
   resp_mg_g_day: 2.0,
   co2_per_g_growth: 1.5
@@ -1698,6 +1700,25 @@ function calcCO2SaturationMgL(tempC, altM){
   return clamp(2.5 * tempAdj * pressureAdj, 0.5, 6.0);
 }
 
+function estimateCarbonatePartitioning(tempC, pH, alkalinity_mgL, dic_g, volL){
+  const pKa1 = 6.35 - 0.015 * (tempC - 25);
+  const pKa2 = 10.33 - 0.018 * (tempC - 25);
+  const H = Math.pow(10, -clamp(pH, 5.5, 9.5));
+  const K1 = Math.pow(10, -pKa1);
+  const K2 = Math.pow(10, -pKa2);
+  const alpha0 = 1 / (1 + (K1 / H) + (K1 * K2) / (H * H));
+  const dic_mgL = (dic_g * 1000) / Math.max(1e-9, volL);
+  const co2Free_mgL = dic_mgL * alpha0;
+  const bufferCapacity = clamp(alkalinity_mgL / (alkalinity_mgL + dic_mgL + 1e-9), 0, 1);
+  return {
+    alpha0,
+    dic_mgL,
+    co2Free_mgL,
+    co2Free_g: (co2Free_mgL * volL) / 1000,
+    bufferCapacity
+  };
+}
+
 // crude "sinks over first few days"
 function sinkingHazard(day){
   if(day < 1) return 0;
@@ -1760,13 +1781,18 @@ function runSimulation(params){
   let NH4 = 0;     // g N
   let NO2 = 0;     // g N
   let NO3 = 0;     // g N
-  let CO2_g = 0;   // g CO2 produced
+  let DIC_g = 0;   // g total dissolved inorganic carbon
+  let CO2_free_g = 0; // g free CO2 (aqueous)
   let macro_g = 0; // g (proxy)
   let micro_g = 0; // g (proxy)
   let heteroMass_g = Math.max(0, Number(params.heteroMass ?? 0));
   let phytoMass_g = Math.max(0, Number(params.photoMass ?? 0));
   const heteroMass0 = heteroMass_g;
   const phytoMass0 = phytoMass_g;
+  let phytoOpen_g = phytoMass_g;
+  let phytoRefuge_g = 0;
+  let phytoN_store_g = 0;
+  let phytoP_store_g = 0;
   let heteroExtinctHits = 0;
   let phytoExtinctHits = 0;
   let heteroExtinctWarned = false;
@@ -1784,6 +1810,17 @@ function runSimulation(params){
   let phytoNightGrowthTotal = 0;
   let phytoReserveBuilt = 0;
   let phytoReserveUsed = 0;
+  let luxuryUptakeTotal = 0;
+  let phytoStoreNegativeHits = 0;
+  let phytoStoreDepleteHits = 0;
+  let phytoStoreFillLast = 0;
+  let phytoMuMaxLast = 0;
+  let phytoMuEffLast = 0;
+  let phytoMuCapHits = 0;
+  let refugeFractionLast = 0;
+  let refugeExchangeLast = 0;
+  let refugeOverrunHits = 0;
+  let refugeEmptyHits = 0;
   let phytoRecruitTotal = 0;
   let co2ZeroHits = 0;
   let co2DegasSteps = 0;
@@ -1796,6 +1833,18 @@ function runSimulation(params){
   let phytoReserve_g = 0;
   let co2AirIn_g = 0;
   let co2AirOut_g = 0;
+  let bufferDepletionHits = 0;
+  let bufferCapacityMin = 1;
+  let bufferCapacityLast = 1;
+  let co2FreeMin_mgL = Infinity;
+  let co2FreeLast_mgL = 0;
+  let dicMin_mgL = Infinity;
+  let dicLast_mgL = 0;
+  let grazerActivity = 0.15;
+  let grazerActivityMin = 1;
+  let laggedConsumptionTotal = 0;
+  let grazingLagCollapseHits = 0;
+  let biomassNonFiniteHits = 0;
 
   // Activity states (dimensionless 0..1)
   let Bhet = 0.04;
@@ -1841,6 +1890,15 @@ function runSimulation(params){
   const phytoRefugiaFrac = 0.18;
   const phytoRecruitFrac = 0.04;
   const grazingAssimEff = 0.8;
+  const phytoStoreNCapFrac = 0.45;
+  const phytoStorePCapFrac = 0.25;
+  const phytoStoreNFrac = 0.7;
+  const phytoStorePFrac = 0.3;
+  const refugeExchangeRate = 0.12;
+  const grazingLagDays = 0.6;
+
+  phytoRefuge_g = phytoMass_g * phytoRefugiaFrac;
+  phytoOpen_g = Math.max(0, phytoMass_g - phytoRefuge_g);
 
   // Outputs
   const out = {
@@ -1865,14 +1923,18 @@ function runSimulation(params){
     NO3_mgL: new Array(n).fill(0),
     NH3_mgL: new Array(n).fill(0),
     CO2_mgL: new Array(n).fill(0),
+    DIC_mgL: new Array(n).fill(0),
     macro_mgL: new Array(n).fill(0),
     micro_mgL: new Array(n).fill(0),
+    store_mgL: new Array(n).fill(0),
     chem: {
       nh4: new Array(n).fill(0),
       nh3: new Array(n).fill(0),
       no2: new Array(n).fill(0),
       no3: new Array(n).fill(0),
       co2: new Array(n).fill(0),
+      dic: new Array(n).fill(0),
+      store: new Array(n).fill(0),
       macro: new Array(n).fill(0),
       micro: new Array(n).fill(0),
     },
@@ -1909,7 +1971,7 @@ function runSimulation(params){
       photoModel: {
         photoMass_g: photoMass,
         o2_mg_g_day_peak: PHOTO_MODEL.o2_mg_g_day_peak,
-        growth_per_day: PHOTO_MODEL.growth_per_day,
+        mu_max_per_day: PHOTO_MODEL.mu_max_per_day,
         resp_mg_g_day: PHOTO_MODEL.resp_mg_g_day,
         macroUptake_mgL_per_g_photo_day: FEED_PROFILE.modeling.macroUptake_mgL_per_g_photo_day,
         microUptake_mgL_per_g_photo_day: FEED_PROFILE.modeling.microUptake_mgL_per_g_photo_day,
@@ -1945,7 +2007,9 @@ function runSimulation(params){
     nh3: new Array(n).fill(0),
     no2: new Array(n).fill(0),
     no3: new Array(n).fill(0),
-    co2: new Array(n).fill(0),
+      co2: new Array(n).fill(0),
+      dic: new Array(n).fill(0),
+      store: new Array(n).fill(0),
     macro: new Array(n).fill(0),
     micro: new Array(n).fill(0),
   };
@@ -2009,10 +2073,13 @@ function runSimulation(params){
   const photoO2_g_day_peak = (PHOTO_MODEL.o2_mg_g_day_peak * photoMass) / 1000;
   const macroUptakeRate_g_day = (FEED_PROFILE.modeling.macroUptake_mgL_per_g_photo_day * photoMass * params.volL) / 1000;
   const microUptakeRate_g_day = (FEED_PROFILE.modeling.microUptake_mgL_per_g_photo_day * photoMass * params.volL) / 1000;
+  const alkalinity_mgL = clamp(Number(params.alkalinity_mgL ?? 80), 10, 400);
   const co2Init_mgL = calcCO2EquilMgL(oxy.T);
-  const co2Init_g = (co2Init_mgL * params.volL) / 1000;
-  CO2_g = Math.max(CO2_g, co2Init_g);
-  const co2HalfSat_g = Math.max(co2Init_g * 0.6, 1e-6);
+  const co2Init_free_g = (co2Init_mgL * params.volL) / 1000;
+  const initPartition = estimateCarbonatePartitioning(oxy.T, params.pH ?? 7.0, alkalinity_mgL, co2Init_free_g, params.volL);
+  const dicInit_g = initPartition.alpha0 > 1e-8 ? (co2Init_free_g / initPartition.alpha0) : co2Init_free_g;
+  DIC_g = Math.max(DIC_g, dicInit_g);
+  const co2HalfSat_g = Math.max(co2Init_free_g * 0.6, 1e-6);
   const co2Sat_mgL = calcCO2SaturationMgL(oxy.T, params.altM ?? 0);
   const co2Sat_g = (co2Sat_mgL * params.volL) / 1000;
   out.meta.co2Init_mgL = co2Init_mgL;
@@ -2181,15 +2248,78 @@ function runSimulation(params){
     out.audit.micro_release += microAdd_g;
 
     // Biomass growth + nutrient consumption
+    phytoMass_g = Math.max(0, phytoOpen_g + phytoRefuge_g);
     let S_tot = S.carb + S.prot + S.fat;
     let nutrientPool = macro_g + micro_g;
     let inorgN_g = Math.max(0, NH4 + NO3);
-    const co2Index = clamp(CO2_g / (CO2_g + co2HalfSat_g), 0, 1);
-    const phytoNutrientIndex = clamp((nutrientPool + inorgN_g * 0.6) / (nutrientPool + inorgN_g * 0.6 + 0.35), 0, 1);
+    const co2Partition = estimateCarbonatePartitioning(tempSmooth, params.pH ?? 7.0, alkalinity_mgL, DIC_g, params.volL);
+    CO2_free_g = co2Partition.co2Free_g;
+    bufferCapacityMin = Math.min(bufferCapacityMin, co2Partition.bufferCapacity);
+    bufferCapacityLast = co2Partition.bufferCapacity;
+    co2FreeMin_mgL = Math.min(co2FreeMin_mgL, co2Partition.co2Free_mgL);
+    co2FreeLast_mgL = co2Partition.co2Free_mgL;
+    dicMin_mgL = Math.min(dicMin_mgL, co2Partition.dic_mgL);
+    dicLast_mgL = co2Partition.dic_mgL;
+    if(co2Partition.bufferCapacity < 0.15 && co2Partition.co2Free_mgL < 0.4){
+      bufferDepletionHits++;
+    }
+    const co2Index = clamp(CO2_free_g / (CO2_free_g + co2HalfSat_g), 0, 1);
+
+    const storeCapN = Math.max(0, phytoMass_g * phytoStoreNCapFrac);
+    const storeCapP = Math.max(0, phytoMass_g * phytoStorePCapFrac);
+    const storeCapTotal = storeCapN + storeCapP;
+    const storeFillPct = storeCapTotal > 1e-9 ? clamp((phytoN_store_g + phytoP_store_g) / storeCapTotal, 0, 1) : 0;
+
+    const uptakeN_potential = (FEED_PROFILE.modeling.macroUptake_mgL_per_g_photo_day * phytoMass_g * params.volL / 1000) * tempF * dt;
+    const uptakeP_potential = (FEED_PROFILE.modeling.microUptake_mgL_per_g_photo_day * phytoMass_g * params.volL / 1000) * tempF * dt;
+    const storeRoomN = Math.max(0, storeCapN - phytoN_store_g);
+    const storeRoomP = Math.max(0, storeCapP - phytoP_store_g);
+    const nAvailableExternal = macro_g + inorgN_g * 0.6;
+    const uptakeN = Math.min(uptakeN_potential, nAvailableExternal, storeRoomN);
+    const uptakeP = Math.min(uptakeP_potential, micro_g, storeRoomP);
+    if(uptakeN > 0){
+      const macroShare = nAvailableExternal > 0 ? (macro_g / nAvailableExternal) : 0;
+      const fromMacro = Math.min(macro_g, uptakeN * macroShare);
+      macro_g = Math.max(0, macro_g - fromMacro);
+      const fromInorg = uptakeN - fromMacro;
+      if(fromInorg > 0){
+        const inTot = inorgN_g || 1;
+        const takeNH4 = Math.min(NH4, fromInorg * (NH4 / inTot));
+        const takeNO3 = Math.min(NO3, fromInorg * (NO3 / inTot));
+        NH4 = Math.max(0, NH4 - takeNH4);
+        NO3 = Math.max(0, NO3 - takeNO3);
+      }
+      phytoN_store_g += uptakeN;
+      luxuryUptakeTotal += uptakeN;
+      macroConsumed_g += fromMacro;
+      out.audit.macro_uptake += fromMacro;
+    }
+    if(uptakeP > 0){
+      micro_g = Math.max(0, micro_g - uptakeP);
+      phytoP_store_g += uptakeP;
+      luxuryUptakeTotal += uptakeP;
+      microConsumed_g += uptakeP;
+      out.audit.micro_uptake += uptakeP;
+    }
+
+    const nAvailTotal = macro_g + inorgN_g * 0.6 + phytoN_store_g;
+    const pAvailTotal = micro_g + phytoP_store_g;
+    const nIndex = clamp(nAvailTotal / (nAvailTotal + 0.35), 0, 1);
+    const pIndex = clamp(pAvailTotal / (pAvailTotal + 0.18), 0, 1);
+    const phytoNutrientIndex = Math.min(nIndex, pIndex);
+    const phytoMuMax = PHOTO_MODEL.mu_max_per_day * tempF * (0.4 + 0.6 * phytoNutrientIndex);
+    const storeCapFactor = clamp(storeFillPct / 0.6, 0, 1);
+    const phytoMuEff = phytoMuMax * lightFactor * co2Index * storeCapFactor;
+    phytoStoreFillLast = storeFillPct;
+    phytoMuMaxLast = phytoMuMax;
+    phytoMuEffLast = phytoMuEff;
+    if(lightFactor > 0.2 && phytoMuEff < phytoMuMax * lightFactor * co2Index * 0.9){
+      phytoMuCapHits++;
+    }
 
     const phytoRescueFactor = phytoMass0 > 0 ? clamp(1 - (phytoMass_g / phytoMass0), 0, 1) : 0;
     const phytoRecruitRaw = phytoMass0 * phytoRecruitFrac * phytoRescueFactor * lightFactor * phytoNutrientIndex * co2Index * dt;
-    let phytoGrowthRaw = phytoMass_g * PHOTO_MODEL.growth_per_day * lightFactor * phytoNutrientIndex * co2Index * dt + phytoRecruitRaw;
+    let phytoGrowthRaw = phytoMass_g * phytoMuEff * dt + phytoRecruitRaw;
     phytoRecruitTotal += phytoRecruitRaw;
     const reserveAdd = phytoGrowthRaw * phytoReserveFrac;
     phytoGrowthRaw -= reserveAdd;
@@ -2201,13 +2331,19 @@ function runSimulation(params){
       phytoReserve_g = reserveCap;
       phytoGrowthRaw += reserveOverflow;
     }
-    const phytoNightPotential = phytoMass_g * PHOTO_MODEL.growth_per_day * phytoNightGrowthFrac * (1 - lightFactor) * phytoNutrientIndex * co2Index * dt;
+    const phytoNightPotential = phytoMass_g * phytoMuMax * phytoNightGrowthFrac * (1 - lightFactor) * co2Index * storeCapFactor * dt;
     const reserveUsePlanned = Math.min(phytoReserve_g, phytoNightPotential);
     const phytoYield = 0.55;
-    const phytoAvailable = nutrientPool + inorgN_g * 0.6;
     const phytoPotential = phytoGrowthRaw + reserveUsePlanned;
     const phytoRequired = phytoPotential / phytoYield;
-    const phytoConsumed = Math.min(phytoRequired, phytoAvailable);
+    const nDemand = phytoRequired * phytoStoreNFrac;
+    const pDemand = phytoRequired * phytoStorePFrac;
+    const nutrientScale = Math.min(
+      1,
+      nAvailTotal / Math.max(1e-9, nDemand),
+      pAvailTotal / Math.max(1e-9, pDemand)
+    );
+    const phytoConsumed = phytoRequired * nutrientScale;
     const phytoGrowth = phytoConsumed * phytoYield;
     const phytoReserveUseActual = clamp(phytoGrowth - phytoGrowthRaw, 0, reserveUsePlanned);
     if(phytoReserveUseActual > 0){
@@ -2219,8 +2355,15 @@ function runSimulation(params){
     if(reserveUnused > 0){
       phytoReserve_g += reserveUnused;
     }
+    if(nutrientScale < 1 && (phytoN_store_g + phytoP_store_g) <= 1e-8 && phytoPotential > 1e-9){
+      phytoStoreDepleteHits++;
+    }
     const phytoDecay = 0;
-    phytoMass_g = Math.max(0, phytoMass_g + phytoGrowth - phytoDecay);
+    const phytoTotal = phytoOpen_g + phytoRefuge_g;
+    const refugeShare = phytoTotal > 1e-9 ? (phytoRefuge_g / phytoTotal) : phytoRefugiaFrac;
+    phytoRefuge_g = Math.max(0, phytoRefuge_g + phytoGrowth * refugeShare - phytoDecay * refugeShare);
+    phytoOpen_g = Math.max(0, phytoOpen_g + phytoGrowth * (1 - refugeShare) - phytoDecay * (1 - refugeShare));
+    phytoMass_g = phytoOpen_g + phytoRefuge_g;
     if(phytoMass_g <= 1e-9){
       phytoExtinctHits++;
       if(!phytoExtinctWarned && params.runMode !== 'uncertainty'){
@@ -2233,41 +2376,74 @@ function runSimulation(params){
     phytoDecayTotal += phytoDecay;
     if(!Number.isFinite(phytoMass_g)){
       addWarning('Phyto mass became non-finite; resetting to 0.');
+      biomassNonFiniteHits++;
       phytoMass_g = 0;
     }
     if(phytoConsumed > 0){
-      const shareNutr = nutrientPool > 0 ? (nutrientPool / phytoAvailable) : 0;
-      const takeNutr = phytoConsumed * shareNutr;
-      const takeInorg = phytoConsumed - takeNutr;
-      if(takeNutr > 0){
-        const nTot = nutrientPool || 1;
-        macro_g = Math.max(0, macro_g - takeNutr * (macro_g / nTot));
-        micro_g = Math.max(0, micro_g - takeNutr * (micro_g / nTot));
+      let nNeed = phytoConsumed * phytoStoreNFrac;
+      let pNeed = phytoConsumed * phytoStorePFrac;
+      const nExternalAvail = macro_g + inorgN_g * 0.6;
+      const nFromExternal = Math.min(nNeed, nExternalAvail);
+      if(nFromExternal > 0){
+        const macroShare = nExternalAvail > 0 ? (macro_g / nExternalAvail) : 0;
+        const fromMacro = Math.min(macro_g, nFromExternal * macroShare);
+        macro_g = Math.max(0, macro_g - fromMacro);
+        macroConsumed_g += fromMacro;
+        out.audit.macro_uptake += fromMacro;
+        const fromInorg = nFromExternal - fromMacro;
+        if(fromInorg > 0){
+          const inTot = inorgN_g || 1;
+          const takeNH4 = Math.min(NH4, fromInorg * (NH4 / inTot));
+          const takeNO3 = Math.min(NO3, fromInorg * (NO3 / inTot));
+          NH4 = Math.max(0, NH4 - takeNH4);
+          NO3 = Math.max(0, NO3 - takeNO3);
+        }
+        nNeed -= nFromExternal;
       }
-      if(takeInorg > 0){
-        const inTot = inorgN_g || 1;
-        const takeNH4 = Math.min(NH4, takeInorg * (NH4 / inTot));
-        const takeNO3 = Math.min(NO3, takeInorg * (NO3 / inTot));
-        NH4 = Math.max(0, NH4 - takeNH4);
-        NO3 = Math.max(0, NO3 - takeNO3);
+      if(nNeed > 0){
+        const takeStoreN = Math.min(phytoN_store_g, nNeed);
+        phytoN_store_g = Math.max(0, phytoN_store_g - takeStoreN);
       }
+      if(pNeed > 0){
+        const fromMicro = Math.min(micro_g, pNeed);
+        micro_g = Math.max(0, micro_g - fromMicro);
+        microConsumed_g += fromMicro;
+        out.audit.micro_uptake += fromMicro;
+        pNeed -= fromMicro;
+        if(pNeed > 0){
+          const takeStoreP = Math.min(phytoP_store_g, pNeed);
+          phytoP_store_g = Math.max(0, phytoP_store_g - takeStoreP);
+        }
+      }
+    }
+    if(phytoN_store_g < 0 || phytoP_store_g < 0 || !Number.isFinite(phytoN_store_g) || !Number.isFinite(phytoP_store_g)){
+      phytoStoreNegativeHits++;
+      phytoN_store_g = Math.max(0, Number.isFinite(phytoN_store_g) ? phytoN_store_g : 0);
+      phytoP_store_g = Math.max(0, Number.isFinite(phytoP_store_g) ? phytoP_store_g : 0);
     }
 
     nutrientPool = macro_g + micro_g;
     inorgN_g = Math.max(0, NH4 + NO3);
     S_tot = S.carb + S.prot + S.fat;
-    const grazingIndex = phytoMass_g / (phytoMass_g + grazingHalfSat_g);
-    const grazablePhyto_g = Math.max(0, phytoMass_g * (1 - phytoRefugiaFrac));
+    const grazablePhyto_g = Math.max(0, phytoOpen_g);
+    const grazerTarget = grazablePhyto_g / (grazablePhyto_g + grazingHalfSat_g);
+    const grazerBlend = clamp(grazingLagDays > 1e-6 ? (dt / grazingLagDays) : 1, 0, 1);
+    grazerActivity = clamp(grazerActivity + (grazerTarget - grazerActivity) * grazerBlend, 0, 1);
+    grazerActivityMin = Math.min(grazerActivityMin, grazerActivity);
+    if(grazerTarget > 0.5 && grazerActivity < 0.1){
+      grazingLagCollapseHits++;
+    }
     const grazingShield = grazablePhyto_g / (grazablePhyto_g + Math.max(phytoMass0 * 0.2, 0.5));
     grazingShieldMin = Math.min(grazingShieldMin, grazingShield);
     const grazingSatiation = 1 - Math.exp(-grazablePhyto_g / Math.max(phytoMass0 * 0.5, 1));
-    const grazeRate_g_day = heteroMass_g * grazingMax_g_g_day * grazingIndex * grazingShield * grazingSatiation * tempF;
+    const grazeRate_g_day = heteroMass_g * grazingMax_g_g_day * grazerActivity * grazingShield * grazingSatiation * tempF;
     const heteroYield = 0.45;
     const heteroAvailable = grazablePhyto_g;
     const heteroConsumed = Math.min(grazeRate_g_day * dt, heteroAvailable);
     if(heteroConsumed < (grazeRate_g_day * dt) - 1e-9) grazingLimitedSteps++;
+    laggedConsumptionTotal += heteroConsumed;
     const heteroGrowth = heteroConsumed * heteroYield * grazingAssimEff;
-    const heteroDecay = heteroMass_g * HET_MODEL.decay_per_day * (1 - grazingIndex) * dt;
+    const heteroDecay = heteroMass_g * HET_MODEL.decay_per_day * (1 - grazerActivity) * dt;
     heteroMass_g = Math.max(0, heteroMass_g + heteroGrowth - heteroDecay);
     if(heteroMass_g <= 1e-9){
       heteroExtinctHits++;
@@ -2280,10 +2456,12 @@ function runSimulation(params){
     heteroConsumedTotal += heteroConsumed;
     if(!Number.isFinite(heteroMass_g)){
       addWarning('Heterotroph mass became non-finite; resetting to 0.');
+      biomassNonFiniteHits++;
       heteroMass_g = 0;
     }
     if(heteroConsumed > 0){
-      phytoMass_g = Math.max(0, phytoMass_g - heteroConsumed);
+      phytoOpen_g = Math.max(0, phytoOpen_g - heteroConsumed);
+      phytoMass_g = phytoOpen_g + phytoRefuge_g;
       phytoGrazedTotal += heteroConsumed;
       out.audit.phyto_grazed += heteroConsumed;
       const grazingWaste = Math.max(0, heteroConsumed - heteroGrowth);
@@ -2294,6 +2472,24 @@ function runSimulation(params){
         NH4 += grazingWaste * FRACTIONS.protein * CHEM.gN_per_g_protein * 0.2;
       }
     }
+
+    const refugeTarget = phytoMass_g * phytoRefugiaFrac;
+    const refugeDelta_g_day = (refugeTarget - phytoRefuge_g) * refugeExchangeRate;
+    const refugeExchange_g = refugeDelta_g_day * dt;
+    if(refugeExchange_g > 0){
+      const move = Math.min(refugeExchange_g, phytoOpen_g);
+      phytoOpen_g -= move;
+      phytoRefuge_g += move;
+    }else if(refugeExchange_g < 0){
+      const move = Math.min(-refugeExchange_g, phytoRefuge_g);
+      phytoRefuge_g -= move;
+      phytoOpen_g += move;
+    }
+    phytoMass_g = phytoOpen_g + phytoRefuge_g;
+    refugeExchangeLast = Math.abs(refugeDelta_g_day);
+    refugeFractionLast = phytoMass_g > 1e-9 ? (phytoRefuge_g / phytoMass_g) : 0;
+    if(refugeFractionLast < 0.05) refugeEmptyHits++;
+    if(refugeFractionLast > 0.6) refugeOverrunHits++;
 
     const decayMass = heteroDecay + phytoDecay;
     if(decayMass > 0){
@@ -2310,18 +2506,9 @@ function runSimulation(params){
       NH4 += decayReturnMass * FRACTIONS.protein * CHEM.gN_per_g_protein * 0.3;
     }
 
-    const phytoMacroUptake_g = Math.min(macro_g, (FEED_PROFILE.modeling.macroUptake_mgL_per_g_photo_day * phytoMass_g * params.volL / 1000) * lightFactor * phytoNutrientIndex * dt);
-    const phytoMicroUptake_g = Math.min(micro_g, (FEED_PROFILE.modeling.microUptake_mgL_per_g_photo_day * phytoMass_g * params.volL / 1000) * lightFactor * phytoNutrientIndex * dt);
-    macro_g = Math.max(0, macro_g - phytoMacroUptake_g);
-    micro_g = Math.max(0, micro_g - phytoMicroUptake_g);
-    macroConsumed_g += phytoMacroUptake_g;
-    microConsumed_g += phytoMicroUptake_g;
-    out.audit.macro_uptake += phytoMacroUptake_g;
-    out.audit.micro_uptake += phytoMicroUptake_g;
-
     const co2GrowthCons_g = phytoGrowth * PHOTO_MODEL.co2_per_g_growth;
-    CO2_g = Math.max(0, CO2_g - co2GrowthCons_g);
-    if(CO2_g <= 1e-9) co2ZeroHits++;
+    DIC_g = Math.max(0, DIC_g - co2GrowthCons_g);
+    if(CO2_free_g <= 1e-9) co2ZeroHits++;
     co2Consumed_g += co2GrowthCons_g;
 
     // Oxidation of solubles
@@ -2379,7 +2566,7 @@ function runSimulation(params){
     const COD_den = Math.min(COD_bio, rDen_flux * 2.5);
     COD_bio = Math.max(0, COD_bio - COD_den*dt);
     const CO2_den = COD_den;
-    CO2_g += CO2_den * dt;
+    DIC_g += CO2_den * dt;
     out.audit.no3_to_n2 += rDen_flux * dt;
     out.audit.co2_from_denit += CO2_den * dt;
 
@@ -2388,15 +2575,23 @@ function runSimulation(params){
 
     const CO2_from_ox = (O2_carb + O2_prot + O2_fat) * CHEM.CO2_per_gO2;
     const CO2_from_endog = O2_endog * CHEM.CO2_per_gO2;
-    CO2_g += (CO2_from_ox + CO2_from_endog + phytoResp_g_day * CHEM.CO2_per_gO2) * dt;
+    DIC_g += (CO2_from_ox + CO2_from_endog + phytoResp_g_day * CHEM.CO2_per_gO2) * dt;
     out.audit.co2_from_ox += CO2_from_ox * dt;
     out.audit.co2_from_endog += CO2_from_endog * dt;
-    const co2Equil_g = (co2Init_mgL * params.volL) / 1000;
-    const co2SatDef_mgL = (co2Equil_g - CO2_g) * 1000 / params.volL;
+    const co2PartitionLate = estimateCarbonatePartitioning(tempSmooth, params.pH ?? 7.0, alkalinity_mgL, DIC_g, params.volL);
+    CO2_free_g = co2PartitionLate.co2Free_g;
+    bufferCapacityMin = Math.min(bufferCapacityMin, co2PartitionLate.bufferCapacity);
+    bufferCapacityLast = co2PartitionLate.bufferCapacity;
+    co2FreeMin_mgL = Math.min(co2FreeMin_mgL, co2PartitionLate.co2Free_mgL);
+    co2FreeLast_mgL = co2PartitionLate.co2Free_mgL;
+    dicMin_mgL = Math.min(dicMin_mgL, co2PartitionLate.dic_mgL);
+    dicLast_mgL = co2PartitionLate.dic_mgL;
+    const co2Equil_mgL = co2Init_mgL;
+    const co2SatDef_mgL = co2Equil_mgL - co2PartitionLate.co2Free_mgL;
     const kLaCO2 = oxy.kLa * 0.6;
     const co2AirFlux_g_day = (kLaCO2 * co2SatDef_mgL * params.volL) / 1000;
     const co2AirFlux_g = co2AirFlux_g_day * dt;
-    CO2_g += co2AirFlux_g;
+    DIC_g += co2AirFlux_g;
     if(co2AirFlux_g >= 0){
       co2AirIn_g += co2AirFlux_g;
       out.audit.co2_air_in += co2AirFlux_g;
@@ -2405,12 +2600,13 @@ function runSimulation(params){
       co2AirOut_g += degas_g;
       out.audit.co2_air_out += degas_g;
     }
-    if(CO2_g > co2Sat_g){
-      const excess = CO2_g - co2Sat_g;
-      CO2_g = co2Sat_g;
+    if(co2PartitionLate.co2Free_g > co2Sat_g){
+      const excessFree_g = co2PartitionLate.co2Free_g - co2Sat_g;
+      const dicReduce = excessFree_g / Math.max(co2PartitionLate.alpha0, 1e-6);
+      DIC_g = Math.max(0, DIC_g - dicReduce);
       co2DegasSteps++;
-      co2Degassed_g += excess;
-      out.audit.co2_degassed += excess;
+      co2Degassed_g += excessFree_g;
+      out.audit.co2_degassed += excessFree_g;
     }
 
     out.audit.nh4_from_pro += NH4_prod * dt;
@@ -2463,13 +2659,15 @@ function runSimulation(params){
     out.NH3_mgL[i] = nh3AsN * CHEM.NH3_ion_per_N;
 
     const co2PhotoCons_g = plant_g_day * CHEM.CO2_per_gO2 * dt;
-    CO2_g = Math.max(0, CO2_g - co2PhotoCons_g);
-    if(CO2_g <= 1e-9) co2ZeroHits++;
+    DIC_g = Math.max(0, DIC_g - co2PhotoCons_g);
+    if(CO2_free_g <= 1e-9) co2ZeroHits++;
     co2Consumed_g += co2PhotoCons_g;
-    out.CO2_mgL[i] = (CO2_g*1000)/params.volL;
+    out.CO2_mgL[i] = (CO2_free_g*1000)/params.volL;
+    out.DIC_mgL[i] = (DIC_g*1000)/params.volL;
 
     out.macro_mgL[i] = (macro_g*1000)/params.volL;
     out.micro_mgL[i] = (micro_g*1000)/params.volL;
+    out.store_mgL[i] = ((phytoN_store_g + phytoP_store_g) * 1000) / params.volL;
 
     const nh4Disp = params.nUnits === 'asIon' ? out.NH4_mgL[i] * CHEM.NH4_ion_per_N : out.NH4_mgL[i];
     const no2Disp = params.nUnits === 'asIon' ? out.NO2_mgL[i] * CHEM.NO2_ion_per_N : out.NO2_mgL[i];
@@ -2480,6 +2678,8 @@ function runSimulation(params){
     out.chem.no3[i] = no3Disp;
     out.chem.nh3[i] = out.NH3_mgL[i];
     out.chem.co2[i] = out.CO2_mgL[i];
+    out.chem.dic[i] = out.DIC_mgL[i];
+    out.chem.store[i] = out.store_mgL[i];
     out.chem.macro[i] = out.macro_mgL[i];
     out.chem.micro[i] = out.micro_mgL[i];
 
@@ -2489,7 +2689,9 @@ function runSimulation(params){
     out.chemProd.no2[i] = no2Disp;
     out.chemProd.no3[i] = no3ProdDisp;
     out.chemProd.nh3[i] = out.NH3_mgL[i];
-    out.chemProd.co2[i] = ((CO2_g + co2Consumed_g) * 1000) / params.volL;
+    out.chemProd.co2[i] = ((CO2_free_g + co2Consumed_g) * 1000) / params.volL;
+    out.chemProd.dic[i] = ((DIC_g + co2Consumed_g) * 1000) / params.volL;
+    out.chemProd.store[i] = out.store_mgL[i];
     out.chemProd.macro[i] = ((macro_g + macroConsumed_g) * 1000) / params.volL;
     out.chemProd.micro[i] = ((micro_g + microConsumed_g) * 1000) / params.volL;
 
@@ -2525,9 +2727,9 @@ function runSimulation(params){
   out.meta.chemProdCumInfo = chemProdCumResult.info;
 
   out.audit.n_balance_init = feedAddedN_g;
-  out.audit.c_balance_init = feedAddedC_g + co2Init_g;
+  out.audit.c_balance_init = feedAddedC_g + co2Init_free_g;
   out.audit.n_balance_end = NH4 + NO2 + NO3 + N_bio;
-  out.audit.c_balance_end = CO2_g + COD_bio + S.carb + S.prot + S.fat + S_slow.carb + S_slow.prot + S_slow.fat
+  out.audit.c_balance_end = DIC_g + COD_bio + S.carb + S.prot + S.fat + S_slow.carb + S_slow.prot + S_slow.fat
     + pelFloat.carb + pelFloat.prot + pelFloat.fat + pelBot.carb + pelBot.prot + pelBot.fat + powBot.carb + powBot.prot + powBot.fat;
   out.meta.feedEnd = pelFloat.carb + pelFloat.prot + pelFloat.fat + pelBot.carb + pelBot.prot + pelBot.fat + powBot.carb + powBot.prot + powBot.fat;
   out.meta.oxygenClampCount = oxygenClampCount;
@@ -2542,6 +2744,24 @@ function runSimulation(params){
   out.meta.phytoNightGrowthTotal = phytoNightGrowthTotal;
   out.meta.phytoReserveBuilt = phytoReserveBuilt;
   out.meta.phytoReserveUsed = phytoReserveUsed;
+  out.meta.phytoStoreFillPct = phytoStoreFillLast;
+  out.meta.phytoStoreN_g = phytoN_store_g;
+  out.meta.phytoStoreP_g = phytoP_store_g;
+  out.meta.luxuryUptakeTotal = luxuryUptakeTotal;
+  out.meta.phytoStoreNegativeHits = phytoStoreNegativeHits;
+  out.meta.phytoStoreDepleteHits = phytoStoreDepleteHits;
+  out.meta.phytoMuMax = phytoMuMaxLast;
+  out.meta.phytoMuEff = phytoMuEffLast;
+  out.meta.phytoMuCapHits = phytoMuCapHits;
+  out.meta.refugeFractionLast = refugeFractionLast;
+  out.meta.refugeExchange_g_day = refugeExchangeLast;
+  out.meta.refugeEmptyHits = refugeEmptyHits;
+  out.meta.refugeOverrunHits = refugeOverrunHits;
+  out.meta.grazerActivityLast = grazerActivity;
+  out.meta.grazerActivityMin = grazerActivityMin;
+  out.meta.laggedConsumptionTotal = laggedConsumptionTotal;
+  out.meta.grazingLagCollapseHits = grazingLagCollapseHits;
+  out.meta.biomassNonFiniteHits = biomassNonFiniteHits;
   out.meta.phytoRecruitTotal = phytoRecruitTotal;
   out.meta.co2ZeroHits = co2ZeroHits;
   out.meta.co2DegasSteps = co2DegasSteps;
@@ -2550,6 +2770,14 @@ function runSimulation(params){
   out.meta.grazingShieldMin = grazingShieldMin;
   out.meta.co2AirIn_g = co2AirIn_g;
   out.meta.co2AirOut_g = co2AirOut_g;
+  out.meta.alkalinity_mgL = alkalinity_mgL;
+  out.meta.co2FreeMin_mgL = co2FreeMin_mgL;
+  out.meta.co2FreeLast_mgL = co2FreeLast_mgL;
+  out.meta.dicMin_mgL = dicMin_mgL;
+  out.meta.dicLast_mgL = dicLast_mgL;
+  out.meta.bufferCapacityMin = bufferCapacityMin;
+  out.meta.bufferCapacityLast = bufferCapacityLast;
+  out.meta.bufferDepletionHits = bufferDepletionHits;
   out.meta.tempTauHours = tempTauHours;
   out.meta.tempSmoothRange = {min: tempSmoothMin, max: tempSmoothMax, targetMin: oxy.T - tempAmp, targetMax: oxy.T + tempAmp};
   out.meta.feedPulse = {
@@ -2569,6 +2797,33 @@ function runSimulation(params){
   }
   if(feedAddedC_g > 0 && Math.abs(out.audit.c_balance_end - feedAddedC_g)/feedAddedC_g > 0.25){
     addWarning('Carbon balance drift exceeds 25% — check hydrolysis/CO2 terms.');
+  }
+  if(phytoStoreNegativeHits > 0){
+    addWarning(`Phyto nutrient stores went negative ${phytoStoreNegativeHits} times; values were clamped to 0.`);
+  }
+  if(phytoStoreDepleteHits > 0 && params.runMode !== 'uncertainty'){
+    addWarning(`Phyto stores depleted while growth demand persisted for ${phytoStoreDepleteHits} steps.`);
+  }
+  if(refugeEmptyHits > 0 && params.runMode !== 'uncertainty'){
+    addWarning(`Refuge compartment emptied for ${refugeEmptyHits} steps; grazing protection was lost.`);
+  }
+  if(refugeOverrunHits > 0 && params.runMode !== 'uncertainty'){
+    addWarning(`Refuge compartment overfilled for ${refugeOverrunHits} steps; open-water grazing access was limited.`);
+  }
+  if(grazingLagCollapseHits > 0 && params.runMode !== 'uncertainty'){
+    addWarning(`Grazer activity lagged behind prey for ${grazingLagCollapseHits} steps; expect delayed grazing response.`);
+  }
+  if(phytoMuCapHits > 0 && params.runMode !== 'uncertainty'){
+    addWarning(`Effective phyto growth was capped by nutrients/stores in ${phytoMuCapHits} steps.`);
+  }
+  if(biomassNonFiniteHits > 0){
+    addWarning(`Biomass values became non-finite ${biomassNonFiniteHits} times; clamped to 0.`);
+  }
+  if(!Number.isFinite(bufferCapacityMin)){
+    addWarning('Buffer capacity became non-finite; check carbonate partitioning math.');
+  }
+  if(bufferDepletionHits > 0 && params.runMode !== 'uncertainty'){
+    addWarning(`Carbonate buffer depleted in ${bufferDepletionHits} steps; free CO₂ fell while alkalinity was low.`);
   }
 
   return out;
@@ -2685,6 +2940,7 @@ function runMonteCarlo(baseParams){
   const co2pk = new Array(runs);
   const macroPk = new Array(runs);
   const microPk = new Array(runs);
+  const storeMin = new Array(runs);
   const otrMax = new Array(runs);
   const kLa = new Array(runs);
   const Cstar = new Array(runs);
@@ -2768,6 +3024,7 @@ function runMonteCarlo(baseParams){
     deficitArea[r] = defA;
 
     let nh = 0, n2 = 0, n3 = 0, nh3 = 0, co2 = 0, mA = 0, mI = 0;
+    let storeFloor = Infinity;
     for(let i=0;i<sim.NH4_mgL.length;i++) if(sim.NH4_mgL[i] > nh) nh = sim.NH4_mgL[i];
     for(let i=0;i<sim.NO2_mgL.length;i++) if(sim.NO2_mgL[i] > n2) n2 = sim.NO2_mgL[i];
     for(let i=0;i<sim.NO3_mgL.length;i++) if(sim.NO3_mgL[i] > n3) n3 = sim.NO3_mgL[i];
@@ -2775,6 +3032,7 @@ function runMonteCarlo(baseParams){
     for(let i=0;i<sim.CO2_mgL.length;i++) if(sim.CO2_mgL[i] > co2) co2 = sim.CO2_mgL[i];
     for(let i=0;i<sim.macro_mgL.length;i++) if(sim.macro_mgL[i] > mA) mA = sim.macro_mgL[i];
     for(let i=0;i<sim.micro_mgL.length;i++) if(sim.micro_mgL[i] > mI) mI = sim.micro_mgL[i];
+    for(let i=0;i<sim.store_mgL.length;i++) if(sim.store_mgL[i] < storeFloor) storeFloor = sim.store_mgL[i];
     nh4pk[r] = nh;
     no2pk[r] = n2;
     no3pk[r] = n3;
@@ -2782,6 +3040,7 @@ function runMonteCarlo(baseParams){
     co2pk[r] = co2;
     macroPk[r] = mA;
     microPk[r] = mI;
+    storeMin[r] = Number.isFinite(storeFloor) ? storeFloor : 0;
 
     otrMax[r] = sim.meta.oxy.OTR_max;
     kLa[r] = sim.meta.oxy.kLa;
@@ -2842,6 +3101,7 @@ function runMonteCarlo(baseParams){
   const sCO2   = scalarStats(co2pk, qLo, qHi);
   const sMacro = scalarStats(macroPk, qLo, qHi);
   const sMicro = scalarStats(microPk, qLo, qHi);
+  const sStoreMin = scalarStats(storeMin, qLo, qHi);
   const sOTR   = scalarStats(otrMax, qLo, qHi);
   const sKLA   = scalarStats(kLa, qLo, qHi);
   const sCstar = scalarStats(Cstar, qLo, qHi);
@@ -2879,6 +3139,7 @@ function runMonteCarlo(baseParams){
       co2pk:sCO2,
       macroPk:sMacro,
       microPk:sMicro,
+      storeMin:sStoreMin,
       otrMax:sOTR,
       kLa:sKLA,
       Cstar:sCstar,
@@ -4238,6 +4499,7 @@ function setFlags(sim, params, mc){
   const seriesNH3 = sim.NH3_mgL;
   const seriesCO2 = sim.CO2_mgL;
   const seriesMicro = sim.micro_mgL;
+  const seriesStore = sim.store_mgL;
   const seriesCopper = seriesMicro.map(v=>v * FEED_PROFILE.modeling.copperFractionOfMicro);
 
   const doMin = isMC ? mc.scalars.minDO.mid : Math.min(...sim.DO_mgL);
@@ -4247,6 +4509,7 @@ function setFlags(sim, params, mc){
   const no3Peak = isMC ? (mc.scalars.no3pk.mid * nFactorNO3) : Math.max(...seriesNO3);
   const co2Peak = isMC ? mc.scalars.co2pk.mid : Math.max(...seriesCO2);
   const microPeak = isMC ? mc.scalars.microPk.mid : Math.max(...seriesMicro);
+  const storeMin = isMC ? mc.scalars.storeMin.mid : Math.min(...seriesStore);
   const copperPeak = microPeak * FEED_PROFILE.modeling.copperFractionOfMicro;
 
   const doClass = classify('min', doMin, 5, 2);
@@ -4298,16 +4561,30 @@ function setFlags(sim, params, mc){
 
   const co2Class = classify('max', co2Peak, 15, 30);
   addTag({
-    label:'CO₂ (produced)',
+    label:'CO₂ free',
     tone: co2Class.tone,
     status: co2Class.label,
     summary:`peak ${fmtVal(co2Peak, 'mg/L')}`,
     details:[
       `Modeled ${isMC ? 'median peak' : 'peak'}: ${fmtVal(co2Peak, 'mg/L')}.`,
       fmtBandLine('max', 15, 30, 'mg/L'),
-      `CO₂ spikes often track heavy feeding or respiration loads.`
+      `Free CO₂ tracks buffering and photosynthetic drawdown.`
     ],
     spark:{series: seriesCO2, mode:'max', good:15, warn:30}
+  });
+
+  const storeClass = classify('min', storeMin, 1.0, 0.4);
+  addTag({
+    label:'Nutrient stores',
+    tone: storeClass.tone,
+    status: storeClass.label,
+    summary:`min ${fmtVal(storeMin, 'mg/L')}`,
+    details:[
+      `Modeled ${isMC ? 'median minimum' : 'minimum'}: ${fmtVal(storeMin, 'mg/L')}.`,
+      fmtBandLine('min', 1.0, 0.4, 'mg/L'),
+      `Stores buffer growth against nutrient droughts; low minima imply luxury uptake is exhausted.`
+    ],
+    spark:{series: seriesStore, mode:'min', good:1.0, warn:0.4}
   });
 
   const no2Class = classify('max', no2Peak, 0.15, 0.30);
@@ -4587,10 +4864,10 @@ function recompute(){
       addWarning('Heterotroph consumed ~0 g over the run. Check feed inputs and kinetics.');
     }
     if((baseSim.meta.co2ZeroHits ?? 0) > 0){
-      addWarning(`CO₂ depleted to 0 mg/L for ${baseSim.meta.co2ZeroHits} steps; phyto growth stalls until CO₂ recovers.`);
+      addWarning(`Free CO₂ depleted to 0 mg/L for ${baseSim.meta.co2ZeroHits} steps; phyto growth stalls until CO₂ recovers.`);
     }
     if((baseSim.meta.co2DegasSteps ?? 0) > 0){
-      addWarning(`CO₂ exceeded saturation for ${baseSim.meta.co2DegasSteps} steps; excess degassed to air.`);
+      addWarning(`Free CO₂ exceeded saturation for ${baseSim.meta.co2DegasSteps} steps; excess degassed to air.`);
     }
     if((baseSim.meta.grazingLimitedSteps ?? 0) > (baseSim.t.length * 0.25)){
       addWarning('Grazing limited for >25% of steps; phyto scarcity or grazing rate caps may be throttling heterotroph growth.');
@@ -4780,6 +5057,9 @@ function recompute(){
       dbg.push(`Grazing limits: ${baseSim.meta.grazingLimitedSteps ?? 0} steps • max ${baseSim.meta.grazingMax_g_g_day.toFixed(2)} g/g/day`);
       dbg.push(`Phyto reserve: built ${baseSim.meta.phytoReserveBuilt.toFixed(2)} g • used ${baseSim.meta.phytoReserveUsed.toFixed(2)} g • night growth ${baseSim.meta.phytoNightGrowthTotal.toFixed(2)} g`);
       dbg.push(`Phyto recruitment: ${(baseSim.meta.phytoRecruitTotal ?? 0).toFixed(2)} g • refugia ${baseSim.meta.phytoRefugiaFrac.toFixed(2)} • grazing shield min ${(baseSim.meta.grazingShieldMin ?? 0).toFixed(2)}`);
+      dbg.push('Biomass dynamics:');
+      dbg.push(`  CO2 free ${(baseSim.meta.co2FreeLast_mgL ?? 0).toFixed(2)} mg/L • buffer capacity ${(baseSim.meta.bufferCapacityLast ?? 0).toFixed(2)} • phyto store fill ${((baseSim.meta.phytoStoreFillPct ?? 0) * 100).toFixed(1)}%`);
+      dbg.push(`  refuge fraction ${(baseSim.meta.refugeFractionLast ?? 0).toFixed(2)} • grazer activity ${(baseSim.meta.grazerActivityLast ?? 0).toFixed(2)} • lagged consumption ${(baseSim.meta.laggedConsumptionTotal ?? 0).toFixed(2)} g`);
       dbg.push(`O2 degassed: ${(baseSim.meta.oxygenDegassed_g ?? 0).toFixed(3)} g (steps ${baseSim.meta.oxygenDegasSteps ?? 0})`);
       dbg.push(`CO2 init: ${(baseSim.meta.co2Init_mgL ?? 0).toFixed(2)} mg/L • sat ${(baseSim.meta.co2Sat_mgL ?? 0).toFixed(2)} mg/L • zero hits ${baseSim.meta.co2ZeroHits ?? 0} • degas ${baseSim.meta.co2DegasSteps ?? 0} • air in ${(baseSim.meta.co2AirIn_g ?? 0).toFixed(2)} g • air out ${(baseSim.meta.co2AirOut_g ?? 0).toFixed(2)} g`);
       dbg.push(`Denit: k=${params.kDenit} 1/day • cap=${params.denitCap}`);
@@ -4888,6 +5168,9 @@ function recompute(){
       dbg.push(`Grazing limits: ${baseSim.meta.grazingLimitedSteps ?? 0} steps • max ${baseSim.meta.grazingMax_g_g_day.toFixed(2)} g/g/day`);
       dbg.push(`Phyto reserve: built ${baseSim.meta.phytoReserveBuilt.toFixed(2)} g • used ${baseSim.meta.phytoReserveUsed.toFixed(2)} g • night growth ${baseSim.meta.phytoNightGrowthTotal.toFixed(2)} g`);
       dbg.push(`Phyto recruitment: ${(baseSim.meta.phytoRecruitTotal ?? 0).toFixed(2)} g • refugia ${baseSim.meta.phytoRefugiaFrac.toFixed(2)} • grazing shield min ${(baseSim.meta.grazingShieldMin ?? 0).toFixed(2)}`);
+      dbg.push('Biomass dynamics:');
+      dbg.push(`  CO2 free ${(baseSim.meta.co2FreeLast_mgL ?? 0).toFixed(2)} mg/L • buffer capacity ${(baseSim.meta.bufferCapacityLast ?? 0).toFixed(2)} • phyto store fill ${((baseSim.meta.phytoStoreFillPct ?? 0) * 100).toFixed(1)}%`);
+      dbg.push(`  refuge fraction ${(baseSim.meta.refugeFractionLast ?? 0).toFixed(2)} • grazer activity ${(baseSim.meta.grazerActivityLast ?? 0).toFixed(2)} • lagged consumption ${(baseSim.meta.laggedConsumptionTotal ?? 0).toFixed(2)} g`);
       dbg.push(`O2 degassed: ${(baseSim.meta.oxygenDegassed_g ?? 0).toFixed(3)} g (steps ${baseSim.meta.oxygenDegasSteps ?? 0})`);
       dbg.push(`CO2 init: ${(baseSim.meta.co2Init_mgL ?? 0).toFixed(2)} mg/L • sat ${(baseSim.meta.co2Sat_mgL ?? 0).toFixed(2)} mg/L • zero hits ${baseSim.meta.co2ZeroHits ?? 0} • degas ${baseSim.meta.co2DegasSteps ?? 0} • air in ${(baseSim.meta.co2AirIn_g ?? 0).toFixed(2)} g • air out ${(baseSim.meta.co2AirOut_g ?? 0).toFixed(2)} g`);
       dbg.push(`Denit: k=${params.kDenit} 1/day • cap=${params.denitCap}`);
