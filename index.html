@@ -2284,7 +2284,382 @@ function estimateBiofilmMass(params){
   return Math.max(0, area_cm2 * thickness_cm * density_g_cm3);
 }
 
-function runSimulation(params){
+function ecoComputeTemp(tempC, ampC, tDay, lightHour){
+  const phase = (tDay - (lightHour / 24) - 0.25) * 2 * Math.PI;
+  return tempC + ampC * Math.sin(phase);
+}
+
+function ecoComputeLight(tDay, lightHour){
+  const localHour = (tDay * 24) % 24;
+  const dayCenter = lightHour % 24;
+  const daylight = 12;
+  const half = daylight / 2;
+  const distance = Math.abs(((localHour - dayCenter + 12) % 24) - 12);
+  if(distance > half) return 0;
+  const x = (distance / half) * Math.PI;
+  return clamp(Math.cos(x), 0, 1);
+}
+
+function ecoSolvePhFromAlkDic(tempC, alkalinityEqL, dicMolL){
+  const pKa1 = 6.35 - 0.015 * (tempC - 25);
+  const pKa2 = 10.33 - 0.018 * (tempC - 25);
+  const pKw = 14.0 - 0.05 * (tempC - 25);
+  const K1 = Math.pow(10, -pKa1);
+  const K2 = Math.pow(10, -pKa2);
+  const Kw = Math.pow(10, -pKw);
+  const solve = (pH)=>{
+    const H = Math.pow(10, -pH);
+    const alpha0 = 1 / (1 + (K1 / H) + (K1 * K2) / (H * H));
+    const hco3 = dicMolL * (K1 / H) * alpha0;
+    const co3 = dicMolL * (K1 * K2 / (H * H)) * alpha0;
+    const oh = Kw / H;
+    return (hco3 + 2 * co3 + oh - H);
+  };
+  let lo = 5.5;
+  let hi = 9.3;
+  let loVal = solve(lo) - alkalinityEqL;
+  let hiVal = solve(hi) - alkalinityEqL;
+  if(loVal * hiVal > 0){
+    return clamp(7.5 + (alkalinityEqL - dicMolL) * 10, 5.5, 9.3);
+  }
+  for(let i = 0; i < 60; i++){
+    const mid = 0.5 * (lo + hi);
+    const midVal = solve(mid) - alkalinityEqL;
+    if(Math.abs(midVal) < 1e-10) return mid;
+    if(midVal * loVal > 0){
+      lo = mid;
+      loVal = midVal;
+    }else{
+      hi = mid;
+      hiVal = midVal;
+    }
+  }
+  return 0.5 * (lo + hi);
+}
+
+function ecoDicFromPh(tempC, alkalinityEqL, pH){
+  const pKa1 = 6.35 - 0.015 * (tempC - 25);
+  const pKa2 = 10.33 - 0.018 * (tempC - 25);
+  const pKw = 14.0 - 0.05 * (tempC - 25);
+  const H = Math.pow(10, -pH);
+  const K1 = Math.pow(10, -pKa1);
+  const K2 = Math.pow(10, -pKa2);
+  const Kw = Math.pow(10, -pKw);
+  const alpha0 = 1 / (1 + (K1 / H) + (K1 * K2) / (H * H));
+  const alpha1 = (K1 / H) * alpha0;
+  const alpha2 = (K1 * K2 / (H * H)) * alpha0;
+  const oh = Kw / H;
+  const denom = Math.max(1e-12, alpha1 + 2 * alpha2);
+  return Math.max(0, (alkalinityEqL - oh + H) / denom);
+}
+
+function ecoCarbonateSubsystem(tempC, volL, dicC_g, alkalinityEqL){
+  const dicMolL = (dicC_g / 12) / Math.max(1e-9, volL);
+  const pH = ecoSolvePhFromAlkDic(tempC, alkalinityEqL, dicMolL);
+  const pKa1 = 6.35 - 0.015 * (tempC - 25);
+  const pKa2 = 10.33 - 0.018 * (tempC - 25);
+  const H = Math.pow(10, -pH);
+  const K1 = Math.pow(10, -pKa1);
+  const K2 = Math.pow(10, -pKa2);
+  const alpha0 = 1 / (1 + (K1 / H) + (K1 * K2) / (H * H));
+  const alpha1 = (K1 / H) * alpha0;
+  const alpha2 = (K1 * K2 / (H * H)) * alpha0;
+  const dicMolTotal = dicMolL * volL;
+  const co2Mol = dicMolTotal * alpha0;
+  const hco3Mol = dicMolTotal * alpha1;
+  const co3Mol = dicMolTotal * alpha2;
+  const co2_g = co2Mol * 44;
+  const dic_mgL = (dicC_g * (44/12) * 1000) / Math.max(1e-9, volL);
+  const co2_mgL = (co2_g * 1000) / Math.max(1e-9, volL);
+  const bufferCapacity = clamp(alkalinityEqL / (alkalinityEqL + dicMolL + 1e-12), 0, 1);
+  return {
+    pH,
+    co2_g,
+    co2_mgL,
+    dic_mgL,
+    bufferCapacity,
+    alpha0,
+    alpha1,
+    alpha2,
+    hco3Mol,
+    co3Mol
+  };
+}
+
+function ecoPrimarySubsystem(state, env, cfg){
+  const {volL, tempFactor, lightFactor, co2Index} = env;
+  const {bioCFrac, bioNFrac, bioPFrac} = cfg.stoich;
+  const uptake = {n:0, p:0};
+  const production = {o2_g_day:0, co2_g_day:0, growth_g:0, storeBuilt:0, storeUsed:0, storeDepleted:0};
+
+  const groups = [
+    {key:'algae', mu:cfg.mu.algae, resp:cfg.resp.algae, storeCap:cfg.storeCap.algae},
+    {key:'plankton', mu:cfg.mu.plankton, resp:cfg.resp.plankton, storeCap:cfg.storeCap.plankton},
+    {key:'plants', mu:cfg.mu.plants, resp:cfg.resp.plants, storeCap:cfg.storeCap.plants}
+  ];
+
+  const din_g = state.pools.nh4_g + state.pools.no2_g + state.pools.no3_g;
+  const dip_g = state.pools.po4_g;
+  const nAvail = din_g / Math.max(1e-9, volL);
+  const pAvail = dip_g / Math.max(1e-9, volL);
+
+  groups.forEach(group=>{
+    const biomass_g = state.biomass[group.key];
+    if(biomass_g <= 0) return;
+    const storeN = state.stores[group.key].n_g;
+    const storeP = state.stores[group.key].p_g;
+    const storeCapN = biomass_g * bioNFrac * group.storeCap;
+    const storeCapP = biomass_g * bioPFrac * group.storeCap;
+    const uptakeN = Math.min(storeCapN - storeN, cfg.uptake.n * biomass_g * (nAvail / (nAvail + cfg.halfSat.n)) * tempFactor);
+    const uptakeP = Math.min(storeCapP - storeP, cfg.uptake.p * biomass_g * (pAvail / (pAvail + cfg.halfSat.p)) * tempFactor);
+    const uptN = Math.max(0, uptakeN);
+    const uptP = Math.max(0, uptakeP);
+    state.stores[group.key].n_g += uptN * env.dt;
+    state.stores[group.key].p_g += uptP * env.dt;
+    state.pools.nh4_g = Math.max(0, state.pools.nh4_g - uptN * env.dt);
+    state.pools.po4_g = Math.max(0, state.pools.po4_g - uptP * env.dt);
+    uptake.n += uptN * env.dt;
+    uptake.p += uptP * env.dt;
+
+    const muMax = group.mu * tempFactor * (0.15 + 0.85 * lightFactor) * (0.4 + 0.6 * co2Index);
+    const potentialGrowth = biomass_g * muMax * env.dt;
+    const nDemand = potentialGrowth * bioNFrac;
+    const pDemand = potentialGrowth * bioPFrac;
+    const nSupply = state.stores[group.key].n_g + state.pools.nh4_g + state.pools.no3_g + state.pools.no2_g;
+    const pSupply = state.stores[group.key].p_g + state.pools.po4_g;
+    const nScale = nDemand > 1e-9 ? Math.min(1, nSupply / nDemand) : 1;
+    const pScale = pDemand > 1e-9 ? Math.min(1, pSupply / pDemand) : 1;
+    const growthScale = Math.min(nScale, pScale, 1);
+    const growth = potentialGrowth * growthScale;
+    const nNeed = growth * bioNFrac;
+    const pNeed = growth * bioPFrac;
+
+    const takeStoreN = Math.min(state.stores[group.key].n_g, nNeed);
+    const remainingN = Math.max(0, nNeed - takeStoreN);
+    const takeStoreP = Math.min(state.stores[group.key].p_g, pNeed);
+    const remainingP = Math.max(0, pNeed - takeStoreP);
+    state.stores[group.key].n_g -= takeStoreN;
+    state.stores[group.key].p_g -= takeStoreP;
+    state.pools.nh4_g = Math.max(0, state.pools.nh4_g - remainingN * cfg.uptakeNh4Frac);
+    const remainingN_no3 = Math.max(0, remainingN - remainingN * cfg.uptakeNh4Frac);
+    state.pools.no3_g = Math.max(0, state.pools.no3_g - remainingN_no3);
+    state.pools.po4_g = Math.max(0, state.pools.po4_g - remainingP);
+    state.biomass[group.key] += growth;
+
+    production.growth_g += growth;
+    production.storeBuilt += uptN * env.dt + uptP * env.dt;
+    production.storeUsed += takeStoreN + takeStoreP;
+    if(growthScale < 0.99 && (state.stores[group.key].n_g + state.stores[group.key].p_g) < 1e-8){
+      production.storeDepleted += 1;
+    }
+
+    const cAssim = growth * bioCFrac;
+    const o2Produced = (cAssim / 12) * 32;
+    production.o2_g_day += (o2Produced / env.dt);
+    production.co2_g_day -= (cAssim * (44/12)) / env.dt;
+
+    const resp = biomass_g * group.resp * tempFactor * (1 - lightFactor);
+    production.o2_g_day -= resp;
+    production.co2_g_day += resp * cfg.co2PerO2;
+  });
+
+  return {uptake, production};
+}
+
+function ecoConsumerSubsystem(state, env, cfg){
+  const {bioCFrac, bioNFrac, bioPFrac} = cfg.stoich;
+  const diag = {grazerStarve:0, predatorStarve:0, grazerDemand:0, predatorDemand:0, grazerLagHit:0, predatorLagHit:0};
+  const flows = {
+    o2_g_day:0,
+    co2_g_day:0,
+    pom_C_g:0,
+    pom_N_g:0,
+    pom_P_g:0,
+    grazedPhyto_g:0,
+    grazedBiofilm_g:0,
+    algaeGrazed_g:0,
+    planktonGrazed_g:0,
+    grazerAssim_g:0,
+    predatorAssim_g:0
+  };
+
+  const openAlgae = Math.max(0, state.refugia.algae_open_g);
+  const openPlankton = Math.max(0, state.refugia.plankton_open_g);
+  const preyPhyto = openAlgae + openPlankton;
+  const grazerBiomass = state.biomass.grazers;
+  const predatorBiomass = state.biomass.predators;
+
+  const grazerTarget = grazerBiomass * cfg.grazingMax.grazers * (preyPhyto / (preyPhyto + cfg.grazingHalfSat.phyto));
+  state.activity.grazerDemand_g_day += (grazerTarget - state.activity.grazerDemand_g_day) * (env.dt / cfg.lagTau.grazers);
+  const grazerDemand = Math.max(0, state.activity.grazerDemand_g_day);
+  diag.grazerDemand = grazerDemand;
+  const grazeAmount = Math.min(preyPhyto, grazerDemand * env.dt);
+  if(grazerDemand * env.dt > preyPhyto + 1e-9){
+    diag.grazerLagHit += 1;
+    diag.grazerStarve += 1;
+  }
+  if(grazeAmount > 0){
+    const algaeShare = preyPhyto > 1e-9 ? (openAlgae / preyPhyto) : 0;
+    const algaeTaken = grazeAmount * algaeShare;
+    const planktonTaken = grazeAmount - algaeTaken;
+    state.refugia.algae_open_g = Math.max(0, openAlgae - algaeTaken);
+    state.refugia.plankton_open_g = Math.max(0, openPlankton - planktonTaken);
+    flows.algaeGrazed_g += algaeTaken;
+    flows.planktonGrazed_g += planktonTaken;
+  }
+
+  const grazerAssim = grazeAmount * cfg.assimEff.grazers;
+  const grazerWaste = grazeAmount - grazerAssim;
+  state.biomass.grazers += grazerAssim;
+  flows.grazerAssim_g += grazerAssim;
+  flows.pom_C_g += grazerWaste * bioCFrac;
+  flows.pom_N_g += grazerWaste * bioNFrac;
+  flows.pom_P_g += grazerWaste * bioPFrac;
+  flows.grazedPhyto_g += grazeAmount;
+
+  const predatorTarget = predatorBiomass * cfg.grazingMax.predators * (grazerBiomass / (grazerBiomass + cfg.grazingHalfSat.grazers));
+  state.activity.predatorDemand_g_day += (predatorTarget - state.activity.predatorDemand_g_day) * (env.dt / cfg.lagTau.predators);
+  const predatorDemand = Math.max(0, state.activity.predatorDemand_g_day);
+  diag.predatorDemand = predatorDemand;
+  const preyGrazer = Math.max(0, state.biomass.grazers);
+  const predatorGraze = Math.min(preyGrazer, predatorDemand * env.dt);
+  if(predatorDemand * env.dt > preyGrazer + 1e-9){
+    diag.predatorLagHit += 1;
+    diag.predatorStarve += 1;
+  }
+  state.biomass.grazers = Math.max(0, preyGrazer - predatorGraze);
+  const predatorAssim = predatorGraze * cfg.assimEff.predators;
+  const predatorWaste = predatorGraze - predatorAssim;
+  state.biomass.predators += predatorAssim;
+  flows.predatorAssim_g += predatorAssim;
+  flows.pom_C_g += predatorWaste * bioCFrac;
+  flows.pom_N_g += predatorWaste * bioNFrac;
+  flows.pom_P_g += predatorWaste * bioPFrac;
+  flows.grazedBiofilm_g += predatorGraze;
+
+  const resp = (grazerBiomass * cfg.resp.grazers + predatorBiomass * cfg.resp.predators) * env.tempFactor;
+  flows.o2_g_day += resp;
+  flows.co2_g_day += resp * cfg.co2PerO2;
+
+  return {flows, diag};
+}
+
+function ecoNutrientSubsystem(state, env, cfg){
+  const flows = {o2_g_day:0, co2_g_day:0, nh4_from_dom:0, denit_no3:0, nit_no2:0, nit_no3:0};
+  const diag = {denitLimited:0, nitrifLimited:0, domDepleted:0};
+  const tempFactor = env.tempFactor;
+  const heteroFactor = state.biomass.grazers + state.biomass.predators;
+  const heteroScale = heteroFactor / (heteroFactor + cfg.heteroHalfSat);
+
+  const pomHyd = cfg.pomHydro * tempFactor * env.dt;
+  const pomToDomC = Math.min(state.pools.pom_C_g, state.pools.pom_C_g * pomHyd);
+  const pomToDomN = Math.min(state.pools.pom_N_g, state.pools.pom_N_g * pomHyd);
+  const pomToDomP = Math.min(state.pools.pom_P_g, state.pools.pom_P_g * pomHyd);
+  state.pools.pom_C_g -= pomToDomC;
+  state.pools.pom_N_g -= pomToDomN;
+  state.pools.pom_P_g -= pomToDomP;
+  state.pools.dom_C_g += pomToDomC;
+  state.pools.dom_N_g += pomToDomN;
+  state.pools.dom_P_g += pomToDomP;
+
+  const domReminRate = cfg.domRemin * tempFactor * heteroScale;
+  const domReminC = Math.min(state.pools.dom_C_g, state.pools.dom_C_g * domReminRate * env.dt);
+  const domReminN = Math.min(state.pools.dom_N_g, state.pools.dom_N_g * domReminRate * env.dt);
+  const domReminP = Math.min(state.pools.dom_P_g, state.pools.dom_P_g * domReminRate * env.dt);
+  state.pools.dom_C_g -= domReminC;
+  state.pools.dom_N_g -= domReminN;
+  state.pools.dom_P_g -= domReminP;
+  state.pools.nh4_g += domReminN;
+  state.pools.po4_g += domReminP;
+  flows.nh4_from_dom += domReminN;
+  flows.o2_g_day += (domReminC / 12) * 32 / env.dt;
+  flows.co2_g_day += (domReminC * (44/12)) / env.dt;
+  if(domReminC < 1e-9 && state.pools.dom_C_g < 1e-8) diag.domDepleted += 1;
+
+  const doSat = env.do_mgL / Math.max(1e-6, env.doSat_mgL);
+  state.activity.nitrifier = clamp(state.activity.nitrifier + (doSat - state.activity.nitrifier) * (env.dt / cfg.lagTau.nitrifier), 0, 1);
+  const nitPotential = state.pools.nh4_g * cfg.nitrif * tempFactor * state.activity.nitrifier * env.dt;
+  const nitNH4 = Math.min(state.pools.nh4_g, nitPotential);
+  state.pools.nh4_g -= nitNH4;
+  state.pools.no2_g += nitNH4;
+  flows.nit_no2 += nitNH4;
+  flows.o2_g_day += (nitNH4 * cfg.o2PerNH4) / env.dt;
+  state.pools.alkalinity_eq -= (nitNH4 / 14) * 2;
+  if(nitNH4 < nitPotential * 0.8) diag.nitrifLimited += 1;
+
+  const nitNO2Potential = state.pools.no2_g * cfg.nitrif * tempFactor * state.activity.nitrifier * env.dt;
+  const nitNO2 = Math.min(state.pools.no2_g, nitNO2Potential);
+  state.pools.no2_g -= nitNO2;
+  state.pools.no3_g += nitNO2;
+  flows.nit_no3 += nitNO2;
+  flows.o2_g_day += (nitNO2 * cfg.o2PerNO2) / env.dt;
+
+  const denitDrive = clamp(1 - doSat, 0, 1);
+  state.activity.denitrifier = clamp(state.activity.denitrifier + (denitDrive - state.activity.denitrifier) * (env.dt / cfg.lagTau.denitrifier), 0, 1);
+  const denitPotential = state.pools.no3_g * cfg.denitrif * tempFactor * state.activity.denitrifier * env.dt;
+  const denitNO3 = Math.min(state.pools.no3_g, denitPotential);
+  const cNeeded = denitNO3 * cfg.cPerDenit;
+  const cAvail = Math.min(state.pools.dom_C_g, cNeeded);
+  const denitScaled = cNeeded > 1e-9 ? denitNO3 * (cAvail / cNeeded) : 0;
+  state.pools.no3_g -= denitScaled;
+  state.pools.dom_C_g -= cAvail;
+  flows.denit_no3 += denitScaled;
+  flows.co2_g_day += (cAvail * (44/12)) / env.dt;
+  state.pools.alkalinity_eq += (denitScaled / 14);
+  if(denitScaled < denitPotential * 0.8) diag.denitLimited += 1;
+
+  return {flows, diag};
+}
+
+function ecoSedimentSubsystem(state, env, cfg){
+  const flows = {o2_g_day:0, co2_g_day:0, sedimentReleaseN:0, sedimentReleaseP:0};
+  const settle = cfg.settleFrac * env.dt;
+  const settledC = Math.min(state.pools.pom_C_g, state.pools.pom_C_g * settle);
+  const settledN = Math.min(state.pools.pom_N_g, state.pools.pom_N_g * settle);
+  const settledP = Math.min(state.pools.pom_P_g, state.pools.pom_P_g * settle);
+  state.pools.pom_C_g -= settledC;
+  state.pools.pom_N_g -= settledN;
+  state.pools.pom_P_g -= settledP;
+  state.pools.sediment_C_g += settledC;
+  state.pools.sediment_N_g += settledN;
+  state.pools.sediment_P_g += settledP;
+
+  const remin = cfg.sedimentRemin * env.tempFactor * env.dt;
+  const sedC = Math.min(state.pools.sediment_C_g, state.pools.sediment_C_g * remin);
+  const sedN = Math.min(state.pools.sediment_N_g, state.pools.sediment_N_g * remin);
+  const sedP = Math.min(state.pools.sediment_P_g, state.pools.sediment_P_g * remin);
+  state.pools.sediment_C_g -= sedC;
+  state.pools.sediment_N_g -= sedN;
+  state.pools.sediment_P_g -= sedP;
+  state.pools.nh4_g += sedN;
+  state.pools.po4_g += sedP;
+  flows.sedimentReleaseN += sedN;
+  flows.sedimentReleaseP += sedP;
+  flows.o2_g_day += (sedC / 12) * 32 / env.dt;
+  flows.co2_g_day += (sedC * (44/12)) / env.dt;
+
+  return flows;
+}
+
+function ecoGasSubsystem(state, env, cfg){
+  const flows = {o2_transfer_g_day:0, co2_air_in_g:0, co2_air_out_g:0};
+  const doDelta = env.kLa * (env.doSat_mgL - state.oxygen.do_mgL);
+  const o2Transfer_g_day = (doDelta * env.volL) / 1000;
+  flows.o2_transfer_g_day = o2Transfer_g_day;
+
+  const co2Eq_mgL = env.co2Sat_mgL;
+  const co2Delta = (co2Eq_mgL - env.co2_mgL);
+  const co2Transfer_g_day = (cfg.kLaCo2 * co2Delta * env.volL) / 1000;
+  if(co2Transfer_g_day >= 0){
+    flows.co2_air_in_g = co2Transfer_g_day;
+  }else{
+    flows.co2_air_out_g = -co2Transfer_g_day;
+  }
+
+  return flows;
+}
+
+function legacySimulation(params){
   // dt: keep ~1200 points for smooth plots
   const targetPts = 1200;
   let dt = params.days/targetPts;
@@ -3692,6 +4067,663 @@ function runSimulation(params){
   }
   if(bufferDepletionHits > 0 && params.runMode !== 'uncertainty'){
     addWarning(`Carbonate buffer depleted in ${bufferDepletionHits} steps; free CO₂ fell while alkalinity was low.`);
+  }
+
+  return out;
+}
+
+function runSimulation(params){
+  const targetPts = 1200;
+  let dt = params.days / targetPts;
+  dt = clamp(dt, 1/48, 1/6);
+  const n = Math.floor(params.days / dt) + 1;
+
+  const oxy = oxygenationModel(params);
+  const volL = Math.max(1e-6, params.volL);
+  const tempAmp = Number(params.tempAmp ?? 0);
+  const lightHour = Number(params.lightHour ?? 12);
+
+  const pelletEachMass_g = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
+  let simFeedPlan = params.feedSchedule || buildFeedSchedule(params, pelletEachMass_g);
+  if(!Array.isArray(simFeedPlan)){
+    addWarning('Invalid feed schedule; resetting to empty feed plan.');
+    simFeedPlan = [];
+  }
+  const feedWindowHours = clamp(Number(params.feedWindowHours ?? 4), 2, 12);
+  const feedPulse = buildFeedPulse(simFeedPlan, dt, params.days, feedWindowHours / 24);
+
+  const alkalinity_mgL = clamp(Number(params.alkalinity_mgL ?? 80), 10, 400);
+  const alkalinityEqL = alkalinity_mgL / 50000;
+  const startPH = clamp(Number(params.pH ?? 7.4), 6.2, 8.6);
+  const initDicMolL = ecoDicFromPh(oxy.T, alkalinityEqL, startPH);
+  const initDicC_g = initDicMolL * volL * 12;
+  const initCarbonate = ecoCarbonateSubsystem(oxy.T, volL, initDicC_g, alkalinityEqL);
+
+  const ECO_CFG = {
+    tempRef: 25,
+    tempQ10: 2.0,
+    stoich: {bioCFrac:0.45, bioNFrac:0.079, bioPFrac:0.011},
+    mu: {algae:0.75, plankton:0.62, plants:0.48},
+    resp: {algae:0.06, plankton:0.05, plants:0.04, grazers:0.10, predators:0.12},
+    storeCap: {algae:0.45, plankton:0.40, plants:0.35},
+    uptake: {n:0.28, p:0.12},
+    uptakeNh4Frac: 0.7,
+    halfSat: {n:0.0006, p:0.00005, co2:2.0},
+    grazingMax: {grazers:0.18, predators:0.12},
+    grazingHalfSat: {phyto:3.0, grazers:1.2},
+    assimEff: {grazers:0.35, predators:0.30},
+    lagTau: {grazers:0.9, predators:1.4, nitrifier:0.6, denitrifier:1.2},
+    pomHydro: 0.4,
+    domRemin: 0.7,
+    nitrif: 0.9,
+    denitrif: 0.6,
+    cPerDenit: 1.07,
+    o2PerNH4: CHEM.O2_per_gN_NH4_to_NO2,
+    o2PerNO2: CHEM.O2_per_gN_NO2_to_NO3,
+    co2PerO2: CHEM.CO2_per_gO2,
+    heteroHalfSat: 3.0,
+    settleFrac: 0.15,
+    sedimentRemin: 0.08,
+    refugeFrac: 0.18,
+    refugeExchange: 0.12,
+    kLaCo2: oxy.kLa * 0.65
+  };
+
+  const state = {
+    pools: {
+      nh4_g: 0.0002 * volL / 1000,
+      no2_g: 0,
+      no3_g: 0.0005 * volL / 1000,
+      po4_g: 0.00005 * volL / 1000,
+      dom_C_g: 0,
+      dom_N_g: 0,
+      dom_P_g: 0,
+      pom_C_g: 0,
+      pom_N_g: 0,
+      pom_P_g: 0,
+      sediment_C_g: 0,
+      sediment_N_g: 0,
+      sediment_P_g: 0,
+      dic_C_g: initDicC_g,
+      alkalinity_eq: alkalinityEqL
+    },
+    biomass: {
+      algae: Math.max(0, Number(params.phytoAlgae_g ?? (params.photoMass ?? 0) * PHYTO_SPLIT.algae)),
+      plankton: Math.max(0, Number(params.phytoPlankton_g ?? (params.photoMass ?? 0) * PHYTO_SPLIT.plankton)),
+      plants: Math.max(0, Number(params.phytoPlants_g ?? (params.photoMass ?? 0) * PHYTO_SPLIT.plants)),
+      grazers: Math.max(0, Number(params.biofilm_g ?? (params.heteroMass ?? 0) * HET_SPLIT.biofilm)),
+      predators: Math.max(0, Number(params.predator_g ?? (params.heteroMass ?? 0) * HET_SPLIT.predator))
+    },
+    refugia: {
+      algae_refuge_g: 0,
+      plankton_refuge_g: 0,
+      algae_open_g: 0,
+      plankton_open_g: 0
+    },
+    stores: {
+      algae: {n_g:0, p_g:0},
+      plankton: {n_g:0, p_g:0},
+      plants: {n_g:0, p_g:0}
+    },
+    activity: {
+      grazerDemand_g_day: 0,
+      predatorDemand_g_day: 0,
+      nitrifier: 0.15,
+      denitrifier: 0.05
+    },
+    oxygen: {
+      do_mgL: clamp(oxy.Cstar * (params.doInitPct/100), 0, oxy.Cstar * 1.2)
+    },
+    headspace: {
+      co2_mol: 0
+    },
+    diagnostics: {
+      bufferDepletion:0,
+      pHLow:0,
+      pHHigh:0,
+      co2Zero:0,
+      nutrientStoreDeplete:0,
+      grazerStarve:0,
+      predatorStarve:0,
+      massClamp:0,
+      oxygenClamp:0
+    }
+  };
+
+  const phytoMass0 = state.biomass.algae + state.biomass.plankton + state.biomass.plants;
+  const heteroMass0 = state.biomass.grazers + state.biomass.predators;
+  const refugeTargetAlgae = phytoMass0 * ECO_CFG.refugeFrac;
+  const refugeTargetPlankton = phytoMass0 * ECO_CFG.refugeFrac;
+  state.refugia.algae_refuge_g = Math.min(state.biomass.algae, refugeTargetAlgae);
+  state.refugia.plankton_refuge_g = Math.min(state.biomass.plankton, refugeTargetPlankton);
+  state.refugia.algae_open_g = Math.max(0, state.biomass.algae - state.refugia.algae_refuge_g);
+  state.refugia.plankton_open_g = Math.max(0, state.biomass.plankton - state.refugia.plankton_refuge_g);
+
+  ['algae','plankton','plants'].forEach(key=>{
+    const bio = state.biomass[key];
+    state.stores[key].n_g = bio * ECO_CFG.stoich.bioNFrac * 0.3;
+    state.stores[key].p_g = bio * ECO_CFG.stoich.bioPFrac * 0.3;
+  });
+
+  const headspaceVolL = Math.max(1, oxy.head.V_head_L || 10);
+  const headspaceVolM3 = headspaceVolL / 1000;
+  const headspaceTempK = oxy.T + 273.15;
+  const headspacePressurePa = pressureFromAltitude_kPa(params.altM) * 1000;
+  const headspaceTotalMol = (headspacePressurePa * headspaceVolM3) / (8.314 * headspaceTempK);
+  const initPpm = 420;
+  state.headspace.co2_mol = headspaceTotalMol * initPpm / 1e6;
+
+  const out = {
+    t: new Array(n),
+    rate: {
+      carb:new Array(n).fill(0),
+      prot:new Array(n).fill(0),
+      fat:new Array(n).fill(0),
+      endog:new Array(n).fill(0),
+      nh4:new Array(n).fill(0),
+      no2:new Array(n).fill(0),
+      hetero:new Array(n).fill(0),
+      plant:new Array(n).fill(0),
+      total:new Array(n).fill(0),
+      supply:new Array(n).fill(0)
+    },
+    cum: {},
+    DO_mgL: new Array(n).fill(0),
+    DO_pct: new Array(n).fill(0),
+    NH4_mgL: new Array(n).fill(0),
+    NO2_mgL: new Array(n).fill(0),
+    NO3_mgL: new Array(n).fill(0),
+    NH3_mgL: new Array(n).fill(0),
+    CO2_mgL: new Array(n).fill(0),
+    DIC_mgL: new Array(n).fill(0),
+    macro_mgL: new Array(n).fill(0),
+    micro_mgL: new Array(n).fill(0),
+    store_mgL: new Array(n).fill(0),
+    chem: {
+      nh4: new Array(n).fill(0),
+      nh3: new Array(n).fill(0),
+      no2: new Array(n).fill(0),
+      no3: new Array(n).fill(0),
+      co2: new Array(n).fill(0),
+      dic: new Array(n).fill(0),
+      store: new Array(n).fill(0),
+      macro: new Array(n).fill(0),
+      micro: new Array(n).fill(0)
+    },
+    chemProd: {
+      nh4: new Array(n).fill(0),
+      nh3: new Array(n).fill(0),
+      no2: new Array(n).fill(0),
+      no3: new Array(n).fill(0),
+      co2: new Array(n).fill(0),
+      dic: new Array(n).fill(0),
+      store: new Array(n).fill(0),
+      macro: new Array(n).fill(0),
+      micro: new Array(n).fill(0)
+    },
+    audit: {
+      nh4_from_pro:0,
+      nh4_from_endog:0,
+      nh4_to_no2:0,
+      no2_to_no3:0,
+      no3_to_n2:0,
+      co2_from_ox:0,
+      co2_from_endog:0,
+      co2_from_denit:0,
+      co2_degassed:0,
+      co2_air_in:0,
+      macro_release:0,
+      macro_uptake:0,
+      micro_release:0,
+      micro_uptake:0,
+      phyto_grazed:0,
+      phyto_algae_grazed:0,
+      phyto_plankton_grazed:0,
+      biofilm_grazed:0,
+      predator_grazed:0,
+      biofilm_grazing_waste:0,
+      predator_grazing_waste:0,
+      n_balance_init:0,
+      c_balance_init:0,
+      n_balance_end:0,
+      c_balance_end:0
+    },
+    biomass: {
+      hetero_g: new Array(n).fill(0),
+      phyto_g: new Array(n).fill(0),
+      hetero_pct: new Array(n).fill(0),
+      phyto_pct: new Array(n).fill(0)
+    },
+    meta: {
+      dt,
+      feedStart:0,
+      feedEnd:0,
+      maxDemand:0,
+      maxSupply:0,
+      co2Init_mgL: initCarbonate.co2_mgL,
+      co2Sat_mgL: calcCO2SaturationMgL(oxy.T, params.altM)
+    }
+  };
+
+  const feedFractions = FEED_PROFILE.modeling;
+  const feedNitrogenFrac = feedFractions.nitrogenFraction;
+  const feedCarbonFrac = 0.45;
+  const feedPhosphorusFrac = 0.012;
+  const domFrac = 0.35;
+
+  let totalFeedN_g = 0;
+  let totalFeedC_g = 0;
+  let totalFeedP_g = 0;
+  let pHMin = initCarbonate.pH;
+  let pHMax = initCarbonate.pH;
+  let pHLast = initCarbonate.pH;
+  let bufferMin = initCarbonate.bufferCapacity;
+  let bufferLast = initCarbonate.bufferCapacity;
+  let co2FreeMin = initCarbonate.co2_mgL;
+  let co2FreeLast = initCarbonate.co2_mgL;
+  let dicMin = initCarbonate.dic_mgL;
+  let dicLast = initCarbonate.dic_mgL;
+  let luxuryUptakeTotal = 0;
+  let grazingShieldMin = 1;
+  let predatorShieldMin = 1;
+  let storeTotal_g_last = 0;
+  let phytoGrowthTotal = 0;
+  let phytoGrazedTotal = 0;
+  let phytoDecayTotal = 0;
+  let heteroGrowthTotal = 0;
+  let heteroConsumedTotal = 0;
+  let biofilmGrazedTotal = 0;
+  let predatorGrazedTotal = 0;
+  let co2DegasSteps = 0;
+  let co2Degassed_g = 0;
+  let co2AirIn_g = 0;
+
+  out.meta.feedStart = 0;
+
+  for(let i = 0; i < n; i++){
+    const t = i * dt;
+    out.t[i] = t;
+
+    const tempC = ecoComputeTemp(oxy.T, tempAmp, t, lightHour);
+    const tempFactor = Math.pow(ECO_CFG.tempQ10, (tempC - ECO_CFG.tempRef) / 10);
+    const lightFactor = ecoComputeLight(t, lightHour);
+
+    const feedPellets = Math.max(0, feedPulse.pellets[i] || 0);
+    const feedPowder_g = Math.max(0, feedPulse.powder[i] || 0);
+    const feedMass_g = feedPellets * pelletEachMass_g + feedPowder_g;
+    if(feedMass_g > 0){
+      const feedN = feedMass_g * feedNitrogenFrac;
+      const feedC = feedMass_g * feedCarbonFrac;
+      const feedP = feedMass_g * feedPhosphorusFrac;
+      const domC = feedC * domFrac;
+      const domN = feedN * domFrac;
+      const domP = feedP * domFrac;
+      state.pools.dom_C_g += domC;
+      state.pools.dom_N_g += domN;
+      state.pools.dom_P_g += domP;
+      state.pools.pom_C_g += (feedC - domC);
+      state.pools.pom_N_g += (feedN - domN);
+      state.pools.pom_P_g += (feedP - domP);
+      totalFeedN_g += feedN;
+      totalFeedC_g += feedC;
+      totalFeedP_g += feedP;
+      out.audit.macro_release += feedN;
+      out.audit.micro_release += feedP;
+    }
+
+    const carbonate = ecoCarbonateSubsystem(tempC, volL, state.pools.dic_C_g, state.pools.alkalinity_eq);
+    const co2Index = carbonate.co2_mgL / (carbonate.co2_mgL + ECO_CFG.halfSat.co2);
+    pHLast = carbonate.pH;
+    pHMin = Math.min(pHMin, carbonate.pH);
+    pHMax = Math.max(pHMax, carbonate.pH);
+    bufferLast = carbonate.bufferCapacity;
+    bufferMin = Math.min(bufferMin, carbonate.bufferCapacity);
+    co2FreeLast = carbonate.co2_mgL;
+    co2FreeMin = Math.min(co2FreeMin, carbonate.co2_mgL);
+    dicLast = carbonate.dic_mgL;
+    dicMin = Math.min(dicMin, carbonate.dic_mgL);
+    if(carbonate.bufferCapacity < 0.08) state.diagnostics.bufferDepletion++;
+    if(carbonate.co2_mgL < 0.05) state.diagnostics.co2Zero++;
+    if(carbonate.pH < 6.4) state.diagnostics.pHLow++;
+    if(carbonate.pH > 8.8) state.diagnostics.pHHigh++;
+
+    const env = {
+      volL,
+      dt,
+      tempFactor,
+      lightFactor,
+      co2Index,
+      do_mgL: state.oxygen.do_mgL,
+      doSat_mgL: oxy.Cstar,
+      co2_mgL: carbonate.co2_mgL
+    };
+
+    const algaeBefore = state.refugia.algae_open_g + state.refugia.algae_refuge_g;
+    const planktonBefore = state.refugia.plankton_open_g + state.refugia.plankton_refuge_g;
+    state.biomass.algae = algaeBefore;
+    state.biomass.plankton = planktonBefore;
+
+    const primary = ecoPrimarySubsystem(state, env, ECO_CFG);
+    luxuryUptakeTotal += primary.uptake.n + primary.uptake.p;
+    phytoGrowthTotal += primary.production.growth_g;
+    out.audit.macro_uptake += primary.uptake.n;
+    out.audit.micro_uptake += primary.uptake.p;
+    if(primary.production.storeDepleted > 0) state.diagnostics.nutrientStoreDeplete += primary.production.storeDepleted;
+
+    const algaeAfter = state.biomass.algae;
+    const planktonAfter = state.biomass.plankton;
+    const algaeGrowthDelta = algaeAfter - algaeBefore;
+    const planktonGrowthDelta = planktonAfter - planktonBefore;
+    if(Math.abs(algaeGrowthDelta) > 1e-9){
+      const openShare = algaeBefore > 1e-9 ? (state.refugia.algae_open_g / algaeBefore) : (1 - ECO_CFG.refugeFrac);
+      state.refugia.algae_open_g = Math.max(0, state.refugia.algae_open_g + algaeGrowthDelta * openShare);
+      state.refugia.algae_refuge_g = Math.max(0, state.refugia.algae_refuge_g + algaeGrowthDelta * (1 - openShare));
+    }
+    if(Math.abs(planktonGrowthDelta) > 1e-9){
+      const openShare = planktonBefore > 1e-9 ? (state.refugia.plankton_open_g / planktonBefore) : (1 - ECO_CFG.refugeFrac);
+      state.refugia.plankton_open_g = Math.max(0, state.refugia.plankton_open_g + planktonGrowthDelta * openShare);
+      state.refugia.plankton_refuge_g = Math.max(0, state.refugia.plankton_refuge_g + planktonGrowthDelta * (1 - openShare));
+    }
+
+    const consumers = ecoConsumerSubsystem(state, env, ECO_CFG);
+    state.diagnostics.grazerStarve += consumers.diag.grazerStarve;
+    state.diagnostics.predatorStarve += consumers.diag.predatorStarve;
+    heteroGrowthTotal += consumers.flows.grazerAssim_g + consumers.flows.predatorAssim_g;
+    heteroConsumedTotal += consumers.flows.grazedPhyto_g + consumers.flows.grazedBiofilm_g;
+    phytoGrazedTotal += consumers.flows.grazedPhyto_g;
+    biofilmGrazedTotal += consumers.flows.grazedPhyto_g;
+    predatorGrazedTotal += consumers.flows.grazedBiofilm_g;
+
+    state.pools.pom_C_g += consumers.flows.pom_C_g;
+    state.pools.pom_N_g += consumers.flows.pom_N_g;
+    state.pools.pom_P_g += consumers.flows.pom_P_g;
+    out.audit.phyto_grazed += consumers.flows.grazedPhyto_g;
+    out.audit.phyto_algae_grazed += consumers.flows.algaeGrazed_g;
+    out.audit.phyto_plankton_grazed += consumers.flows.planktonGrazed_g;
+    out.audit.biofilm_grazed += consumers.flows.grazedBiofilm_g;
+    out.audit.predator_grazed += consumers.flows.grazedBiofilm_g;
+    out.audit.biofilm_grazing_waste += Math.max(0, consumers.flows.grazedPhyto_g - consumers.flows.grazerAssim_g);
+    out.audit.predator_grazing_waste += Math.max(0, consumers.flows.grazedBiofilm_g - consumers.flows.predatorAssim_g);
+
+    const nutrient = ecoNutrientSubsystem(state, env, ECO_CFG);
+    out.audit.nh4_from_pro += nutrient.flows.nh4_from_dom;
+    out.audit.nh4_to_no2 += nutrient.flows.nit_no2;
+    out.audit.no2_to_no3 += nutrient.flows.nit_no3;
+    out.audit.no3_to_n2 += nutrient.flows.denit_no3;
+    out.audit.co2_from_denit += nutrient.flows.denit_no3 * ECO_CFG.cPerDenit;
+
+    const sediment = ecoSedimentSubsystem(state, env, ECO_CFG);
+    out.audit.nh4_from_endog += sediment.sedimentReleaseN;
+    out.audit.micro_release += sediment.sedimentReleaseP;
+
+    const decayRates = {algae:0.05, plankton:0.07, plants:0.04, grazers:0.06, predators:0.05};
+    ['algae','plankton','plants','grazers','predators'].forEach(key=>{
+      const decay = state.biomass[key] * decayRates[key] * tempFactor * dt;
+      if(decay > 0){
+        state.biomass[key] = Math.max(0, state.biomass[key] - decay);
+        state.pools.pom_C_g += decay * ECO_CFG.stoich.bioCFrac;
+        state.pools.pom_N_g += decay * ECO_CFG.stoich.bioNFrac;
+        state.pools.pom_P_g += decay * ECO_CFG.stoich.bioPFrac;
+        if(key === 'algae' || key === 'plankton' || key === 'plants'){
+          phytoDecayTotal += decay;
+        }
+      }
+    });
+
+    const algaeTotal = state.refugia.algae_open_g + state.refugia.algae_refuge_g;
+    const planktonTotal = state.refugia.plankton_open_g + state.refugia.plankton_refuge_g;
+    const algaeTarget = algaeTotal * ECO_CFG.refugeFrac;
+    const planktonTarget = planktonTotal * ECO_CFG.refugeFrac;
+    const algaeDelta = (algaeTarget - state.refugia.algae_refuge_g) * ECO_CFG.refugeExchange * dt;
+    const planktonDelta = (planktonTarget - state.refugia.plankton_refuge_g) * ECO_CFG.refugeExchange * dt;
+    if(algaeDelta > 0){
+      const move = Math.min(algaeDelta, state.refugia.algae_open_g);
+      state.refugia.algae_open_g -= move;
+      state.refugia.algae_refuge_g += move;
+    }else{
+      const move = Math.min(-algaeDelta, state.refugia.algae_refuge_g);
+      state.refugia.algae_refuge_g -= move;
+      state.refugia.algae_open_g += move;
+    }
+    if(planktonDelta > 0){
+      const move = Math.min(planktonDelta, state.refugia.plankton_open_g);
+      state.refugia.plankton_open_g -= move;
+      state.refugia.plankton_refuge_g += move;
+    }else{
+      const move = Math.min(-planktonDelta, state.refugia.plankton_refuge_g);
+      state.refugia.plankton_refuge_g -= move;
+      state.refugia.plankton_open_g += move;
+    }
+
+    state.biomass.algae = state.refugia.algae_open_g + state.refugia.algae_refuge_g;
+    state.biomass.plankton = state.refugia.plankton_open_g + state.refugia.plankton_refuge_g;
+    const refugeTotal = state.refugia.algae_refuge_g + state.refugia.plankton_refuge_g;
+    const refugeDenom = Math.max(1e-9, state.biomass.algae + state.biomass.plankton);
+    const refugeFrac = refugeTotal / refugeDenom;
+    grazingShieldMin = Math.min(grazingShieldMin, refugeFrac);
+    predatorShieldMin = Math.min(predatorShieldMin, state.biomass.grazers / Math.max(1e-9, heteroMass0));
+
+    const o2Demand = nutrient.flows.o2_g_day + consumers.flows.o2_g_day + sediment.o2_g_day;
+    const o2Prod = primary.production.o2_g_day;
+
+    const gasEnv = {
+      volL,
+      kLa: oxy.kLa,
+      doSat_mgL: oxy.Cstar,
+      co2Sat_mgL: calcCO2SaturationMgL(tempC, params.altM) * (state.headspace.co2_mol / headspaceTotalMol) * (1e6 / initPpm),
+      co2_mgL: carbonate.co2_mgL
+    };
+    const gas = ecoGasSubsystem(state, gasEnv, ECO_CFG);
+
+    const o2Net_g = (gas.o2_transfer_g_day + o2Prod - o2Demand) * dt;
+    const doNext = state.oxygen.do_mgL + (o2Net_g * 1000 / volL);
+    if(doNext < 0){
+      state.diagnostics.oxygenClamp++;
+      state.oxygen.do_mgL = 0;
+    }else{
+      state.oxygen.do_mgL = doNext;
+    }
+
+    const co2Transfer_g = (gas.co2_air_in_g - gas.co2_air_out_g) * dt;
+    const co2TransferC_g = co2Transfer_g * (12/44);
+    state.pools.dic_C_g += co2TransferC_g;
+    const headspaceDeltaMol = (gas.co2_air_out_g - gas.co2_air_in_g) * dt / 44;
+    state.headspace.co2_mol = Math.max(0, state.headspace.co2_mol + headspaceDeltaMol);
+    out.audit.co2_air_in += gas.co2_air_in_g * dt;
+    out.audit.co2_degassed += gas.co2_air_out_g * dt;
+    if(gas.co2_air_out_g > 0){
+      co2DegasSteps += 1;
+      co2Degassed_g += gas.co2_air_out_g * dt;
+    }
+    if(gas.co2_air_in_g > 0){
+      co2AirIn_g += gas.co2_air_in_g * dt;
+    }
+
+    const co2Balance_g_day = (primary.production.co2_g_day + consumers.flows.co2_g_day + nutrient.flows.co2_g_day + sediment.co2_g_day);
+    state.pools.dic_C_g += (co2Balance_g_day * dt) * (12/44);
+    out.audit.co2_from_ox += Math.max(0, co2Balance_g_day) * dt;
+
+    if(!Number.isFinite(state.pools.dic_C_g) || state.pools.dic_C_g < 0){
+      state.diagnostics.massClamp++;
+      state.pools.dic_C_g = Math.max(0, Number.isFinite(state.pools.dic_C_g) ? state.pools.dic_C_g : 0);
+    }
+
+    out.rate.carb[i] = nutrient.flows.o2_g_day;
+    out.rate.nh4[i] = nutrient.flows.o2_g_day * 0.35;
+    out.rate.no2[i] = nutrient.flows.o2_g_day * 0.15;
+    out.rate.hetero[i] = consumers.flows.o2_g_day;
+    out.rate.plant[i] = -primary.production.o2_g_day;
+    out.rate.total[i] = o2Demand - o2Prod;
+    out.rate.supply[i] = gas.o2_transfer_g_day;
+    out.meta.maxDemand = Math.max(out.meta.maxDemand, out.rate.total[i]);
+    out.meta.maxSupply = Math.max(out.meta.maxSupply, out.rate.supply[i]);
+
+    const nh4_mgL = (state.pools.nh4_g * 1000) / volL;
+    const no2_mgL = (state.pools.no2_g * 1000) / volL;
+    const no3_mgL = (state.pools.no3_g * 1000) / volL;
+    const po4_mgL = (state.pools.po4_g * 1000) / volL;
+    const storeTotal_g = ['algae','plankton','plants'].reduce((acc,key)=>acc + state.stores[key].n_g + state.stores[key].p_g, 0);
+    const store_mgL = (storeTotal_g * 1000) / volL;
+    storeTotal_g_last = storeTotal_g;
+
+    out.DO_mgL[i] = state.oxygen.do_mgL;
+    out.DO_pct[i] = oxy.Cstar > 0 ? (state.oxygen.do_mgL / oxy.Cstar) * 100 : 0;
+    out.NH4_mgL[i] = nh4_mgL;
+    out.NO2_mgL[i] = no2_mgL;
+    out.NO3_mgL[i] = no3_mgL;
+    out.NH3_mgL[i] = nh4_mgL * nh3Fraction(pHLast, tempC) * CHEM.NH3_ion_per_N;
+    out.CO2_mgL[i] = carbonate.co2_mgL;
+    out.DIC_mgL[i] = carbonate.dic_mgL;
+    out.macro_mgL[i] = (nh4_mgL + no2_mgL + no3_mgL);
+    out.micro_mgL[i] = po4_mgL;
+    out.store_mgL[i] = store_mgL;
+
+    out.chem.nh4[i] = nh4_mgL;
+    out.chem.nh3[i] = out.NH3_mgL[i];
+    out.chem.no2[i] = no2_mgL;
+    out.chem.no3[i] = no3_mgL;
+    out.chem.co2[i] = carbonate.co2_mgL;
+    out.chem.dic[i] = carbonate.dic_mgL;
+    out.chem.store[i] = store_mgL;
+    out.chem.macro[i] = out.macro_mgL[i];
+    out.chem.micro[i] = out.micro_mgL[i];
+
+    out.chemProd.nh4[i] = nh4_mgL;
+    out.chemProd.nh3[i] = out.NH3_mgL[i];
+    out.chemProd.no2[i] = no2_mgL;
+    out.chemProd.no3[i] = no3_mgL;
+    out.chemProd.co2[i] = carbonate.co2_mgL;
+    out.chemProd.dic[i] = carbonate.dic_mgL;
+    out.chemProd.store[i] = store_mgL;
+    out.chemProd.macro[i] = out.macro_mgL[i];
+    out.chemProd.micro[i] = out.micro_mgL[i];
+
+    const phytoMass = state.biomass.algae + state.biomass.plankton + state.biomass.plants;
+    const heteroMass = state.biomass.grazers + state.biomass.predators;
+    out.biomass.hetero_g[i] = heteroMass;
+    out.biomass.phyto_g[i] = phytoMass;
+    out.biomass.hetero_pct[i] = heteroMass0 > 0 ? ((heteroMass - heteroMass0) / heteroMass0) * 100 : 0;
+    out.biomass.phyto_pct[i] = phytoMass0 > 0 ? ((phytoMass - phytoMass0) / phytoMass0) * 100 : 0;
+  }
+
+  const chemCumResult = buildCumulativeSeries(out.chem, dt);
+  out.chemCum = chemCumResult.series;
+  out.meta.chemCumInfo = chemCumResult.info;
+  const chemProdCumResult = buildCumulativeSeries(out.chemProd, dt);
+  out.chemProdCum = chemProdCumResult.series;
+  out.meta.chemProdCumInfo = chemProdCumResult.info;
+
+  out.audit.n_balance_init = totalFeedN_g;
+  out.audit.c_balance_init = totalFeedC_g + initCarbonate.co2_g * (12/44);
+  out.audit.n_balance_end = state.pools.nh4_g + state.pools.no2_g + state.pools.no3_g + state.pools.dom_N_g
+    + state.pools.pom_N_g + state.pools.sediment_N_g
+    + (state.biomass.algae + state.biomass.plankton + state.biomass.plants + state.biomass.grazers + state.biomass.predators) * ECO_CFG.stoich.bioNFrac;
+  out.audit.c_balance_end = state.pools.dic_C_g + state.pools.dom_C_g + state.pools.pom_C_g + state.pools.sediment_C_g
+    + (state.biomass.algae + state.biomass.plankton + state.biomass.plants + state.biomass.grazers + state.biomass.predators) * ECO_CFG.stoich.bioCFrac;
+  out.audit.co2_from_endog = 0;
+
+  out.meta.feedEnd = state.pools.dom_C_g + state.pools.pom_C_g;
+  out.meta.phytoGrowthTotal = phytoGrowthTotal;
+  out.meta.heteroGrowthTotal = heteroGrowthTotal;
+  out.meta.phytoGrazedTotal = phytoGrazedTotal;
+  out.meta.phytoDecayTotal = phytoDecayTotal;
+  out.meta.heteroConsumedTotal = heteroConsumedTotal;
+  out.meta.phytoAlgaeGrowthTotal = 0;
+  out.meta.phytoPlanktonGrowthTotal = 0;
+  out.meta.phytoPlantsGrowthTotal = 0;
+  out.meta.biofilmGrazedTotal = biofilmGrazedTotal;
+  out.meta.predatorGrazedTotal = predatorGrazedTotal;
+  out.meta.phytoAlgae_g = state.biomass.algae;
+  out.meta.phytoPlankton_g = state.biomass.plankton;
+  out.meta.phytoPlants_g = state.biomass.plants;
+  out.meta.biofilm_g = state.biomass.grazers;
+  out.meta.predator_g = state.biomass.predators;
+  out.meta.phytoStoreFillPct = storeTotal_g_last > 0
+    ? clamp(storeTotal_g_last / (phytoMass0 * (ECO_CFG.stoich.bioNFrac + ECO_CFG.stoich.bioPFrac)), 0, 1)
+    : 0;
+  out.meta.phytoStoreN_g = state.stores.algae.n_g + state.stores.plankton.n_g + state.stores.plants.n_g;
+  out.meta.phytoStoreP_g = state.stores.algae.p_g + state.stores.plankton.p_g + state.stores.plants.p_g;
+  out.meta.luxuryUptakeTotal = luxuryUptakeTotal;
+  out.meta.phytoStoreDepleteHits = state.diagnostics.nutrientStoreDeplete;
+  out.meta.phytoReserveBuilt = 0;
+  out.meta.phytoReserveUsed = 0;
+  out.meta.phytoNightGrowthTotal = 0;
+  out.meta.phytoRecruitTotal = 0;
+  out.meta.phytoStoreNegativeHits = 0;
+  out.meta.phytoMuMax = 0;
+  out.meta.phytoMuEff = 0;
+  out.meta.phytoMuCapHits = 0;
+  out.meta.refugeExchange_g_day = 0;
+  out.meta.refugeEmptyHits = 0;
+  out.meta.refugeOverrunHits = 0;
+  out.meta.biofilmGrazingMax_g_g_day = ECO_CFG.grazingMax.grazers;
+  out.meta.predatorGrazingMax_g_g_day = ECO_CFG.grazingMax.predators;
+  out.meta.biofilmActivityMin = 0;
+  out.meta.predatorActivityMin = 0;
+  out.meta.laggedBiofilmConsumptionTotal = 0;
+  out.meta.laggedPredatorConsumptionTotal = 0;
+  out.meta.refugeFractionLast = grazingShieldMin;
+  out.meta.grazingShieldMin = grazingShieldMin;
+  out.meta.predatorShieldMin = predatorShieldMin;
+  out.meta.pHLast = pHLast;
+  out.meta.pHMin = pHMin;
+  out.meta.pHMax = pHMax;
+  out.meta.co2FreeMin_mgL = co2FreeMin;
+  out.meta.co2FreeLast_mgL = co2FreeLast;
+  out.meta.dicMin_mgL = dicMin;
+  out.meta.dicLast_mgL = dicLast;
+  out.meta.bufferCapacityMin = bufferMin;
+  out.meta.bufferCapacityLast = bufferLast;
+  out.meta.bufferDepletionHits = state.diagnostics.bufferDepletion;
+  out.meta.co2ZeroHits = state.diagnostics.co2Zero;
+  out.meta.co2DegasSteps = co2DegasSteps;
+  out.meta.co2Degassed_g = co2Degassed_g;
+  out.meta.co2AirIn_g = co2AirIn_g;
+  out.meta.co2AirOut_g = co2Degassed_g;
+  out.meta.biofilmActivityLast = state.activity.grazerDemand_g_day;
+  out.meta.predatorActivityLast = state.activity.predatorDemand_g_day;
+  out.meta.grazingLimitedSteps = state.diagnostics.grazerStarve;
+  out.meta.predatorGrazingLimitedSteps = state.diagnostics.predatorStarve;
+  out.meta.oxygenClampCount = state.diagnostics.oxygenClamp;
+  out.meta.oxygenDegasSteps = 0;
+  out.meta.oxygenDegassed_g = 0;
+  out.meta.massClampHits = state.diagnostics.massClamp;
+  out.meta.alkalinity_mgL = alkalinity_mgL;
+  out.meta.feedPulse = {
+    totalPellets: feedPulse.totalPellets,
+    totalPowder_g: feedPulse.totalPowder,
+    windowHours: feedWindowHours,
+    windowSteps: feedPulse.windowSteps
+  };
+  out.meta.feedPlanStats = {
+    entries: simFeedPlan.length,
+    pellets: simFeedPlan.reduce((acc, f)=>acc + (Number(f.pellets) || 0), 0),
+    powder_g: simFeedPlan.reduce((acc, f)=>acc + (Number(f.powder_g) || 0), 0)
+  };
+
+  if(state.diagnostics.bufferDepletion > 0 && params.runMode !== 'uncertainty'){
+    addWarning(`Carbonate buffer depleted in ${state.diagnostics.bufferDepletion} steps; check alkalinity or DIC input.`);
+  }
+  if(state.diagnostics.nutrientStoreDeplete > 0 && params.runMode !== 'uncertainty'){
+    addWarning(`Phyto stores depleted in ${state.diagnostics.nutrientStoreDeplete} steps; growth stalled under nutrient scarcity.`);
+  }
+  if(state.diagnostics.grazerStarve > 0 && params.runMode !== 'uncertainty'){
+    addWarning(`Grazer starvation in ${state.diagnostics.grazerStarve} steps; grazing lag or prey refugia may dominate.`);
+  }
+  if(state.diagnostics.predatorStarve > 0 && params.runMode !== 'uncertainty'){
+    addWarning(`Predator starvation in ${state.diagnostics.predatorStarve} steps; prey collapse or lagged response detected.`);
+  }
+  if(state.diagnostics.pHLow > 0 && params.runMode !== 'uncertainty'){
+    addWarning(`pH dipped below 6.4 for ${state.diagnostics.pHLow} steps; nitrification and CO₂ may be overpowering buffer.`);
+  }
+  if(state.diagnostics.pHHigh > 0 && params.runMode !== 'uncertainty'){
+    addWarning(`pH exceeded 8.8 for ${state.diagnostics.pHHigh} steps; CO₂ drawdown may be too strong.`);
+  }
+  if(state.diagnostics.oxygenClamp > 0){
+    addWarning(`DO hit 0 mg/L in ${state.diagnostics.oxygenClamp} steps; oxygen demand exceeded supply.`);
+  }
+  if(state.diagnostics.massClamp > 0){
+    addWarning(`Non-finite mass detected ${state.diagnostics.massClamp} times; values were clamped to 0.`);
   }
 
   return out;
@@ -5971,7 +7003,8 @@ function recompute(){
       dbg.push(`Diurnal: tempAmp ${params.tempAmp}°C • lights @ ${params.lightHour}:00`);
       dbg.push(`Feed profile: ${FEED_PROFILE.name}`);
       dbg.push(`Chem display: ${chemMode}`);
-      dbg.push(`N units: ${params.nUnits} • pH=${params.pH} • NH3 frac=${nh3Fraction(params.pH ?? 7.0, params.Tnow).toFixed(3)}`);
+      const phDisplay = baseSim.meta.pHLast ?? params.pH ?? 7.0;
+      dbg.push(`N units: ${params.nUnits} • pH=${phDisplay.toFixed(2)} • NH3 frac=${nh3Fraction(phDisplay, params.Tnow).toFixed(3)}`);
       if(DEBUG_STATE.lastBandDiagnostics){
         dbg.push(`Band sanitation: rate invalid ${DEBUG_STATE.lastBandDiagnostics.rateInvalid} (inverted ${DEBUG_STATE.lastBandDiagnostics.rateInverted}), chem invalid ${DEBUG_STATE.lastBandDiagnostics.chemInvalid} (inverted ${DEBUG_STATE.lastBandDiagnostics.chemInverted}), bio invalid ${DEBUG_STATE.lastBandDiagnostics.bioInvalid} (inverted ${DEBUG_STATE.lastBandDiagnostics.bioInverted}), DO invalid ${DEBUG_STATE.lastBandDiagnostics.doInvalid} (inverted ${DEBUG_STATE.lastBandDiagnostics.doInverted})`);
       }
