@@ -1367,6 +1367,10 @@ function renderFeedingCalendar(params, feedPlan, popEvents){
       if(feed.powder_g) meta.push(`${feed.powder_g.toFixed(2)} g pow`);
     }
     if(pop) meta.push(`pop ${Math.round(pop)}`);
+    const metaText = meta.join(' • ');
+    if(!metaText){
+      cell.classList.add('no-meta');
+    }
     cell.innerHTML = `
       <div class="day-num">${dayDate.getDate()}</div>
       <div class="day-meta"></div>
@@ -1513,6 +1517,8 @@ const DEBUG_STATE = {
   lastDebugCopyStatus: null,
   lastDebugCopyError: null,
   lastUpdateISO: null,
+  debounceQueued: 0,
+  debounceMs: null,
   missingContainers: [],
   initReadyState: null,
   errors: [],  // newest last
@@ -1742,6 +1748,14 @@ lines.push(`surface=${p.lenCm}×${p.widCm} cm, blanket=${p.blanketPct}%, ripple=
     lines.push('');
     lines.push('--- Recompute timing (last) ---');
     lines.push(`Total recompute: ${DEBUG_STATE.lastRecomputeMs.toFixed(1)} ms`);
+  }
+  if(Number.isFinite(DEBUG_STATE.debounceQueued) || Number.isFinite(DEBUG_STATE.debounceMs)){
+    lines.push('');
+    lines.push('--- Debounce ---');
+    lines.push(`Queued recomputes: ${Number.isFinite(DEBUG_STATE.debounceQueued) ? DEBUG_STATE.debounceQueued : 0}`);
+    if(Number.isFinite(DEBUG_STATE.debounceMs)){
+      lines.push(`Delay: ${DEBUG_STATE.debounceMs} ms`);
+    }
   }
   if(DEBUG_STATE.initReadyState){
     lines.push('');
@@ -2115,6 +2129,41 @@ const PHOTO_MODEL = {
   co2_per_g_growth: 1.5
 };
 
+const PHYTO_SPLIT = {
+  algae: 0.4,
+  plankton: 0.35,
+  plants: 0.25
+};
+
+const HET_SPLIT = {
+  biofilm: 0.65,
+  predator: 0.35
+};
+
+const PHYTO_COMPARTMENTS = {
+  algae: {
+    mu_max_per_day: 0.78,
+    decay_per_day: 0.08,
+    reserveFrac: 0.32,
+    reserveCapFrac: 0.28,
+    nightGrowthFrac: 0.18
+  },
+  plankton: {
+    mu_max_per_day: 0.72,
+    decay_per_day: 0.075,
+    reserveFrac: 0.3,
+    reserveCapFrac: 0.26,
+    nightGrowthFrac: 0.2
+  },
+  plants: {
+    mu_max_per_day: 0.32,
+    decay_per_day: 0.03,
+    reserveFrac: 0.62,
+    reserveCapFrac: 0.65,
+    nightGrowthFrac: 0.5
+  }
+};
+
 const FISH_MODEL = {
   o2_mg_g_day_base: 5.0,
   q10: 2.0,
@@ -2126,6 +2175,23 @@ const HET_MODEL = {
   decay_per_day: 0.08,
   macroUptake_mgL_per_g_day: 0.18,
   microUptake_mgL_per_g_day: 0.04
+};
+
+const TROPHIC_MODEL = {
+  biofilm: {
+    grazingMax_g_g_day: 0.16,
+    decay_per_day: 0.07,
+    yield: 0.48,
+    assimEff: 0.76,
+    lagDays: 0.5
+  },
+  predator: {
+    grazingMax_g_g_day: 0.1,
+    decay_per_day: 0.1,
+    yield: 0.42,
+    assimEff: 0.68,
+    lagDays: 0.7
+  }
 };
 
 const FRACTIONS = {
@@ -2266,18 +2332,43 @@ function runSimulation(params){
   let CO2_free_g = 0; // g free CO2 (aqueous)
   let macro_g = 0; // g (proxy)
   let micro_g = 0; // g (proxy)
-  let heteroMass_g = Math.max(0, Number(params.heteroMass ?? 0));
-  let phytoMass_g = Math.max(0, Number(params.photoMass ?? 0));
+  let phytoAlgae_g = Math.max(0, Number(params.phytoAlgae_g ?? (params.photoMass ?? 0) * PHYTO_SPLIT.algae));
+  let phytoPlankton_g = Math.max(0, Number(params.phytoPlankton_g ?? (params.photoMass ?? 0) * PHYTO_SPLIT.plankton));
+  let phytoPlants_g = Math.max(0, Number(params.phytoPlants_g ?? (params.photoMass ?? 0) * PHYTO_SPLIT.plants));
+  let phytoMass_g = Math.max(0, phytoAlgae_g + phytoPlankton_g + phytoPlants_g);
+  let biofilm_g = Math.max(0, Number(params.biofilm_g ?? (params.heteroMass ?? 0) * HET_SPLIT.biofilm));
+  let predator_g = Math.max(0, Number(params.predator_g ?? (params.heteroMass ?? 0) * HET_SPLIT.predator));
+  let heteroMass_g = Math.max(0, biofilm_g + predator_g);
   const heteroMass0 = heteroMass_g;
   const phytoMass0 = phytoMass_g;
-  let phytoOpen_g = phytoMass_g;
-  let phytoRefuge_g = 0;
+  const phytoAlgae0 = phytoAlgae_g;
+  const phytoPlankton0 = phytoPlankton_g;
+  const phytoPlants0 = phytoPlants_g;
+  const biofilm0 = biofilm_g;
+  const predator0 = predator_g;
+  let phytoAlgaeOpen_g = phytoAlgae_g;
+  let phytoAlgaeRefuge_g = 0;
+  let phytoPlanktonOpen_g = phytoPlankton_g;
+  let phytoPlanktonRefuge_g = 0;
+  let phytoAlgaeReserve_g = 0;
+  let phytoPlanktonReserve_g = 0;
+  let phytoPlantsReserve_g = 0;
   let phytoN_store_g = 0;
   let phytoP_store_g = 0;
   let heteroExtinctHits = 0;
   let phytoExtinctHits = 0;
+  let phytoAlgaeExtinctHits = 0;
+  let phytoPlanktonExtinctHits = 0;
+  let phytoPlantsExtinctHits = 0;
+  let biofilmExtinctHits = 0;
+  let predatorExtinctHits = 0;
   let heteroExtinctWarned = false;
   let phytoExtinctWarned = false;
+  let phytoAlgaeExtinctWarned = false;
+  let phytoPlanktonExtinctWarned = false;
+  let phytoPlantsExtinctWarned = false;
+  let biofilmExtinctWarned = false;
+  let predatorExtinctWarned = false;
   let macroConsumed_g = 0;
   let microConsumed_g = 0;
   let co2Consumed_g = 0;
@@ -2285,9 +2376,14 @@ function runSimulation(params){
   let heteroGrowthTotal = 0;
   let heteroConsumedTotal = 0;
   let phytoGrowthTotal = 0;
+  let phytoAlgaeGrowthTotal = 0;
+  let phytoPlanktonGrowthTotal = 0;
+  let phytoPlantsGrowthTotal = 0;
   let phytoConsumedTotal = 0;
   let phytoDecayTotal = 0;
   let phytoGrazedTotal = 0;
+  let biofilmGrazedTotal = 0;
+  let predatorGrazedTotal = 0;
   let phytoNightGrowthTotal = 0;
   let phytoReserveBuilt = 0;
   let phytoReserveUsed = 0;
@@ -2310,8 +2406,9 @@ function runSimulation(params){
   let oxygenDegasSteps = 0;
   let oxygenDegassed_g = 0;
   let grazingLimitedSteps = 0;
+  let predatorGrazingLimitedSteps = 0;
   let grazingShieldMin = 1;
-  let phytoReserve_g = 0;
+  let predatorShieldMin = 1;
   let co2AirIn_g = 0;
   let co2AirOut_g = 0;
   let bufferDepletionHits = 0;
@@ -2321,11 +2418,22 @@ function runSimulation(params){
   let co2FreeLast_mgL = 0;
   let dicMin_mgL = Infinity;
   let dicLast_mgL = 0;
-  let grazerActivity = 0.15;
-  let grazerActivityMin = 1;
-  let laggedConsumptionTotal = 0;
+  let biofilmActivity = 0.2;
+  let biofilmActivityMin = 1;
+  let predatorActivity = 0.15;
+  let predatorActivityMin = 1;
+  let laggedBiofilmConsumptionTotal = 0;
+  let laggedPredatorConsumptionTotal = 0;
   let grazingLagCollapseHits = 0;
+  let predatorLagCollapseHits = 0;
   let biomassNonFiniteHits = 0;
+  let phytoAlgaeNonFiniteHits = 0;
+  let phytoPlanktonNonFiniteHits = 0;
+  let phytoPlantsNonFiniteHits = 0;
+  let biofilmNonFiniteHits = 0;
+  let predatorNonFiniteHits = 0;
+  let biofilmStableCollapseHits = 0;
+  let predatorStableCollapseHits = 0;
 
   // Activity states (dimensionless 0..1)
   let Bhet = 0.04;
@@ -2357,29 +2465,26 @@ function runSimulation(params){
   const biofilmRef_g = Math.max(5, params.volL * 0.05);
   const biofilmMult = clamp(0.3 + Math.sqrt(biofilmMass_g / biofilmRef_g), 0.3, 2.5);
   const kDenit = Math.max(0, Number(params.kDenit ?? 0));
-  const heteroMass = Number(params.heteroMass ?? 0);
-  const photoMass = Number(params.photoMass ?? 0);
+  const heteroMass = heteroMass_g;
+  const photoMass = phytoMass_g;
   const tempAmp = Number(params.tempAmp ?? 0);
   const lightHour = Number(params.lightHour ?? 0);
   const macroRelease = FEED_PROFILE.modeling.macroRelease_mgL_per_g;
   const microRelease = FEED_PROFILE.modeling.microRelease_mgL_per_g;
-  const grazingHalfSat_g = Math.max(0.5, phytoMass0 * 0.25);
-  const grazingMax_g_g_day = 0.12;
-  const phytoReserveCapFrac = 0.4;
-  const phytoReserveFrac = 0.45;
-  const phytoNightGrowthFrac = 0.35;
+  const biofilmGrazingHalfSat_g = Math.max(0.5, (phytoAlgae_g + phytoPlankton_g) * 0.25);
+  const predatorGrazingHalfSat_g = Math.max(0.3, biofilm_g * 0.3);
   const phytoRefugiaFrac = 0.18;
   const phytoRecruitFrac = 0.04;
-  const grazingAssimEff = 0.8;
   const phytoStoreNCapFrac = 0.45;
   const phytoStorePCapFrac = 0.25;
   const phytoStoreNFrac = 0.7;
   const phytoStorePFrac = 0.3;
   const refugeExchangeRate = 0.12;
-  const grazingLagDays = 0.6;
 
-  phytoRefuge_g = phytoMass_g * phytoRefugiaFrac;
-  phytoOpen_g = Math.max(0, phytoMass_g - phytoRefuge_g);
+  phytoAlgaeRefuge_g = phytoAlgae_g * phytoRefugiaFrac;
+  phytoAlgaeOpen_g = Math.max(0, phytoAlgae_g - phytoAlgaeRefuge_g);
+  phytoPlanktonRefuge_g = phytoPlankton_g * phytoRefugiaFrac;
+  phytoPlanktonOpen_g = Math.max(0, phytoPlankton_g - phytoPlanktonRefuge_g);
 
   // Outputs
   const out = {
@@ -2437,6 +2542,12 @@ function runSimulation(params){
       micro_release:0,
       micro_uptake:0,
       phyto_grazed:0,
+      phyto_algae_grazed:0,
+      phyto_plankton_grazed:0,
+      biofilm_grazed:0,
+      predator_grazed:0,
+      biofilm_grazing_waste:0,
+      predator_grazing_waste:0,
       n_balance_init:0,
       n_balance_end:0,
       c_balance_init:0,
@@ -2458,10 +2569,19 @@ function runSimulation(params){
         microUptake_mgL_per_g_photo_day: FEED_PROFILE.modeling.microUptake_mgL_per_g_photo_day,
         copperFractionOfMicro: FEED_PROFILE.modeling.copperFractionOfMicro
       },
+      phytoCompartments: {
+        algae: {...PHYTO_COMPARTMENTS.algae, mass_g: phytoAlgae_g},
+        plankton: {...PHYTO_COMPARTMENTS.plankton, mass_g: phytoPlankton_g},
+        plants: {...PHYTO_COMPARTMENTS.plants, mass_g: phytoPlants_g}
+      },
       heteroModel: {
         heteroMass_g: heteroMass,
         o2_mg_g_day_base: FISH_MODEL.o2_mg_g_day_base,
         q10: FISH_MODEL.q10
+      },
+      trophicModel: {
+        biofilm: {...TROPHIC_MODEL.biofilm, mass_g: biofilm_g},
+        predator: {...TROPHIC_MODEL.predator, mass_g: predator_g}
       },
       feedStart:0,
       feedEnd:0,
@@ -2469,10 +2589,10 @@ function runSimulation(params){
       maxSupply:0,
       biofilmMass_g: biofilmMass_g,
       biofilmMult: biofilmMult,
-      grazingHalfSat_g: grazingHalfSat_g,
-      grazingMax_g_g_day: grazingMax_g_g_day,
-      phytoReserveCapFrac: phytoReserveCapFrac,
-      phytoNightGrowthFrac: phytoNightGrowthFrac,
+      biofilmGrazingHalfSat_g: biofilmGrazingHalfSat_g,
+      predatorGrazingHalfSat_g: predatorGrazingHalfSat_g,
+      biofilmGrazingMax_g_g_day: TROPHIC_MODEL.biofilm.grazingMax_g_g_day,
+      predatorGrazingMax_g_g_day: TROPHIC_MODEL.predator.grazingMax_g_g_day,
       phytoRefugiaFrac: phytoRefugiaFrac,
       phytoRecruitFrac: phytoRecruitFrac
     }
@@ -2729,7 +2849,7 @@ function runSimulation(params){
     out.audit.micro_release += microAdd_g;
 
     // Biomass growth + nutrient consumption
-    phytoMass_g = Math.max(0, phytoOpen_g + phytoRefuge_g);
+    phytoMass_g = Math.max(0, phytoAlgaeOpen_g + phytoAlgaeRefuge_g + phytoPlanktonOpen_g + phytoPlanktonRefuge_g + phytoPlants_g);
     let S_tot = S.carb + S.prot + S.fat;
     let nutrientPool = macro_g + micro_g;
     let inorgN_g = Math.max(0, NH4 + NO3);
@@ -2788,63 +2908,174 @@ function runSimulation(params){
     const nIndex = clamp(nAvailTotal / (nAvailTotal + 0.35), 0, 1);
     const pIndex = clamp(pAvailTotal / (pAvailTotal + 0.18), 0, 1);
     const phytoNutrientIndex = Math.min(nIndex, pIndex);
-    const phytoMuMax = PHOTO_MODEL.mu_max_per_day * tempF * (0.4 + 0.6 * phytoNutrientIndex);
     const storeCapFactor = clamp(storeFillPct / 0.6, 0, 1);
-    const phytoMuEff = phytoMuMax * lightFactor * co2Index * storeCapFactor;
+
+    const algaeMuMax = PHYTO_COMPARTMENTS.algae.mu_max_per_day * tempF * (0.4 + 0.6 * phytoNutrientIndex);
+    const planktonMuMax = PHYTO_COMPARTMENTS.plankton.mu_max_per_day * tempF * (0.4 + 0.6 * phytoNutrientIndex);
+    const plantsMuMax = PHYTO_COMPARTMENTS.plants.mu_max_per_day * tempF * (0.4 + 0.6 * phytoNutrientIndex);
+    const algaeMuEff = algaeMuMax * lightFactor * co2Index * storeCapFactor;
+    const planktonMuEff = planktonMuMax * lightFactor * co2Index * storeCapFactor;
+    const plantsMuEff = plantsMuMax * lightFactor * co2Index * storeCapFactor;
+
     phytoStoreFillLast = storeFillPct;
-    phytoMuMaxLast = phytoMuMax;
-    phytoMuEffLast = phytoMuEff;
-    if(lightFactor > 0.2 && phytoMuEff < phytoMuMax * lightFactor * co2Index * 0.9){
-      phytoMuCapHits++;
+    phytoMuMaxLast = phytoMass_g > 1e-9
+      ? (algaeMuMax * phytoAlgae_g + planktonMuMax * phytoPlankton_g + plantsMuMax * phytoPlants_g) / phytoMass_g
+      : 0;
+    phytoMuEffLast = phytoMass_g > 1e-9
+      ? (algaeMuEff * phytoAlgae_g + planktonMuEff * phytoPlankton_g + plantsMuEff * phytoPlants_g) / phytoMass_g
+      : 0;
+    if(lightFactor > 0.2){
+      if(algaeMuEff < algaeMuMax * lightFactor * co2Index * 0.9) phytoMuCapHits++;
+      if(planktonMuEff < planktonMuMax * lightFactor * co2Index * 0.9) phytoMuCapHits++;
+      if(plantsMuEff < plantsMuMax * lightFactor * co2Index * 0.9) phytoMuCapHits++;
     }
 
-    const phytoRescueFactor = phytoMass0 > 0 ? clamp(1 - (phytoMass_g / phytoMass0), 0, 1) : 0;
-    const phytoRecruitRaw = phytoMass0 * phytoRecruitFrac * phytoRescueFactor * lightFactor * phytoNutrientIndex * co2Index * dt;
-    let phytoGrowthRaw = phytoMass_g * phytoMuEff * dt + phytoRecruitRaw;
-    phytoRecruitTotal += phytoRecruitRaw;
-    const reserveAdd = phytoGrowthRaw * phytoReserveFrac;
-    phytoGrowthRaw -= reserveAdd;
-    phytoReserve_g += reserveAdd;
-    phytoReserveBuilt += reserveAdd;
-    const reserveCap = Math.max(0, phytoMass_g * phytoReserveCapFrac);
-    const reserveOverflow = Math.max(0, phytoReserve_g - reserveCap);
-    if(reserveOverflow > 0){
-      phytoReserve_g = reserveCap;
-      phytoGrowthRaw += reserveOverflow;
+    const algaeRescueFactor = phytoAlgae0 > 0 ? clamp(1 - (phytoAlgae_g / phytoAlgae0), 0, 1) : 0;
+    const planktonRescueFactor = phytoPlankton0 > 0 ? clamp(1 - (phytoPlankton_g / phytoPlankton0), 0, 1) : 0;
+    const plantsRescueFactor = phytoPlants0 > 0 ? clamp(1 - (phytoPlants_g / phytoPlants0), 0, 1) : 0;
+    const algaeRecruit = phytoAlgae0 * phytoRecruitFrac * algaeRescueFactor * lightFactor * phytoNutrientIndex * co2Index * dt;
+    const planktonRecruit = phytoPlankton0 * phytoRecruitFrac * planktonRescueFactor * lightFactor * phytoNutrientIndex * co2Index * dt;
+    const plantsRecruit = phytoPlants0 * phytoRecruitFrac * plantsRescueFactor * lightFactor * phytoNutrientIndex * co2Index * dt;
+    phytoRecruitTotal += algaeRecruit + planktonRecruit + plantsRecruit;
+
+    let algaeGrowthRaw = phytoAlgae_g * algaeMuEff * dt + algaeRecruit;
+    let planktonGrowthRaw = phytoPlankton_g * planktonMuEff * dt + planktonRecruit;
+    let plantsGrowthRaw = phytoPlants_g * plantsMuEff * dt + plantsRecruit;
+
+    const algaeReserveAdd = algaeGrowthRaw * PHYTO_COMPARTMENTS.algae.reserveFrac;
+    const planktonReserveAdd = planktonGrowthRaw * PHYTO_COMPARTMENTS.plankton.reserveFrac;
+    const plantsReserveAdd = plantsGrowthRaw * PHYTO_COMPARTMENTS.plants.reserveFrac;
+    algaeGrowthRaw -= algaeReserveAdd;
+    planktonGrowthRaw -= planktonReserveAdd;
+    plantsGrowthRaw -= plantsReserveAdd;
+    phytoAlgaeReserve_g += algaeReserveAdd;
+    phytoPlanktonReserve_g += planktonReserveAdd;
+    phytoPlantsReserve_g += plantsReserveAdd;
+    phytoReserveBuilt += algaeReserveAdd + planktonReserveAdd + plantsReserveAdd;
+
+    const algaeReserveCap = Math.max(0, phytoAlgae_g * PHYTO_COMPARTMENTS.algae.reserveCapFrac);
+    const planktonReserveCap = Math.max(0, phytoPlankton_g * PHYTO_COMPARTMENTS.plankton.reserveCapFrac);
+    const plantsReserveCap = Math.max(0, phytoPlants_g * PHYTO_COMPARTMENTS.plants.reserveCapFrac);
+    const algaeReserveOverflow = Math.max(0, phytoAlgaeReserve_g - algaeReserveCap);
+    const planktonReserveOverflow = Math.max(0, phytoPlanktonReserve_g - planktonReserveCap);
+    const plantsReserveOverflow = Math.max(0, phytoPlantsReserve_g - plantsReserveCap);
+    if(algaeReserveOverflow > 0){
+      phytoAlgaeReserve_g = algaeReserveCap;
+      algaeGrowthRaw += algaeReserveOverflow;
     }
-    const phytoNightPotential = phytoMass_g * phytoMuMax * phytoNightGrowthFrac * (1 - lightFactor) * co2Index * storeCapFactor * dt;
-    const reserveUsePlanned = Math.min(phytoReserve_g, phytoNightPotential);
+    if(planktonReserveOverflow > 0){
+      phytoPlanktonReserve_g = planktonReserveCap;
+      planktonGrowthRaw += planktonReserveOverflow;
+    }
+    if(plantsReserveOverflow > 0){
+      phytoPlantsReserve_g = plantsReserveCap;
+      plantsGrowthRaw += plantsReserveOverflow;
+    }
+
+    const algaeNightPotential = phytoAlgae_g * algaeMuMax * PHYTO_COMPARTMENTS.algae.nightGrowthFrac * (1 - lightFactor) * co2Index * storeCapFactor * dt;
+    const planktonNightPotential = phytoPlankton_g * planktonMuMax * PHYTO_COMPARTMENTS.plankton.nightGrowthFrac * (1 - lightFactor) * co2Index * storeCapFactor * dt;
+    const plantsNightPotential = phytoPlants_g * plantsMuMax * PHYTO_COMPARTMENTS.plants.nightGrowthFrac * (1 - lightFactor) * co2Index * storeCapFactor * dt;
+    const algaeReserveUsePlanned = Math.min(phytoAlgaeReserve_g, algaeNightPotential);
+    const planktonReserveUsePlanned = Math.min(phytoPlanktonReserve_g, planktonNightPotential);
+    const plantsReserveUsePlanned = Math.min(phytoPlantsReserve_g, plantsNightPotential);
+
     const phytoYield = 0.55;
-    const phytoPotential = phytoGrowthRaw + reserveUsePlanned;
-    const phytoRequired = phytoPotential / phytoYield;
-    const nDemand = phytoRequired * phytoStoreNFrac;
-    const pDemand = phytoRequired * phytoStorePFrac;
+    const algaePotential = algaeGrowthRaw + algaeReserveUsePlanned;
+    const planktonPotential = planktonGrowthRaw + planktonReserveUsePlanned;
+    const plantsPotential = plantsGrowthRaw + plantsReserveUsePlanned;
+    const algaeRequired = algaePotential / phytoYield;
+    const planktonRequired = planktonPotential / phytoYield;
+    const plantsRequired = plantsPotential / phytoYield;
+    const phytoRequiredTotal = algaeRequired + planktonRequired + plantsRequired;
+    const nDemand = phytoRequiredTotal * phytoStoreNFrac;
+    const pDemand = phytoRequiredTotal * phytoStorePFrac;
     const nutrientScale = Math.min(
       1,
       nAvailTotal / Math.max(1e-9, nDemand),
       pAvailTotal / Math.max(1e-9, pDemand)
     );
-    const phytoConsumed = phytoRequired * nutrientScale;
-    const phytoGrowth = phytoConsumed * phytoYield;
-    const phytoReserveUseActual = clamp(phytoGrowth - phytoGrowthRaw, 0, reserveUsePlanned);
-    if(phytoReserveUseActual > 0){
-      phytoReserve_g = Math.max(0, phytoReserve_g - phytoReserveUseActual);
-      phytoReserveUsed += phytoReserveUseActual;
-      phytoNightGrowthTotal += phytoReserveUseActual;
+
+    const algaeConsumed = algaeRequired * nutrientScale;
+    const planktonConsumed = planktonRequired * nutrientScale;
+    const plantsConsumed = plantsRequired * nutrientScale;
+    const algaeGrowth = algaeConsumed * phytoYield;
+    const planktonGrowth = planktonConsumed * phytoYield;
+    const plantsGrowth = plantsConsumed * phytoYield;
+
+    const algaeReserveUseActual = clamp(algaeGrowth - algaeGrowthRaw, 0, algaeReserveUsePlanned);
+    const planktonReserveUseActual = clamp(planktonGrowth - planktonGrowthRaw, 0, planktonReserveUsePlanned);
+    const plantsReserveUseActual = clamp(plantsGrowth - plantsGrowthRaw, 0, plantsReserveUsePlanned);
+    if(algaeReserveUseActual > 0){
+      phytoAlgaeReserve_g = Math.max(0, phytoAlgaeReserve_g - algaeReserveUseActual);
+      phytoReserveUsed += algaeReserveUseActual;
+      phytoNightGrowthTotal += algaeReserveUseActual;
     }
-    const reserveUnused = reserveUsePlanned - phytoReserveUseActual;
-    if(reserveUnused > 0){
-      phytoReserve_g += reserveUnused;
+    if(planktonReserveUseActual > 0){
+      phytoPlanktonReserve_g = Math.max(0, phytoPlanktonReserve_g - planktonReserveUseActual);
+      phytoReserveUsed += planktonReserveUseActual;
+      phytoNightGrowthTotal += planktonReserveUseActual;
     }
-    if(nutrientScale < 1 && (phytoN_store_g + phytoP_store_g) <= 1e-8 && phytoPotential > 1e-9){
+    if(plantsReserveUseActual > 0){
+      phytoPlantsReserve_g = Math.max(0, phytoPlantsReserve_g - plantsReserveUseActual);
+      phytoReserveUsed += plantsReserveUseActual;
+      phytoNightGrowthTotal += plantsReserveUseActual;
+    }
+    const algaeReserveUnused = algaeReserveUsePlanned - algaeReserveUseActual;
+    const planktonReserveUnused = planktonReserveUsePlanned - planktonReserveUseActual;
+    const plantsReserveUnused = plantsReserveUsePlanned - plantsReserveUseActual;
+    if(algaeReserveUnused > 0) phytoAlgaeReserve_g += algaeReserveUnused;
+    if(planktonReserveUnused > 0) phytoPlanktonReserve_g += planktonReserveUnused;
+    if(plantsReserveUnused > 0) phytoPlantsReserve_g += plantsReserveUnused;
+    if(nutrientScale < 1 && (phytoN_store_g + phytoP_store_g) <= 1e-8 && phytoRequiredTotal > 1e-9){
       phytoStoreDepleteHits++;
     }
-    const phytoDecay = 0;
-    const phytoTotal = phytoOpen_g + phytoRefuge_g;
-    const refugeShare = phytoTotal > 1e-9 ? (phytoRefuge_g / phytoTotal) : phytoRefugiaFrac;
-    phytoRefuge_g = Math.max(0, phytoRefuge_g + phytoGrowth * refugeShare - phytoDecay * refugeShare);
-    phytoOpen_g = Math.max(0, phytoOpen_g + phytoGrowth * (1 - refugeShare) - phytoDecay * (1 - refugeShare));
-    phytoMass_g = phytoOpen_g + phytoRefuge_g;
+
+    const algaeDecay = phytoAlgae_g * PHYTO_COMPARTMENTS.algae.decay_per_day * tempF * dt;
+    const planktonDecay = phytoPlankton_g * PHYTO_COMPARTMENTS.plankton.decay_per_day * tempF * dt;
+    const plantsDecay = phytoPlants_g * PHYTO_COMPARTMENTS.plants.decay_per_day * tempF * dt;
+
+    const algaeTotal = phytoAlgaeOpen_g + phytoAlgaeRefuge_g;
+    const planktonTotal = phytoPlanktonOpen_g + phytoPlanktonRefuge_g;
+    const algaeRefugeShare = algaeTotal > 1e-9 ? (phytoAlgaeRefuge_g / algaeTotal) : phytoRefugiaFrac;
+    const planktonRefugeShare = planktonTotal > 1e-9 ? (phytoPlanktonRefuge_g / planktonTotal) : phytoRefugiaFrac;
+    phytoAlgaeRefuge_g = Math.max(0, phytoAlgaeRefuge_g + algaeGrowth * algaeRefugeShare - algaeDecay * algaeRefugeShare);
+    phytoAlgaeOpen_g = Math.max(0, phytoAlgaeOpen_g + algaeGrowth * (1 - algaeRefugeShare) - algaeDecay * (1 - algaeRefugeShare));
+    phytoPlanktonRefuge_g = Math.max(0, phytoPlanktonRefuge_g + planktonGrowth * planktonRefugeShare - planktonDecay * planktonRefugeShare);
+    phytoPlanktonOpen_g = Math.max(0, phytoPlanktonOpen_g + planktonGrowth * (1 - planktonRefugeShare) - planktonDecay * (1 - planktonRefugeShare));
+    phytoPlants_g = Math.max(0, phytoPlants_g + plantsGrowth - plantsDecay);
+
+    phytoAlgae_g = phytoAlgaeOpen_g + phytoAlgaeRefuge_g;
+    phytoPlankton_g = phytoPlanktonOpen_g + phytoPlanktonRefuge_g;
+    phytoMass_g = phytoAlgae_g + phytoPlankton_g + phytoPlants_g;
+
+    phytoGrowthTotal += algaeGrowth + planktonGrowth + plantsGrowth;
+    phytoAlgaeGrowthTotal += algaeGrowth;
+    phytoPlanktonGrowthTotal += planktonGrowth;
+    phytoPlantsGrowthTotal += plantsGrowth;
+    phytoConsumedTotal += algaeConsumed + planktonConsumed + plantsConsumed;
+    phytoDecayTotal += algaeDecay + planktonDecay + plantsDecay;
+
+    if(phytoAlgae_g <= 1e-9){
+      phytoAlgaeExtinctHits++;
+      if(!phytoAlgaeExtinctWarned && params.runMode !== 'uncertainty'){
+        addWarning('Phyto algae biomass reached 0 g; algae compartment extinct.');
+        phytoAlgaeExtinctWarned = true;
+      }
+    }
+    if(phytoPlankton_g <= 1e-9){
+      phytoPlanktonExtinctHits++;
+      if(!phytoPlanktonExtinctWarned && params.runMode !== 'uncertainty'){
+        addWarning('Phyto plankton biomass reached 0 g; plankton compartment extinct.');
+        phytoPlanktonExtinctWarned = true;
+      }
+    }
+    if(phytoPlants_g <= 1e-9){
+      phytoPlantsExtinctHits++;
+      if(!phytoPlantsExtinctWarned && params.runMode !== 'uncertainty'){
+        addWarning('Phyto plants biomass reached 0 g; plant compartment extinct.');
+        phytoPlantsExtinctWarned = true;
+      }
+    }
     if(phytoMass_g <= 1e-9){
       phytoExtinctHits++;
       if(!phytoExtinctWarned && params.runMode !== 'uncertainty'){
@@ -2852,17 +3083,38 @@ function runSimulation(params){
         phytoExtinctWarned = true;
       }
     }
-    phytoGrowthTotal += phytoGrowth;
-    phytoConsumedTotal += phytoConsumed;
-    phytoDecayTotal += phytoDecay;
-    if(!Number.isFinite(phytoMass_g)){
-      addWarning('Phyto mass became non-finite; resetting to 0.');
+
+    if(!Number.isFinite(phytoAlgae_g)){
+      addWarning('Phyto algae mass became non-finite; resetting to 0.');
       biomassNonFiniteHits++;
-      phytoMass_g = 0;
+      phytoAlgaeNonFiniteHits++;
+      phytoAlgae_g = 0;
+      phytoAlgaeOpen_g = 0;
+      phytoAlgaeRefuge_g = 0;
+      phytoAlgaeReserve_g = 0;
     }
-    if(phytoConsumed > 0){
-      let nNeed = phytoConsumed * phytoStoreNFrac;
-      let pNeed = phytoConsumed * phytoStorePFrac;
+    if(!Number.isFinite(phytoPlankton_g)){
+      addWarning('Phyto plankton mass became non-finite; resetting to 0.');
+      biomassNonFiniteHits++;
+      phytoPlanktonNonFiniteHits++;
+      phytoPlankton_g = 0;
+      phytoPlanktonOpen_g = 0;
+      phytoPlanktonRefuge_g = 0;
+      phytoPlanktonReserve_g = 0;
+    }
+    if(!Number.isFinite(phytoPlants_g)){
+      addWarning('Phyto plants mass became non-finite; resetting to 0.');
+      biomassNonFiniteHits++;
+      phytoPlantsNonFiniteHits++;
+      phytoPlants_g = 0;
+      phytoPlantsReserve_g = 0;
+    }
+    phytoMass_g = phytoAlgae_g + phytoPlankton_g + phytoPlants_g;
+
+    const phytoConsumedStep = algaeConsumed + planktonConsumed + plantsConsumed;
+    if(phytoConsumedStep > 0){
+      let nNeed = phytoConsumedStep * phytoStoreNFrac;
+      let pNeed = phytoConsumedStep * phytoStorePFrac;
       const nExternalAvail = macro_g + inorgN_g * 0.6;
       const nFromExternal = Math.min(nNeed, nExternalAvail);
       if(nFromExternal > 0){
@@ -2906,26 +3158,103 @@ function runSimulation(params){
     nutrientPool = macro_g + micro_g;
     inorgN_g = Math.max(0, NH4 + NO3);
     S_tot = S.carb + S.prot + S.fat;
-    const grazablePhyto_g = Math.max(0, phytoOpen_g);
-    const grazerTarget = grazablePhyto_g / (grazablePhyto_g + grazingHalfSat_g);
-    const grazerBlend = clamp(grazingLagDays > 1e-6 ? (dt / grazingLagDays) : 1, 0, 1);
-    grazerActivity = clamp(grazerActivity + (grazerTarget - grazerActivity) * grazerBlend, 0, 1);
-    grazerActivityMin = Math.min(grazerActivityMin, grazerActivity);
-    if(grazerTarget > 0.5 && grazerActivity < 0.1){
+    const grazableAlgae_g = Math.max(0, phytoAlgaeOpen_g);
+    const grazablePlankton_g = Math.max(0, phytoPlanktonOpen_g);
+    const grazablePhyto_g = grazableAlgae_g + grazablePlankton_g;
+    const biofilmTarget = grazablePhyto_g / (grazablePhyto_g + biofilmGrazingHalfSat_g);
+    const biofilmBlend = clamp(TROPHIC_MODEL.biofilm.lagDays > 1e-6 ? (dt / TROPHIC_MODEL.biofilm.lagDays) : 1, 0, 1);
+    biofilmActivity = clamp(biofilmActivity + (biofilmTarget - biofilmActivity) * biofilmBlend, 0, 1);
+    biofilmActivityMin = Math.min(biofilmActivityMin, biofilmActivity);
+    if(biofilmTarget > 0.5 && biofilmActivity < 0.1){
       grazingLagCollapseHits++;
     }
-    const grazingShield = grazablePhyto_g / (grazablePhyto_g + Math.max(phytoMass0 * 0.2, 0.5));
+    const grazingShield = grazablePhyto_g / (grazablePhyto_g + Math.max((phytoAlgae0 + phytoPlankton0) * 0.2, 0.5));
     grazingShieldMin = Math.min(grazingShieldMin, grazingShield);
-    const grazingSatiation = 1 - Math.exp(-grazablePhyto_g / Math.max(phytoMass0 * 0.5, 1));
-    const grazeRate_g_day = heteroMass_g * grazingMax_g_g_day * grazerActivity * grazingShield * grazingSatiation * tempF;
-    const heteroYield = 0.45;
-    const heteroAvailable = grazablePhyto_g;
-    const heteroConsumed = Math.min(grazeRate_g_day * dt, heteroAvailable);
-    if(heteroConsumed < (grazeRate_g_day * dt) - 1e-9) grazingLimitedSteps++;
-    laggedConsumptionTotal += heteroConsumed;
-    const heteroGrowth = heteroConsumed * heteroYield * grazingAssimEff;
-    const heteroDecay = heteroMass_g * HET_MODEL.decay_per_day * (1 - grazerActivity) * dt;
-    heteroMass_g = Math.max(0, heteroMass_g + heteroGrowth - heteroDecay);
+    const grazingSatiation = 1 - Math.exp(-grazablePhyto_g / Math.max((phytoAlgae0 + phytoPlankton0) * 0.5, 1));
+    const biofilmGrazeRate_g_day = biofilm_g * TROPHIC_MODEL.biofilm.grazingMax_g_g_day * biofilmActivity * grazingShield * grazingSatiation * tempF;
+    const biofilmConsumed = Math.min(biofilmGrazeRate_g_day * dt, grazablePhyto_g);
+    if(biofilmConsumed < (biofilmGrazeRate_g_day * dt) - 1e-9) grazingLimitedSteps++;
+    laggedBiofilmConsumptionTotal += biofilmConsumed;
+    const biofilmGrowth = biofilmConsumed * TROPHIC_MODEL.biofilm.yield * TROPHIC_MODEL.biofilm.assimEff;
+    const biofilmDecay = biofilm_g * TROPHIC_MODEL.biofilm.decay_per_day * (1 - biofilmActivity) * dt;
+    biofilm_g = Math.max(0, biofilm_g + biofilmGrowth - biofilmDecay);
+
+    let algaeGrazed = 0;
+    let planktonGrazed = 0;
+    if(biofilmConsumed > 0){
+      const algaeShare = grazablePhyto_g > 1e-9 ? (grazableAlgae_g / grazablePhyto_g) : 0;
+      algaeGrazed = biofilmConsumed * algaeShare;
+      planktonGrazed = biofilmConsumed - algaeGrazed;
+      phytoAlgaeOpen_g = Math.max(0, phytoAlgaeOpen_g - algaeGrazed);
+      phytoPlanktonOpen_g = Math.max(0, phytoPlanktonOpen_g - planktonGrazed);
+      phytoGrazedTotal += biofilmConsumed;
+      biofilmGrazedTotal += biofilmConsumed;
+      out.audit.phyto_grazed += biofilmConsumed;
+      out.audit.phyto_algae_grazed += algaeGrazed;
+      out.audit.phyto_plankton_grazed += planktonGrazed;
+      const biofilmWaste = Math.max(0, biofilmConsumed - biofilmGrowth);
+      if(biofilmWaste > 0){
+        S.carb += biofilmWaste * FRACTIONS.carb;
+        S.prot += biofilmWaste * FRACTIONS.protein;
+        S.fat  += biofilmWaste * FRACTIONS.fat;
+        NH4 += biofilmWaste * FRACTIONS.protein * CHEM.gN_per_g_protein * 0.2;
+        out.audit.biofilm_grazing_waste += biofilmWaste;
+      }
+    }
+
+    if(biofilm_g <= 1e-9){
+      biofilmExtinctHits++;
+      if(!biofilmExtinctWarned && params.runMode !== 'uncertainty'){
+        addWarning('Biofilm biomass reached 0 g; biofilm grazers extinct.');
+        biofilmExtinctWarned = true;
+      }
+    }
+
+    const predatorTarget = biofilm_g / (biofilm_g + predatorGrazingHalfSat_g);
+    const predatorBlend = clamp(TROPHIC_MODEL.predator.lagDays > 1e-6 ? (dt / TROPHIC_MODEL.predator.lagDays) : 1, 0, 1);
+    predatorActivity = clamp(predatorActivity + (predatorTarget - predatorActivity) * predatorBlend, 0, 1);
+    predatorActivityMin = Math.min(predatorActivityMin, predatorActivity);
+    if(predatorTarget > 0.5 && predatorActivity < 0.1){
+      predatorLagCollapseHits++;
+    }
+    const predatorShield = biofilm_g / (biofilm_g + Math.max(biofilm0 * 0.2, 0.4));
+    predatorShieldMin = Math.min(predatorShieldMin, predatorShield);
+    const predatorSatiation = 1 - Math.exp(-biofilm_g / Math.max(biofilm0 * 0.5, 0.6));
+    const predatorGrazeRate_g_day = predator_g * TROPHIC_MODEL.predator.grazingMax_g_g_day * predatorActivity * predatorShield * predatorSatiation * tempF;
+    const predatorConsumed = Math.min(predatorGrazeRate_g_day * dt, biofilm_g);
+    if(predatorConsumed < (predatorGrazeRate_g_day * dt) - 1e-9) predatorGrazingLimitedSteps++;
+    laggedPredatorConsumptionTotal += predatorConsumed;
+    biofilm_g = Math.max(0, biofilm_g - predatorConsumed);
+
+    const predatorGrowth = predatorConsumed * TROPHIC_MODEL.predator.yield * TROPHIC_MODEL.predator.assimEff;
+    const predatorDecay = predator_g * TROPHIC_MODEL.predator.decay_per_day * (1 - predatorActivity) * dt;
+    predator_g = Math.max(0, predator_g + predatorGrowth - predatorDecay);
+
+    if(predatorConsumed > 0){
+      predatorGrazedTotal += predatorConsumed;
+      out.audit.biofilm_grazed += predatorConsumed;
+      out.audit.predator_grazed += predatorConsumed;
+      const predatorWaste = Math.max(0, predatorConsumed - predatorGrowth);
+      if(predatorWaste > 0){
+        S.carb += predatorWaste * FRACTIONS.carb;
+        S.prot += predatorWaste * FRACTIONS.protein;
+        S.fat  += predatorWaste * FRACTIONS.fat;
+        NH4 += predatorWaste * FRACTIONS.protein * CHEM.gN_per_g_protein * 0.2;
+        out.audit.predator_grazing_waste += predatorWaste;
+      }
+    }
+
+    if(predator_g <= 1e-9){
+      predatorExtinctHits++;
+      if(!predatorExtinctWarned && params.runMode !== 'uncertainty'){
+        addWarning('Predator biomass reached 0 g; predator compartment extinct.');
+        predatorExtinctWarned = true;
+      }
+    }
+
+    heteroMass_g = biofilm_g + predator_g;
+    heteroConsumedTotal += biofilmConsumed + predatorConsumed;
+    heteroGrowthTotal += biofilmGrowth + predatorGrowth;
     if(heteroMass_g <= 1e-9){
       heteroExtinctHits++;
       if(!heteroExtinctWarned && params.runMode !== 'uncertainty'){
@@ -2933,45 +3262,63 @@ function runSimulation(params){
         heteroExtinctWarned = true;
       }
     }
-    heteroGrowthTotal += heteroGrowth;
-    heteroConsumedTotal += heteroConsumed;
-    if(!Number.isFinite(heteroMass_g)){
-      addWarning('Heterotroph mass became non-finite; resetting to 0.');
+
+    if(!Number.isFinite(biofilm_g)){
+      addWarning('Biofilm mass became non-finite; resetting to 0.');
       biomassNonFiniteHits++;
-      heteroMass_g = 0;
+      biofilmNonFiniteHits++;
+      biofilm_g = 0;
     }
-    if(heteroConsumed > 0){
-      phytoOpen_g = Math.max(0, phytoOpen_g - heteroConsumed);
-      phytoMass_g = phytoOpen_g + phytoRefuge_g;
-      phytoGrazedTotal += heteroConsumed;
-      out.audit.phyto_grazed += heteroConsumed;
-      const grazingWaste = Math.max(0, heteroConsumed - heteroGrowth);
-      if(grazingWaste > 0){
-        S.carb += grazingWaste * FRACTIONS.carb;
-        S.prot += grazingWaste * FRACTIONS.protein;
-        S.fat  += grazingWaste * FRACTIONS.fat;
-        NH4 += grazingWaste * FRACTIONS.protein * CHEM.gN_per_g_protein * 0.2;
-      }
+    if(!Number.isFinite(predator_g)){
+      addWarning('Predator mass became non-finite; resetting to 0.');
+      biomassNonFiniteHits++;
+      predatorNonFiniteHits++;
+      predator_g = 0;
+    }
+    heteroMass_g = biofilm_g + predator_g;
+
+    if(heteroMass_g > heteroMass0 * 0.6){
+      if(biofilm_g <= 1e-9) biofilmStableCollapseHits++;
+      if(predator_g <= 1e-9) predatorStableCollapseHits++;
     }
 
-    const refugeTarget = phytoMass_g * phytoRefugiaFrac;
-    const refugeDelta_g_day = (refugeTarget - phytoRefuge_g) * refugeExchangeRate;
-    const refugeExchange_g = refugeDelta_g_day * dt;
-    if(refugeExchange_g > 0){
-      const move = Math.min(refugeExchange_g, phytoOpen_g);
-      phytoOpen_g -= move;
-      phytoRefuge_g += move;
-    }else if(refugeExchange_g < 0){
-      const move = Math.min(-refugeExchange_g, phytoRefuge_g);
-      phytoRefuge_g -= move;
-      phytoOpen_g += move;
+    const algaeRefugeTarget = (phytoAlgaeOpen_g + phytoAlgaeRefuge_g) * phytoRefugiaFrac;
+    const planktonRefugeTarget = (phytoPlanktonOpen_g + phytoPlanktonRefuge_g) * phytoRefugiaFrac;
+    const algaeRefugeDelta_g_day = (algaeRefugeTarget - phytoAlgaeRefuge_g) * refugeExchangeRate;
+    const planktonRefugeDelta_g_day = (planktonRefugeTarget - phytoPlanktonRefuge_g) * refugeExchangeRate;
+    const algaeExchange_g = algaeRefugeDelta_g_day * dt;
+    const planktonExchange_g = planktonRefugeDelta_g_day * dt;
+    if(algaeExchange_g > 0){
+      const move = Math.min(algaeExchange_g, phytoAlgaeOpen_g);
+      phytoAlgaeOpen_g -= move;
+      phytoAlgaeRefuge_g += move;
+    }else if(algaeExchange_g < 0){
+      const move = Math.min(-algaeExchange_g, phytoAlgaeRefuge_g);
+      phytoAlgaeRefuge_g -= move;
+      phytoAlgaeOpen_g += move;
     }
-    phytoMass_g = phytoOpen_g + phytoRefuge_g;
-    refugeExchangeLast = Math.abs(refugeDelta_g_day);
-    refugeFractionLast = phytoMass_g > 1e-9 ? (phytoRefuge_g / phytoMass_g) : 0;
+    if(planktonExchange_g > 0){
+      const move = Math.min(planktonExchange_g, phytoPlanktonOpen_g);
+      phytoPlanktonOpen_g -= move;
+      phytoPlanktonRefuge_g += move;
+    }else if(planktonExchange_g < 0){
+      const move = Math.min(-planktonExchange_g, phytoPlanktonRefuge_g);
+      phytoPlanktonRefuge_g -= move;
+      phytoPlanktonOpen_g += move;
+    }
+    phytoAlgae_g = phytoAlgaeOpen_g + phytoAlgaeRefuge_g;
+    phytoPlankton_g = phytoPlanktonOpen_g + phytoPlanktonRefuge_g;
+    phytoMass_g = phytoAlgae_g + phytoPlankton_g + phytoPlants_g;
+    const refugeTotal = phytoAlgaeRefuge_g + phytoPlanktonRefuge_g;
+    const refugeTotalMass = (phytoAlgaeOpen_g + phytoAlgaeRefuge_g + phytoPlanktonOpen_g + phytoPlanktonRefuge_g);
+    refugeExchangeLast = Math.abs(algaeRefugeDelta_g_day) + Math.abs(planktonRefugeDelta_g_day);
+    refugeFractionLast = refugeTotalMass > 1e-9 ? (refugeTotal / refugeTotalMass) : 0;
     if(refugeFractionLast < 0.05) refugeEmptyHits++;
     if(refugeFractionLast > 0.6) refugeOverrunHits++;
 
+    const phytoDecay = algaeDecay + planktonDecay + plantsDecay;
+    const heteroDecay = biofilmDecay + predatorDecay;
+    const phytoGrowthStep = algaeGrowth + planktonGrowth + plantsGrowth;
     const decayMass = heteroDecay + phytoDecay;
     if(decayMass > 0){
       const decayReturnMass = decayMass * 0.35;
@@ -2987,7 +3334,7 @@ function runSimulation(params){
       NH4 += decayReturnMass * FRACTIONS.protein * CHEM.gN_per_g_protein * 0.3;
     }
 
-    const co2GrowthCons_g = phytoGrowth * PHOTO_MODEL.co2_per_g_growth;
+    const co2GrowthCons_g = phytoGrowthStep * PHOTO_MODEL.co2_per_g_growth;
     DIC_g = Math.max(0, DIC_g - co2GrowthCons_g);
     if(CO2_free_g <= 1e-9) co2ZeroHits++;
     co2Consumed_g += co2GrowthCons_g;
@@ -3219,12 +3566,22 @@ function runSimulation(params){
   out.meta.heteroGrowthTotal = heteroGrowthTotal;
   out.meta.heteroConsumedTotal = heteroConsumedTotal;
   out.meta.phytoGrowthTotal = phytoGrowthTotal;
+  out.meta.phytoAlgaeGrowthTotal = phytoAlgaeGrowthTotal;
+  out.meta.phytoPlanktonGrowthTotal = phytoPlanktonGrowthTotal;
+  out.meta.phytoPlantsGrowthTotal = phytoPlantsGrowthTotal;
   out.meta.phytoConsumedTotal = phytoConsumedTotal;
   out.meta.phytoDecayTotal = phytoDecayTotal;
   out.meta.phytoGrazedTotal = phytoGrazedTotal;
+  out.meta.biofilmGrazedTotal = biofilmGrazedTotal;
+  out.meta.predatorGrazedTotal = predatorGrazedTotal;
   out.meta.phytoNightGrowthTotal = phytoNightGrowthTotal;
   out.meta.phytoReserveBuilt = phytoReserveBuilt;
   out.meta.phytoReserveUsed = phytoReserveUsed;
+  out.meta.phytoAlgae_g = phytoAlgae_g;
+  out.meta.phytoPlankton_g = phytoPlankton_g;
+  out.meta.phytoPlants_g = phytoPlants_g;
+  out.meta.biofilm_g = biofilm_g;
+  out.meta.predator_g = predator_g;
   out.meta.phytoStoreFillPct = phytoStoreFillLast;
   out.meta.phytoStoreN_g = phytoN_store_g;
   out.meta.phytoStoreP_g = phytoP_store_g;
@@ -3238,17 +3595,30 @@ function runSimulation(params){
   out.meta.refugeExchange_g_day = refugeExchangeLast;
   out.meta.refugeEmptyHits = refugeEmptyHits;
   out.meta.refugeOverrunHits = refugeOverrunHits;
-  out.meta.grazerActivityLast = grazerActivity;
-  out.meta.grazerActivityMin = grazerActivityMin;
-  out.meta.laggedConsumptionTotal = laggedConsumptionTotal;
+  out.meta.biofilmActivityLast = biofilmActivity;
+  out.meta.biofilmActivityMin = biofilmActivityMin;
+  out.meta.predatorActivityLast = predatorActivity;
+  out.meta.predatorActivityMin = predatorActivityMin;
+  out.meta.laggedBiofilmConsumptionTotal = laggedBiofilmConsumptionTotal;
+  out.meta.laggedPredatorConsumptionTotal = laggedPredatorConsumptionTotal;
   out.meta.grazingLagCollapseHits = grazingLagCollapseHits;
+  out.meta.predatorLagCollapseHits = predatorLagCollapseHits;
   out.meta.biomassNonFiniteHits = biomassNonFiniteHits;
+  out.meta.phytoAlgaeNonFiniteHits = phytoAlgaeNonFiniteHits;
+  out.meta.phytoPlanktonNonFiniteHits = phytoPlanktonNonFiniteHits;
+  out.meta.phytoPlantsNonFiniteHits = phytoPlantsNonFiniteHits;
+  out.meta.biofilmNonFiniteHits = biofilmNonFiniteHits;
+  out.meta.predatorNonFiniteHits = predatorNonFiniteHits;
   out.meta.phytoRecruitTotal = phytoRecruitTotal;
   out.meta.co2ZeroHits = co2ZeroHits;
   out.meta.co2DegasSteps = co2DegasSteps;
   out.meta.co2Degassed_g = co2Degassed_g;
   out.meta.grazingLimitedSteps = grazingLimitedSteps;
+  out.meta.predatorGrazingLimitedSteps = predatorGrazingLimitedSteps;
   out.meta.grazingShieldMin = grazingShieldMin;
+  out.meta.predatorShieldMin = predatorShieldMin;
+  out.meta.biofilmStableCollapseHits = biofilmStableCollapseHits;
+  out.meta.predatorStableCollapseHits = predatorStableCollapseHits;
   out.meta.co2AirIn_g = co2AirIn_g;
   out.meta.co2AirOut_g = co2AirOut_g;
   out.meta.alkalinity_mgL = alkalinity_mgL;
@@ -3272,7 +3642,15 @@ function runSimulation(params){
     pellets: simFeedPlan.reduce((acc, f)=>acc + (Number(f.pellets) || 0), 0),
     powder_g: simFeedPlan.reduce((acc, f)=>acc + (Number(f.powder_g) || 0), 0)
   };
-  out.meta.biomassExtinction = {heteroHits:heteroExtinctHits, phytoHits:phytoExtinctHits};
+  out.meta.biomassExtinction = {
+    heteroHits: heteroExtinctHits,
+    phytoHits: phytoExtinctHits,
+    phytoAlgaeHits: phytoAlgaeExtinctHits,
+    phytoPlanktonHits: phytoPlanktonExtinctHits,
+    phytoPlantsHits: phytoPlantsExtinctHits,
+    biofilmHits: biofilmExtinctHits,
+    predatorHits: predatorExtinctHits
+  };
   if(feedAddedN_g > 0 && Math.abs(out.audit.n_balance_end - feedAddedN_g)/feedAddedN_g > 0.15){
     addWarning('Nitrogen balance drift exceeds 15% — check kinetics or timestep.');
   }
@@ -3293,6 +3671,15 @@ function runSimulation(params){
   }
   if(grazingLagCollapseHits > 0 && params.runMode !== 'uncertainty'){
     addWarning(`Grazer activity lagged behind prey for ${grazingLagCollapseHits} steps; expect delayed grazing response.`);
+  }
+  if(predatorLagCollapseHits > 0 && params.runMode !== 'uncertainty'){
+    addWarning(`Predator response lagged behind biofilm for ${predatorLagCollapseHits} steps; predator buildup may be delayed.`);
+  }
+  if(biofilmStableCollapseHits > 0 && params.runMode !== 'uncertainty'){
+    addWarning(`Biofilm collapsed for ${biofilmStableCollapseHits} steps while total heterotroph mass stayed elevated.`);
+  }
+  if(predatorStableCollapseHits > 0 && params.runMode !== 'uncertainty'){
+    addWarning(`Predator collapsed for ${predatorStableCollapseHits} steps while total heterotroph mass stayed elevated.`);
   }
   if(phytoMuCapHits > 0 && params.runMode !== 'uncertainty'){
     addWarning(`Effective phyto growth was capped by nutrients/stores in ${phytoMuCapHits} steps.`);
@@ -5240,6 +5627,13 @@ function getParams(){
   p.denitCap = clamp(Number.isFinite(p.denitCap) ? p.denitCap : 1.0, 0, 1);
   p.lightHour = clamp(Number.isFinite(p.lightHour) ? p.lightHour : 8, 0, 23);
   p.photoMass = clamp(Number.isFinite(p.photoMass) ? p.photoMass : 0, 0, 100000);
+  const phytoTotal = p.photoMass;
+  const heteroTotal = Number.isFinite(p.heteroMass) ? p.heteroMass : 0;
+  p.phytoAlgae_g = Math.max(0, phytoTotal * PHYTO_SPLIT.algae);
+  p.phytoPlankton_g = Math.max(0, phytoTotal * PHYTO_SPLIT.plankton);
+  p.phytoPlants_g = Math.max(0, phytoTotal * PHYTO_SPLIT.plants);
+  p.biofilm_g = Math.max(0, heteroTotal * HET_SPLIT.biofilm);
+  p.predator_g = Math.max(0, heteroTotal * HET_SPLIT.predator);
   return p;
 }
 
@@ -5271,8 +5665,21 @@ function resolveChemSeries(sim, mode){
   return {series: sim.chem, titleSuffix:'(net)'}; // bio
 }
 
+function setRecomputeBubbleState(isActive){
+  const bubble = el('recomputeToast');
+  if(!bubble) return;
+  bubble.classList.toggle('is-active', !!isActive);
+  bubble.setAttribute('aria-hidden', isActive ? 'false' : 'true');
+}
+
 function recompute(){
   clearError();
+  if(debounceTimerId !== null){
+    clearTimeout(debounceTimerId);
+    debounceTimerId = null;
+  }
+  DEBUG_STATE.debounceQueued = 0;
+  setRecomputeBubbleState(true);
   setStage('recompute', 'start');
   DEBUG_STATE.warnings = [];
   const recomputeStart = performance.now();
@@ -5332,11 +5739,16 @@ function recompute(){
       heteroGrowthTotal: baseSim.meta.heteroGrowthTotal ?? null,
       heteroConsumedTotal: baseSim.meta.heteroConsumedTotal ?? null,
       phytoGrowthTotal: baseSim.meta.phytoGrowthTotal ?? null,
+      phytoAlgaeGrowthTotal: baseSim.meta.phytoAlgaeGrowthTotal ?? null,
+      phytoPlanktonGrowthTotal: baseSim.meta.phytoPlanktonGrowthTotal ?? null,
+      phytoPlantsGrowthTotal: baseSim.meta.phytoPlantsGrowthTotal ?? null,
       phytoConsumedTotal: baseSim.meta.phytoConsumedTotal ?? null,
       phytoDecayTotal: baseSim.meta.phytoDecayTotal ?? null,
       tempSmoothRange: baseSim.meta.tempSmoothRange ?? null,
       co2ZeroHits: baseSim.meta.co2ZeroHits ?? null,
       phytoGrazedTotal: baseSim.meta.phytoGrazedTotal ?? null,
+      biofilmGrazedTotal: baseSim.meta.biofilmGrazedTotal ?? null,
+      predatorGrazedTotal: baseSim.meta.predatorGrazedTotal ?? null,
       oxygenDegassed_g: baseSim.meta.oxygenDegassed_g ?? null
     };
     if(params.photoMass > 0 && (baseSim.meta.phytoConsumedTotal ?? 0) <= 1e-6){
@@ -5533,15 +5945,24 @@ function recompute(){
       if(baseSim.meta.heteroGrowthTotal != null || baseSim.meta.phytoGrowthTotal != null){
         dbg.push(`Biomass totals: hetero +${(baseSim.meta.heteroGrowthTotal ?? 0).toFixed(2)} g (consumed ${(baseSim.meta.heteroConsumedTotal ?? 0).toFixed(2)} g), phyto +${(baseSim.meta.phytoGrowthTotal ?? 0).toFixed(2)} g (consumed ${(baseSim.meta.phytoConsumedTotal ?? 0).toFixed(2)} g)`);
       }
-      if(baseSim.meta.biomassExtinction){
-        dbg.push(`Biomass extinctions: hetero ${baseSim.meta.biomassExtinction.heteroHits} steps, phyto ${baseSim.meta.biomassExtinction.phytoHits} steps`);
+      if(baseSim.meta.phytoAlgae_g != null || baseSim.meta.biofilm_g != null){
+        const phytoTotal = (baseSim.meta.phytoAlgae_g ?? 0) + (baseSim.meta.phytoPlankton_g ?? 0) + (baseSim.meta.phytoPlants_g ?? 0);
+        const heteroTotal = (baseSim.meta.biofilm_g ?? 0) + (baseSim.meta.predator_g ?? 0);
+        const phytoDenom = phytoTotal > 1e-9 ? phytoTotal : 1;
+        const heteroDenom = heteroTotal > 1e-9 ? heteroTotal : 1;
+        dbg.push(`Phyto split: algae ${(baseSim.meta.phytoAlgae_g ?? 0).toFixed(2)} g (${(100*(baseSim.meta.phytoAlgae_g ?? 0)/phytoDenom).toFixed(1)}%), plankton ${(baseSim.meta.phytoPlankton_g ?? 0).toFixed(2)} g (${(100*(baseSim.meta.phytoPlankton_g ?? 0)/phytoDenom).toFixed(1)}%), plants ${(baseSim.meta.phytoPlants_g ?? 0).toFixed(2)} g (${(100*(baseSim.meta.phytoPlants_g ?? 0)/phytoDenom).toFixed(1)}%)`);
+        dbg.push(`Hetero split: biofilm ${(baseSim.meta.biofilm_g ?? 0).toFixed(2)} g (${(100*(baseSim.meta.biofilm_g ?? 0)/heteroDenom).toFixed(1)}%), predator ${(baseSim.meta.predator_g ?? 0).toFixed(2)} g (${(100*(baseSim.meta.predator_g ?? 0)/heteroDenom).toFixed(1)}%)`);
       }
-      dbg.push(`Grazing limits: ${baseSim.meta.grazingLimitedSteps ?? 0} steps • max ${baseSim.meta.grazingMax_g_g_day.toFixed(2)} g/g/day`);
+      if(baseSim.meta.biomassExtinction){
+        dbg.push(`Biomass extinctions: hetero ${baseSim.meta.biomassExtinction.heteroHits} steps, phyto ${baseSim.meta.biomassExtinction.phytoHits} steps • algae ${baseSim.meta.biomassExtinction.phytoAlgaeHits} • plankton ${baseSim.meta.biomassExtinction.phytoPlanktonHits} • plants ${baseSim.meta.biomassExtinction.phytoPlantsHits} • biofilm ${baseSim.meta.biomassExtinction.biofilmHits} • predator ${baseSim.meta.biomassExtinction.predatorHits}`);
+      }
+      dbg.push(`Grazing limits: biofilm ${baseSim.meta.grazingLimitedSteps ?? 0} steps • max ${(baseSim.meta.biofilmGrazingMax_g_g_day ?? 0).toFixed(2)} g/g/day; predator ${baseSim.meta.predatorGrazingLimitedSteps ?? 0} steps • max ${(baseSim.meta.predatorGrazingMax_g_g_day ?? 0).toFixed(2)} g/g/day`);
       dbg.push(`Phyto reserve: built ${baseSim.meta.phytoReserveBuilt.toFixed(2)} g • used ${baseSim.meta.phytoReserveUsed.toFixed(2)} g • night growth ${baseSim.meta.phytoNightGrowthTotal.toFixed(2)} g`);
-      dbg.push(`Phyto recruitment: ${(baseSim.meta.phytoRecruitTotal ?? 0).toFixed(2)} g • refugia ${baseSim.meta.phytoRefugiaFrac.toFixed(2)} • grazing shield min ${(baseSim.meta.grazingShieldMin ?? 0).toFixed(2)}`);
+      dbg.push(`Phyto recruitment: ${(baseSim.meta.phytoRecruitTotal ?? 0).toFixed(2)} g • refugia ${baseSim.meta.phytoRefugiaFrac.toFixed(2)} • grazing shield min ${(baseSim.meta.grazingShieldMin ?? 0).toFixed(2)} • predator shield min ${(baseSim.meta.predatorShieldMin ?? 0).toFixed(2)}`);
       dbg.push('Biomass dynamics:');
       dbg.push(`  CO2 free ${(baseSim.meta.co2FreeLast_mgL ?? 0).toFixed(2)} mg/L • buffer capacity ${(baseSim.meta.bufferCapacityLast ?? 0).toFixed(2)} • phyto store fill ${((baseSim.meta.phytoStoreFillPct ?? 0) * 100).toFixed(1)}%`);
-      dbg.push(`  refuge fraction ${(baseSim.meta.refugeFractionLast ?? 0).toFixed(2)} • grazer activity ${(baseSim.meta.grazerActivityLast ?? 0).toFixed(2)} • lagged consumption ${(baseSim.meta.laggedConsumptionTotal ?? 0).toFixed(2)} g`);
+      dbg.push(`  refuge fraction ${(baseSim.meta.refugeFractionLast ?? 0).toFixed(2)} • biofilm activity ${(baseSim.meta.biofilmActivityLast ?? 0).toFixed(2)} • predator activity ${(baseSim.meta.predatorActivityLast ?? 0).toFixed(2)}`);
+      dbg.push(`  lagged grazing: biofilm ${(baseSim.meta.laggedBiofilmConsumptionTotal ?? 0).toFixed(2)} g • predator ${(baseSim.meta.laggedPredatorConsumptionTotal ?? 0).toFixed(2)} g`);
       dbg.push(`O2 degassed: ${(baseSim.meta.oxygenDegassed_g ?? 0).toFixed(3)} g (steps ${baseSim.meta.oxygenDegasSteps ?? 0})`);
       dbg.push(`CO2 init: ${(baseSim.meta.co2Init_mgL ?? 0).toFixed(2)} mg/L • sat ${(baseSim.meta.co2Sat_mgL ?? 0).toFixed(2)} mg/L • zero hits ${baseSim.meta.co2ZeroHits ?? 0} • degas ${baseSim.meta.co2DegasSteps ?? 0} • air in ${(baseSim.meta.co2AirIn_g ?? 0).toFixed(2)} g • air out ${(baseSim.meta.co2AirOut_g ?? 0).toFixed(2)} g`);
       dbg.push(`Denit: k=${params.kDenit} 1/day • cap=${params.denitCap}`);
@@ -5644,15 +6065,24 @@ function recompute(){
       if(baseSim.meta.heteroGrowthTotal != null || baseSim.meta.phytoGrowthTotal != null){
         dbg.push(`Biomass totals: hetero +${(baseSim.meta.heteroGrowthTotal ?? 0).toFixed(2)} g (consumed ${(baseSim.meta.heteroConsumedTotal ?? 0).toFixed(2)} g), phyto +${(baseSim.meta.phytoGrowthTotal ?? 0).toFixed(2)} g (consumed ${(baseSim.meta.phytoConsumedTotal ?? 0).toFixed(2)} g)`);
       }
-      if(baseSim.meta.biomassExtinction){
-        dbg.push(`Biomass extinctions: hetero ${baseSim.meta.biomassExtinction.heteroHits} steps, phyto ${baseSim.meta.biomassExtinction.phytoHits} steps`);
+      if(baseSim.meta.phytoAlgae_g != null || baseSim.meta.biofilm_g != null){
+        const phytoTotal = (baseSim.meta.phytoAlgae_g ?? 0) + (baseSim.meta.phytoPlankton_g ?? 0) + (baseSim.meta.phytoPlants_g ?? 0);
+        const heteroTotal = (baseSim.meta.biofilm_g ?? 0) + (baseSim.meta.predator_g ?? 0);
+        const phytoDenom = phytoTotal > 1e-9 ? phytoTotal : 1;
+        const heteroDenom = heteroTotal > 1e-9 ? heteroTotal : 1;
+        dbg.push(`Phyto split: algae ${(baseSim.meta.phytoAlgae_g ?? 0).toFixed(2)} g (${(100*(baseSim.meta.phytoAlgae_g ?? 0)/phytoDenom).toFixed(1)}%), plankton ${(baseSim.meta.phytoPlankton_g ?? 0).toFixed(2)} g (${(100*(baseSim.meta.phytoPlankton_g ?? 0)/phytoDenom).toFixed(1)}%), plants ${(baseSim.meta.phytoPlants_g ?? 0).toFixed(2)} g (${(100*(baseSim.meta.phytoPlants_g ?? 0)/phytoDenom).toFixed(1)}%)`);
+        dbg.push(`Hetero split: biofilm ${(baseSim.meta.biofilm_g ?? 0).toFixed(2)} g (${(100*(baseSim.meta.biofilm_g ?? 0)/heteroDenom).toFixed(1)}%), predator ${(baseSim.meta.predator_g ?? 0).toFixed(2)} g (${(100*(baseSim.meta.predator_g ?? 0)/heteroDenom).toFixed(1)}%)`);
       }
-      dbg.push(`Grazing limits: ${baseSim.meta.grazingLimitedSteps ?? 0} steps • max ${baseSim.meta.grazingMax_g_g_day.toFixed(2)} g/g/day`);
+      if(baseSim.meta.biomassExtinction){
+        dbg.push(`Biomass extinctions: hetero ${baseSim.meta.biomassExtinction.heteroHits} steps, phyto ${baseSim.meta.biomassExtinction.phytoHits} steps • algae ${baseSim.meta.biomassExtinction.phytoAlgaeHits} • plankton ${baseSim.meta.biomassExtinction.phytoPlanktonHits} • plants ${baseSim.meta.biomassExtinction.phytoPlantsHits} • biofilm ${baseSim.meta.biomassExtinction.biofilmHits} • predator ${baseSim.meta.biomassExtinction.predatorHits}`);
+      }
+      dbg.push(`Grazing limits: biofilm ${baseSim.meta.grazingLimitedSteps ?? 0} steps • max ${(baseSim.meta.biofilmGrazingMax_g_g_day ?? 0).toFixed(2)} g/g/day; predator ${baseSim.meta.predatorGrazingLimitedSteps ?? 0} steps • max ${(baseSim.meta.predatorGrazingMax_g_g_day ?? 0).toFixed(2)} g/g/day`);
       dbg.push(`Phyto reserve: built ${baseSim.meta.phytoReserveBuilt.toFixed(2)} g • used ${baseSim.meta.phytoReserveUsed.toFixed(2)} g • night growth ${baseSim.meta.phytoNightGrowthTotal.toFixed(2)} g`);
-      dbg.push(`Phyto recruitment: ${(baseSim.meta.phytoRecruitTotal ?? 0).toFixed(2)} g • refugia ${baseSim.meta.phytoRefugiaFrac.toFixed(2)} • grazing shield min ${(baseSim.meta.grazingShieldMin ?? 0).toFixed(2)}`);
+      dbg.push(`Phyto recruitment: ${(baseSim.meta.phytoRecruitTotal ?? 0).toFixed(2)} g • refugia ${baseSim.meta.phytoRefugiaFrac.toFixed(2)} • grazing shield min ${(baseSim.meta.grazingShieldMin ?? 0).toFixed(2)} • predator shield min ${(baseSim.meta.predatorShieldMin ?? 0).toFixed(2)}`);
       dbg.push('Biomass dynamics:');
       dbg.push(`  CO2 free ${(baseSim.meta.co2FreeLast_mgL ?? 0).toFixed(2)} mg/L • buffer capacity ${(baseSim.meta.bufferCapacityLast ?? 0).toFixed(2)} • phyto store fill ${((baseSim.meta.phytoStoreFillPct ?? 0) * 100).toFixed(1)}%`);
-      dbg.push(`  refuge fraction ${(baseSim.meta.refugeFractionLast ?? 0).toFixed(2)} • grazer activity ${(baseSim.meta.grazerActivityLast ?? 0).toFixed(2)} • lagged consumption ${(baseSim.meta.laggedConsumptionTotal ?? 0).toFixed(2)} g`);
+      dbg.push(`  refuge fraction ${(baseSim.meta.refugeFractionLast ?? 0).toFixed(2)} • biofilm activity ${(baseSim.meta.biofilmActivityLast ?? 0).toFixed(2)} • predator activity ${(baseSim.meta.predatorActivityLast ?? 0).toFixed(2)}`);
+      dbg.push(`  lagged grazing: biofilm ${(baseSim.meta.laggedBiofilmConsumptionTotal ?? 0).toFixed(2)} g • predator ${(baseSim.meta.laggedPredatorConsumptionTotal ?? 0).toFixed(2)} g`);
       dbg.push(`O2 degassed: ${(baseSim.meta.oxygenDegassed_g ?? 0).toFixed(3)} g (steps ${baseSim.meta.oxygenDegasSteps ?? 0})`);
       dbg.push(`CO2 init: ${(baseSim.meta.co2Init_mgL ?? 0).toFixed(2)} mg/L • sat ${(baseSim.meta.co2Sat_mgL ?? 0).toFixed(2)} mg/L • zero hits ${baseSim.meta.co2ZeroHits ?? 0} • degas ${baseSim.meta.co2DegasSteps ?? 0} • air in ${(baseSim.meta.co2AirIn_g ?? 0).toFixed(2)} g • air out ${(baseSim.meta.co2AirOut_g ?? 0).toFixed(2)} g`);
       dbg.push(`Denit: k=${params.kDenit} 1/day • cap=${params.denitCap}`);
@@ -5699,6 +6129,7 @@ function recompute(){
     setStage('Interactions', 'init canvases');
     initCanvasInteractions();
 
+    setRecomputeBubbleState(false);
     setStage('recompute', 'done');
     DEBUG_STATE.lastRecomputeMs = performance.now() - recomputeStart;
     if(DEBUG_STATE.lastRecomputeMs > 800){
@@ -5706,6 +6137,10 @@ function recompute(){
     }
 
   }catch(err){
+    setStage('recompute', 'error');
+    setRecomputeBubbleState(false);
+    addWarning(`Recompute failed: ${err?.message || err}`);
+    console.warn('Recompute failed:', err);
     showError(err);
   }
 }
@@ -5818,16 +6253,28 @@ function applyAllPresets(){
 /* =========================================================
    Init
 ========================================================= */
-let recomputeTimer = null;
+let debounceTimerId = null;
 function scheduleRecompute(){
   const mode = el('liveRecompute') ? el('liveRecompute').value : 'on';
   if(mode === 'off'){
     if(el('recomputeBtn')) el('recomputeBtn').style.display = 'inline-block';
+    DEBUG_STATE.debounceQueued = 0;
+    DEBUG_STATE.debounceMs = null;
     return;
   }
   if(el('recomputeBtn')) el('recomputeBtn').style.display = 'none';
-  clearTimeout(recomputeTimer);
-  recomputeTimer = setTimeout(()=>recompute(), 150);
+  const debounceDelayMs = 1000;
+  DEBUG_STATE.debounceMs = debounceDelayMs;
+  if(debounceTimerId !== null){
+    DEBUG_STATE.debounceQueued = (DEBUG_STATE.debounceQueued || 0) + 1;
+  }else{
+    DEBUG_STATE.debounceQueued = 1;
+  }
+  clearTimeout(debounceTimerId);
+  debounceTimerId = setTimeout(()=>{
+    DEBUG_STATE.debounceQueued = 0;
+    recompute();
+  }, debounceDelayMs);
 }
 
 function updateModeUI(){
