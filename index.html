@@ -1519,6 +1519,7 @@ const DEBUG_STATE = {
   lastUpdateISO: null,
   lastOxyMissingCount: 0,
   lastMCSeriesFallbacks: null,
+  lastBiofilmMetaMissing: null,
   debounceQueued: 0,
   debounceMs: null,
   missingContainers: [],
@@ -4977,23 +4978,40 @@ function runMonteCarlo(baseParams){
   const tmp = new Array(runs);
   let mcMissingRows = 0;
   let mcMissingValues = 0;
+  let mcMissingSeries = 0;
   const mcSeriesFallbacks = new Set();
+  const mcSeriesMissing = new Set();
+  const isSeriesArray = value => Array.isArray(value) || ArrayBuffer.isView(value);
 
   function fillQ(srcRuns, out, fallbackSeries, label){
+    if(!isSeriesArray(srcRuns)){
+      mcMissingSeries += 1;
+      if(label) mcSeriesMissing.add(label);
+      for(let i=0;i<n;i++){
+        for(let r=0;r<runs;r++){
+          tmp[r] = fallbackSeries?.[i] ?? 0;
+        }
+        tmp.sort((a,b)=>a-b);
+        out.lo[i]  = quantileFromSorted(tmp, qLo);
+        out.mid[i] = quantileFromSorted(tmp, 0.5);
+        out.hi[i]  = quantileFromSorted(tmp, qHi);
+      }
+      return;
+    }
     for(let i=0;i<n;i++){
       for(let r=0;r<runs;r++){
         const row = srcRuns[r];
-        if(!row || !Array.isArray(row)){
+        if(!row || !isSeriesArray(row)){
           mcMissingRows += 1;
           if(label) mcSeriesFallbacks.add(label);
-          tmp[r] = fallbackSeries ? fallbackSeries[i] : 0;
+          tmp[r] = fallbackSeries?.[i] ?? 0;
           continue;
         }
         const value = row[i];
         if(!Number.isFinite(value)){
           mcMissingValues += 1;
           if(label) mcSeriesFallbacks.add(label);
-          tmp[r] = fallbackSeries ? fallbackSeries[i] : 0;
+          tmp[r] = fallbackSeries?.[i] ?? 0;
           continue;
         }
         tmp[r] = value;
@@ -5020,13 +5038,20 @@ function runMonteCarlo(baseParams){
   fillQ(bio_runs.hetero_pct, qBioPct.hetero_pct, baseSim.biomass.hetero_pct, 'bio:hetero_pct');
   fillQ(bio_runs.phyto_pct, qBioPct.phyto_pct, baseSim.biomass.phyto_pct, 'bio:phyto_pct');
 
-  if(mcMissingRows > 0 || mcMissingValues > 0){
+  if(mcMissingRows > 0 || mcMissingValues > 0 || mcMissingSeries > 0){
     DEBUG_STATE.lastMCSeriesFallbacks = {
       rows: mcMissingRows,
       values: mcMissingValues,
-      series: Array.from(mcSeriesFallbacks)
+      missingSeries: mcMissingSeries,
+      series: Array.from(mcSeriesFallbacks),
+      missing: Array.from(mcSeriesMissing)
     };
-    addWarning(`Monte Carlo series fallback used for ${mcMissingRows} rows and ${mcMissingValues} values; check series outputs.`);
+    const parts = [
+      mcMissingSeries > 0 ? `${mcMissingSeries} missing series` : null,
+      mcMissingRows > 0 ? `${mcMissingRows} missing rows` : null,
+      mcMissingValues > 0 ? `${mcMissingValues} missing values` : null
+    ].filter(Boolean).join(', ');
+    addWarning(`Monte Carlo series fallback used for ${parts}; check series outputs.`);
   }else{
     DEBUG_STATE.lastMCSeriesFallbacks = null;
   }
@@ -6214,6 +6239,10 @@ function fmtVal(value, unit='', decimals=null){
   return `${value.toFixed(d)}${unit ? ` ${unit}` : ''}`;
 }
 
+function renderFixedValue(value, decimals, fallback='n/a'){
+  return Number.isFinite(value) ? Number(value).toFixed(decimals) : fallback;
+}
+
 function fmtBandLine(mode, good, warn, unit=''){
   if(mode === 'min'){
     return `Safe ≥ ${fmtVal(good, unit)} • Watch ${fmtVal(warn, unit)}–${fmtVal(good, unit)} • Risk < ${fmtVal(warn, unit)}`;
@@ -6745,6 +6774,26 @@ function setRecomputeBubbleState(isActive){
   bubble.setAttribute('aria-hidden', isActive ? 'false' : 'true');
 }
 
+function composeBiofilmDebugLine(baseSim, params, context){
+  const biofilmMass = baseSim.meta?.biofilmMass_g;
+  const biofilmMult = baseSim.meta?.biofilmMult;
+  const missing = !Number.isFinite(biofilmMass) || !Number.isFinite(biofilmMult);
+  if(missing){
+    DEBUG_STATE.lastBiofilmMetaMissing = {
+      timeISO: new Date().toISOString(),
+      context: context || 'unknown',
+      biofilmMass_g: Number.isFinite(biofilmMass) ? biofilmMass : null,
+      biofilmMult: Number.isFinite(biofilmMult) ? biofilmMult : null
+    };
+    addWarning(`Biofilm meta missing for ${context || 'unknown'}; debug values may be incomplete.`);
+  }else{
+    DEBUG_STATE.lastBiofilmMetaMissing = null;
+  }
+  const massLabel = renderFixedValue(biofilmMass, 2, 'n/a');
+  const multLabel = renderFixedValue(biofilmMult, 2, 'n/a');
+  return `Biofilm: ${params.biofilmMm} mm • mass ${massLabel} g • mult ${multLabel} • slowFrac ${params.slowFrac}`;
+}
+
 function recompute(){
   clearError();
   if(debounceTimerId !== null){
@@ -6757,6 +6806,7 @@ function recompute(){
   DEBUG_STATE.warnings = [];
   DEBUG_STATE.lastOxyMissingCount = 0;
   DEBUG_STATE.lastMCSeriesFallbacks = null;
+  DEBUG_STATE.lastBiofilmMetaMissing = null;
   const recomputeStart = performance.now();
 
   try{
@@ -7013,7 +7063,7 @@ function recompute(){
       }
       dbg.push(`Rate peaks: demand ${baseSim.meta.maxDemand.toFixed(3)} g/day • supply ${baseSim.meta.maxSupply.toFixed(3)} g/day`);
       dbg.push('Metabolism mode: grazing-linked heterotrophs + photosynthesis (modernized kinetics)');
-      dbg.push(`Biofilm: ${params.biofilmMm} mm • mass ${baseSim.meta.biofilmMass_g.toFixed(2)} g • mult ${baseSim.meta.biofilmMult.toFixed(2)} • slowFrac ${params.slowFrac}`);
+      dbg.push(composeBiofilmDebugLine(baseSim, params, 'mc'));
       if(baseSim.meta.tempSmoothRange){
         dbg.push(`Temp smoothing: τ=${baseSim.meta.tempTauHours}h, smooth ${baseSim.meta.tempSmoothRange.min.toFixed(2)}–${baseSim.meta.tempSmoothRange.max.toFixed(2)}°C (target ${baseSim.meta.tempSmoothRange.targetMin.toFixed(2)}–${baseSim.meta.tempSmoothRange.targetMax.toFixed(2)}°C)`);
       }
@@ -7134,7 +7184,7 @@ function recompute(){
       }
       dbg.push(`Rate peaks: demand ${baseSim.meta.maxDemand.toFixed(3)} g/day • supply ${baseSim.meta.maxSupply.toFixed(3)} g/day`);
       dbg.push('Metabolism mode: grazing-linked heterotrophs + photosynthesis (modernized kinetics)');
-      dbg.push(`Biofilm: ${params.biofilmMm} mm • mass ${baseSim.meta.biofilmMass_g.toFixed(2)} g • mult ${baseSim.meta.biofilmMult.toFixed(2)} • slowFrac ${params.slowFrac}`);
+      dbg.push(composeBiofilmDebugLine(baseSim, params, 'deterministic'));
       if(baseSim.meta.tempSmoothRange){
         dbg.push(`Temp smoothing: τ=${baseSim.meta.tempTauHours}h, smooth ${baseSim.meta.tempSmoothRange.min.toFixed(2)}–${baseSim.meta.tempSmoothRange.max.toFixed(2)}°C (target ${baseSim.meta.tempSmoothRange.targetMin.toFixed(2)}–${baseSim.meta.tempSmoothRange.targetMax.toFixed(2)}°C)`);
       }
