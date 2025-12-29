@@ -1794,6 +1794,8 @@ function runSimulation(params){
   let grazingLimitedSteps = 0;
   let grazingShieldMin = 1;
   let phytoReserve_g = 0;
+  let co2AirIn_g = 0;
+  let co2AirOut_g = 0;
 
   // Activity states (dimensionless 0..1)
   let Bhet = 0.04;
@@ -1832,12 +1834,13 @@ function runSimulation(params){
   const macroRelease = FEED_PROFILE.modeling.macroRelease_mgL_per_g;
   const microRelease = FEED_PROFILE.modeling.microRelease_mgL_per_g;
   const grazingHalfSat_g = Math.max(0.5, phytoMass0 * 0.25);
-  const grazingMax_g_g_day = 0.18;
+  const grazingMax_g_g_day = 0.12;
   const phytoReserveCapFrac = 0.4;
   const phytoReserveFrac = 0.45;
   const phytoNightGrowthFrac = 0.35;
   const phytoRefugiaFrac = 0.18;
   const phytoRecruitFrac = 0.04;
+  const grazingAssimEff = 0.8;
 
   // Outputs
   const out = {
@@ -1883,6 +1886,8 @@ function runSimulation(params){
       co2_from_endog:0,
       co2_from_denit:0,
       co2_degassed:0,
+      co2_air_in:0,
+      co2_air_out:0,
       o2_degassed:0,
       macro_release:0,
       macro_uptake:0,
@@ -2255,12 +2260,13 @@ function runSimulation(params){
     const grazablePhyto_g = Math.max(0, phytoMass_g * (1 - phytoRefugiaFrac));
     const grazingShield = grazablePhyto_g / (grazablePhyto_g + Math.max(phytoMass0 * 0.2, 0.5));
     grazingShieldMin = Math.min(grazingShieldMin, grazingShield);
-    const grazeRate_g_day = heteroMass_g * grazingMax_g_g_day * grazingIndex * grazingShield * tempF;
+    const grazingSatiation = 1 - Math.exp(-grazablePhyto_g / Math.max(phytoMass0 * 0.5, 1));
+    const grazeRate_g_day = heteroMass_g * grazingMax_g_g_day * grazingIndex * grazingShield * grazingSatiation * tempF;
     const heteroYield = 0.45;
     const heteroAvailable = grazablePhyto_g;
     const heteroConsumed = Math.min(grazeRate_g_day * dt, heteroAvailable);
     if(heteroConsumed < (grazeRate_g_day * dt) - 1e-9) grazingLimitedSteps++;
-    const heteroGrowth = heteroConsumed * heteroYield;
+    const heteroGrowth = heteroConsumed * heteroYield * grazingAssimEff;
     const heteroDecay = heteroMass_g * HET_MODEL.decay_per_day * (1 - grazingIndex) * dt;
     heteroMass_g = Math.max(0, heteroMass_g + heteroGrowth - heteroDecay);
     if(heteroMass_g <= 1e-9){
@@ -2385,6 +2391,20 @@ function runSimulation(params){
     CO2_g += (CO2_from_ox + CO2_from_endog + phytoResp_g_day * CHEM.CO2_per_gO2) * dt;
     out.audit.co2_from_ox += CO2_from_ox * dt;
     out.audit.co2_from_endog += CO2_from_endog * dt;
+    const co2Equil_g = (co2Init_mgL * params.volL) / 1000;
+    const co2SatDef_mgL = (co2Equil_g - CO2_g) * 1000 / params.volL;
+    const kLaCO2 = oxy.kLa * 0.6;
+    const co2AirFlux_g_day = (kLaCO2 * co2SatDef_mgL * params.volL) / 1000;
+    const co2AirFlux_g = co2AirFlux_g_day * dt;
+    CO2_g += co2AirFlux_g;
+    if(co2AirFlux_g >= 0){
+      co2AirIn_g += co2AirFlux_g;
+      out.audit.co2_air_in += co2AirFlux_g;
+    }else{
+      const degas_g = Math.abs(co2AirFlux_g);
+      co2AirOut_g += degas_g;
+      out.audit.co2_air_out += degas_g;
+    }
     if(CO2_g > co2Sat_g){
       const excess = CO2_g - co2Sat_g;
       CO2_g = co2Sat_g;
@@ -2528,6 +2548,8 @@ function runSimulation(params){
   out.meta.co2Degassed_g = co2Degassed_g;
   out.meta.grazingLimitedSteps = grazingLimitedSteps;
   out.meta.grazingShieldMin = grazingShieldMin;
+  out.meta.co2AirIn_g = co2AirIn_g;
+  out.meta.co2AirOut_g = co2AirOut_g;
   out.meta.tempTauHours = tempTauHours;
   out.meta.tempSmoothRange = {min: tempSmoothMin, max: tempSmoothMax, targetMin: oxy.T - tempAmp, targetMax: oxy.T + tempAmp};
   out.meta.feedPulse = {
@@ -4573,6 +4595,9 @@ function recompute(){
     if((baseSim.meta.grazingLimitedSteps ?? 0) > (baseSim.t.length * 0.25)){
       addWarning('Grazing limited for >25% of steps; phyto scarcity or grazing rate caps may be throttling heterotroph growth.');
     }
+    if((baseSim.meta.co2AirOut_g ?? 0) > (baseSim.meta.co2AirIn_g ?? 0) * 1.2){
+      addWarning('CO₂ degassing outpaced atmospheric re-supply; CO₂ limitation may still constrain growth.');
+    }
     if((baseSim.meta.phytoReserveUsed ?? 0) <= 1e-6 && params.photoMass > 0){
       addWarning('Phyto reserve never used; night growth may be stalled by nutrients or CO₂.');
     }
@@ -4756,7 +4781,7 @@ function recompute(){
       dbg.push(`Phyto reserve: built ${baseSim.meta.phytoReserveBuilt.toFixed(2)} g • used ${baseSim.meta.phytoReserveUsed.toFixed(2)} g • night growth ${baseSim.meta.phytoNightGrowthTotal.toFixed(2)} g`);
       dbg.push(`Phyto recruitment: ${(baseSim.meta.phytoRecruitTotal ?? 0).toFixed(2)} g • refugia ${baseSim.meta.phytoRefugiaFrac.toFixed(2)} • grazing shield min ${(baseSim.meta.grazingShieldMin ?? 0).toFixed(2)}`);
       dbg.push(`O2 degassed: ${(baseSim.meta.oxygenDegassed_g ?? 0).toFixed(3)} g (steps ${baseSim.meta.oxygenDegasSteps ?? 0})`);
-      dbg.push(`CO2 init: ${(baseSim.meta.co2Init_mgL ?? 0).toFixed(2)} mg/L • sat ${(baseSim.meta.co2Sat_mgL ?? 0).toFixed(2)} mg/L • zero hits ${baseSim.meta.co2ZeroHits ?? 0} • degas ${baseSim.meta.co2DegasSteps ?? 0}`);
+      dbg.push(`CO2 init: ${(baseSim.meta.co2Init_mgL ?? 0).toFixed(2)} mg/L • sat ${(baseSim.meta.co2Sat_mgL ?? 0).toFixed(2)} mg/L • zero hits ${baseSim.meta.co2ZeroHits ?? 0} • degas ${baseSim.meta.co2DegasSteps ?? 0} • air in ${(baseSim.meta.co2AirIn_g ?? 0).toFixed(2)} g • air out ${(baseSim.meta.co2AirOut_g ?? 0).toFixed(2)} g`);
       dbg.push(`Denit: k=${params.kDenit} 1/day • cap=${params.denitCap}`);
       dbg.push(`Heterotroph mass: ${params.heteroMass} g (base ${FISH_MODEL.o2_mg_g_day_base} mg/g/day @ ${FISH_MODEL.refTempC}°C)`);
       dbg.push(`Photosynthetic mass: ${params.photoMass} g (peak ${PHOTO_MODEL.o2_mg_g_day_peak} mg/g/day)`);
@@ -4864,7 +4889,7 @@ function recompute(){
       dbg.push(`Phyto reserve: built ${baseSim.meta.phytoReserveBuilt.toFixed(2)} g • used ${baseSim.meta.phytoReserveUsed.toFixed(2)} g • night growth ${baseSim.meta.phytoNightGrowthTotal.toFixed(2)} g`);
       dbg.push(`Phyto recruitment: ${(baseSim.meta.phytoRecruitTotal ?? 0).toFixed(2)} g • refugia ${baseSim.meta.phytoRefugiaFrac.toFixed(2)} • grazing shield min ${(baseSim.meta.grazingShieldMin ?? 0).toFixed(2)}`);
       dbg.push(`O2 degassed: ${(baseSim.meta.oxygenDegassed_g ?? 0).toFixed(3)} g (steps ${baseSim.meta.oxygenDegasSteps ?? 0})`);
-      dbg.push(`CO2 init: ${(baseSim.meta.co2Init_mgL ?? 0).toFixed(2)} mg/L • sat ${(baseSim.meta.co2Sat_mgL ?? 0).toFixed(2)} mg/L • zero hits ${baseSim.meta.co2ZeroHits ?? 0} • degas ${baseSim.meta.co2DegasSteps ?? 0}`);
+      dbg.push(`CO2 init: ${(baseSim.meta.co2Init_mgL ?? 0).toFixed(2)} mg/L • sat ${(baseSim.meta.co2Sat_mgL ?? 0).toFixed(2)} mg/L • zero hits ${baseSim.meta.co2ZeroHits ?? 0} • degas ${baseSim.meta.co2DegasSteps ?? 0} • air in ${(baseSim.meta.co2AirIn_g ?? 0).toFixed(2)} g • air out ${(baseSim.meta.co2AirOut_g ?? 0).toFixed(2)} g`);
       dbg.push(`Denit: k=${params.kDenit} 1/day • cap=${params.denitCap}`);
       dbg.push(`Heterotroph mass: ${params.heteroMass} g (base ${FISH_MODEL.o2_mg_g_day_base} mg/g/day @ ${FISH_MODEL.refTempC}°C)`);
       dbg.push(`Photosynthetic mass: ${params.photoMass} g (peak ${PHOTO_MODEL.o2_mg_g_day_peak} mg/g/day)`);
