@@ -1,0 +1,10 @@
+{
+  "name": "aquachem",
+  "version": "1.0.0",
+  "description": "Static AquaChem app",
+  "private": true,
+  "scripts": {
+    "test": "node scripts/validate-js.js",
+    "lint:js": "node scripts/validate-js.js"
+  }
+}
