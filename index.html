@@ -36,16 +36,40 @@
       z-index:0;
     }
     header{
-      padding:22px 20px 16px;
-      border-bottom:1px solid var(--line);
+      padding:18px 20px 14px;
+      border-bottom:1px solid rgba(122,162,255,.18);
       position:sticky;
       top:0;
-      background:linear-gradient(180deg, rgba(11,16,32,.98), rgba(11,16,32,.88));
+      background:linear-gradient(180deg, rgba(10,15,30,.98), rgba(10,15,30,.92));
       backdrop-filter: blur(12px);
       z-index:10;
     }
-    header h1{margin:0;font-size:20px;font-weight:700;letter-spacing:.3px}
-    header p{margin:8px 0 0;color:var(--muted);font-size:13px;max-width:1100px;line-height:1.45}
+    .app-title{
+      display:flex;
+      align-items:center;
+      gap:12px;
+    }
+    .app-mark{
+      width:44px;
+      height:44px;
+      border-radius:14px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background:linear-gradient(140deg, rgba(122,162,255,.28), rgba(99,230,190,.16));
+      border:1px solid rgba(122,162,255,.35);
+      box-shadow:0 10px 18px rgba(0,0,0,.3);
+      font-size:20px;
+    }
+    header h1{margin:0;font-size:18px;font-weight:700;letter-spacing:.4px}
+    .app-subtitle{
+      margin:4px 0 0;
+      color:rgba(231,236,255,.78);
+      font-size:12px;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+    }
+    header p{margin:10px 0 0;color:var(--muted);font-size:12px;max-width:960px;line-height:1.45}
     .wrap{max-width:1280px;margin:0 auto;padding:20px;display:grid;gap:16px;grid-template-columns: 480px 1fr;position:relative;z-index:1;}
     @media (max-width: 1100px){ .wrap{grid-template-columns:1fr;} header{position:static;} }
     .card{
@@ -367,8 +391,7 @@
       box-shadow:none;
     }
     .cal-cell .day-num{font-weight:600;color:#dfe6ff;font-size:10px}
-    .cal-cell .day-meta{color:var(--muted);font-size:8.5px;margin-top:1px}
-    .cal-cell.no-meta .day-meta{display:none}
+    .cal-cell .day-meta{display:none}
     .cal-cell.feed{background:rgba(99,230,190,.12); border-color:rgba(99,230,190,.4)}
     .cal-cell.pop{background:rgba(255,207,90,.14); border-color:rgba(255,207,90,.4)}
     .cal-cell.feed.pop{
@@ -453,12 +476,16 @@
 </head>
 <body>
 <header class="app-header">
-  <h1>O₂ Demand Planner — pellets + powder + “pop” events + DO simulation</h1>
+  <div class="app-title">
+    <div class="app-mark">🫧</div>
+    <div>
+      <h1>Aquarium Oxygen Planner</h1>
+      <div class="app-subtitle">Demand modeling · Oxygenation inference · Feeding cadence</div>
+    </div>
+  </div>
   <p>
-    This sim estimates <b>oxygen demand</b> from decomposing feed and (optionally) nitrification.
-    It also simulates <b>dissolved oxygen (DO)</b> using an inferred oxygenation model:
-    <b>bubble transfer</b> (airflow + depth + diffuser efficiency) + <b>surface transfer</b> (ripples + blanket coverage + headspace ventilation).
-    The goal is inference: plausible numbers you can tune later with even one real-world measurement.
+    Estimate oxygen demand from feed decomposition and nitrification, then simulate dissolved oxygen with bubble + surface transfer.
+    Calibrate with real-world measurements to tighten uncertainty bands over time.
   </p>
 </header>
 
@@ -1346,7 +1373,7 @@ function renderFeedingCalendar(params, feedPlan, popEvents){
     }
     cell.innerHTML = `
       <div class="day-num">${dayDate.getDate()}</div>
-      <div class="day-meta">${metaText || ''}</div>
+      <div class="day-meta"></div>
     `;
     monthGrid.appendChild(cell);
   }
@@ -1354,6 +1381,7 @@ function renderFeedingCalendar(params, feedPlan, popEvents){
   DEBUG_STATE.lastFeedCalendarCompact = compact;
   const calWidth = cal.getBoundingClientRect().width;
   DEBUG_STATE.lastCalendarTileWidth = Number.isFinite(calWidth) ? (calWidth / Math.max(1, monthCount)) : null;
+  DEBUG_STATE.lastCalendarMetaHidden = true;
   if(Number.isFinite(DEBUG_STATE.lastCalendarTileWidth) && DEBUG_STATE.lastCalendarTileWidth < 180){
     if(!DEBUG_STATE.lastCalendarTileWarnedISO){
       addWarning('Calendar tiles are narrow; consider expanding a month for readability.');
@@ -1477,6 +1505,7 @@ const DEBUG_STATE = {
   lastFeedCalendarStartISO: null,
   lastCalendarExpandedKey: null,
   lastCalendarTileWidth: null,
+  lastCalendarMetaHidden: null,
   lastCalendarTileWarnedISO: null,
   panelOverflowPx: null,
   panelOverflowLimitPx: 0,
@@ -1613,6 +1642,9 @@ lines.push(`surface=${p.lenCm}×${p.widCm} cm, blanket=${p.blanketPct}%, ripple=
     }
     if(Number.isFinite(DEBUG_STATE.lastCalendarTileWidth)){
       lines.push(`tileWidth=${DEBUG_STATE.lastCalendarTileWidth.toFixed(1)}px`);
+    }
+    if(DEBUG_STATE.lastCalendarMetaHidden != null){
+      lines.push(`metaHidden=${DEBUG_STATE.lastCalendarMetaHidden ? 'yes' : 'no'}`);
     }
   }
   if(Number.isFinite(DEBUG_STATE.panelOverflowPx)){
