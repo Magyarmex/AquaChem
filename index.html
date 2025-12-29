@@ -63,13 +63,13 @@
     }
     .panel-section{
       position:relative;
-      padding:14px 14px 12px 16px;
+      padding:10px 12px 10px 14px;
       border-radius:16px;
       background:linear-gradient(180deg,rgba(12,19,39,.92),rgba(9,14,30,.92));
       border:1px solid rgba(122,162,255,.14);
       box-shadow:0 12px 24px rgba(0,0,0,.28);
       display:grid;
-      gap:10px;
+      gap:8px;
       overflow:hidden;
     }
     .panel-section::before{
@@ -93,7 +93,7 @@
       display:flex;
       align-items:center;
       gap:8px;
-      font-size:13px;
+      font-size:12px;
       letter-spacing:.08em;
       text-transform:uppercase;
       color:#dfe6ff;
@@ -108,11 +108,11 @@
       border-radius:10px;
       background:rgba(122,162,255,.18);
       border:1px solid rgba(122,162,255,.25);
-      font-size:14px;
+      font-size:13px;
     }
     .panel-sub{
       color:var(--muted);
-      font-size:12px;
+      font-size:11px;
       line-height:1.45;
       padding-left:8px;
     }
@@ -141,8 +141,8 @@
     .panel-divider{height:1px;background:rgba(255,255,255,.08);margin:4px 0}
     .panel-quick{
       display:grid;
-      gap:10px;
-      padding:10px;
+      gap:8px;
+      padding:8px 10px;
       border-radius:16px;
       background:linear-gradient(140deg, rgba(122,162,255,.16), rgba(99,230,190,.08));
       border:1px solid rgba(122,162,255,.2);
@@ -151,11 +151,11 @@
     .panel-drawer{
       border:1px solid rgba(255,255,255,.12);
       border-radius:12px;
-      padding:8px 10px;
+      padding:6px 8px;
       background:rgba(0,0,0,.18);
     }
     .panel-drawer summary{font-size:12px;color:#dfe6ff;font-weight:600}
-    .panel-drawer .drawer-text{color:var(--muted);font-size:12px;line-height:1.45;margin-top:8px}
+    .panel-drawer .drawer-text{color:var(--muted);font-size:11px;line-height:1.45;margin-top:6px}
     .left-panel .row label{font-size:11px;letter-spacing:.03em}
     .left-panel input[type="number"],
     .left-panel input[type="text"],
@@ -165,10 +165,17 @@
       border-color:rgba(122,162,255,.6);
     }
     .left-panel .row input[type="range"]{min-width:180px}
-    .left-panel .grid2{gap:8px}
-    .left-panel .grid3{gap:8px}
+    .left-panel .grid2{gap:6px}
+    .left-panel .grid3{gap:6px}
     .left-panel .small{font-size:11px}
     .left-panel .note{font-size:11px}
+    .panel-section.compact{
+      padding:8px 10px 8px 12px;
+      gap:6px;
+    }
+    .panel-section.compact .panel-title{font-size:11px}
+    .panel-section.compact .panel-title .icon{width:24px;height:24px;font-size:12px}
+    .panel-section.compact .panel-sub{font-size:10px}
     .grid2{display:grid;gap:10px;grid-template-columns:1fr 1fr;}
 
     .grid3{display:grid;gap:10px;grid-template-columns:1fr 1fr 1fr;}
@@ -276,8 +283,8 @@
     .tag-details{margin-top:8px;color:var(--muted);font-size:12px;line-height:1.45}
     .calendar{
       display:grid;
-      gap:10px;
-      margin-top:8px;
+      gap:8px;
+      margin-top:6px;
     }
     .calendar.tiles{
       grid-template-columns:repeat(3, minmax(0, 1fr));
@@ -291,11 +298,12 @@
     .calendar-month{
       border:1px solid rgba(255,255,255,.12);
       border-radius:12px;
-      padding:8px;
+      padding:8px 7px;
       background:rgba(0,0,0,.18);
       display:grid;
-      gap:6px;
+      gap:4px;
       position:relative;
+      min-width:0;
     }
     .calendar-month.expanded{
       grid-column:1 / -1;
@@ -308,19 +316,21 @@
       display:flex;
       align-items:center;
       justify-content:space-between;
-      font-size:12px;
+      font-size:11px;
       color:#dfe6ff;
       letter-spacing:.08em;
       text-transform:uppercase;
+      gap:6px;
+      flex-wrap:wrap;
     }
     .calendar-header .summary{
       color:var(--muted);
-      font-size:10px;
+      font-size:9px;
       letter-spacing:.04em;
     }
     .calendar-header .month-actions{
       display:flex;
-      gap:6px;
+      gap:4px;
       align-items:center;
     }
     .calendar-header .month-toggle{
@@ -328,8 +338,8 @@
       background:rgba(122,162,255,.16);
       color:#dfe6ff;
       border-radius:999px;
-      padding:2px 8px;
-      font-size:9px;
+      padding:2px 6px;
+      font-size:10px;
       letter-spacing:.08em;
       text-transform:uppercase;
       cursor:pointer;
@@ -337,17 +347,19 @@
     .calendar-grid{
       display:grid;
       grid-template-columns: repeat(7, 1fr);
-      gap:4px;
-      margin-top:4px;
+      gap:3px;
+      margin-top:2px;
     }
     .cal-cell{
       border:1px solid rgba(255,255,255,.12);
       border-radius:8px;
-      padding:4px 4px;
+      padding:3px 3px;
       background:rgba(0,0,0,.18);
-      min-height:36px;
+      min-height:30px;
       position:relative;
       font-size:9.5px;
+      line-height:1.2;
+      overflow:hidden;
     }
     .cal-cell.empty{
       background:transparent;
@@ -355,7 +367,8 @@
       box-shadow:none;
     }
     .cal-cell .day-num{font-weight:600;color:#dfe6ff;font-size:10px}
-    .cal-cell .day-meta{color:var(--muted);font-size:9px;margin-top:2px}
+    .cal-cell .day-meta{color:var(--muted);font-size:8.5px;margin-top:1px}
+    .cal-cell.no-meta .day-meta{display:none}
     .cal-cell.feed{background:rgba(99,230,190,.12); border-color:rgba(99,230,190,.4)}
     .cal-cell.pop{background:rgba(255,207,90,.14); border-color:rgba(255,207,90,.4)}
     .cal-cell.feed.pop{
@@ -415,44 +428,26 @@
     .hr{height:1px;background:rgba(255,255,255,.10);margin:10px 0}
     .errbox{border:1px solid rgba(255,107,107,.35);background:rgba(255,107,107,.08);padding:10px;border-radius:12px;color:#ffd1d1;font-size:12px;display:none}
     .errbox pre{margin:8px 0 0;white-space:pre-wrap;word-break:break-word;color:#ffd1d1}
-    .recompute-toast{
-      position:fixed;
-      top:86px;
-      right:20px;
-      display:flex;
-      align-items:center;
-      gap:8px;
-      padding:6px 12px;
+    .copy-toast{
+      font-size:11px;
+      color:var(--ok);
+      padding:2px 8px;
       border-radius:999px;
-      border:1px solid rgba(255,255,255,.16);
-      background:rgba(9,14,30,.86);
-      color:var(--muted);
-      font-size:12px;
-      letter-spacing:.02em;
-      box-shadow:var(--shadow);
-      opacity:0;
-      transform:translateY(-4px);
-      pointer-events:none;
-      transition:opacity .2s ease, transform .2s ease;
-      z-index:20;
+      border:1px solid rgba(99,230,190,.35);
+      background:rgba(99,230,190,.12);
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
     }
-    .recompute-toast.is-active{
-      opacity:1;
-      transform:translateY(0);
+    .copy-toast.warn{
+      color:#fff3d1;
+      border-color:rgba(255,207,90,.45);
+      background:rgba(255,207,90,.16);
     }
-    .recompute-toast .spinner{
-      width:12px;
-      height:12px;
-      border-radius:50%;
-      border:2px solid rgba(255,255,255,.25);
-      border-top-color:var(--accent);
-      animation:spin .8s linear infinite;
-    }
-    @keyframes spin{
-      to{ transform:rotate(360deg); }
-    }
-    @media (max-width: 640px){
-      .recompute-toast{top:72px; right:12px;}
+    .calendar-month.expanded .cal-cell{
+      min-height:52px;
+      font-size:11px;
+      padding:6px;
     }
   </style>
 </head>
@@ -468,12 +463,14 @@
 </header>
 
 <div class="wrap">
-  <div class="recompute-toast" id="recomputeToast" role="status" aria-live="polite" aria-hidden="true">
-    <span class="spinner" aria-hidden="true"></span>
-    <span>Recomputing…</span>
-  </div>
-  <div class="card">
-    <h2>Inputs</h2>
+  <div class="card left-panel">
+    <div class="panel-quick">
+      <div class="panel-header">
+        <div class="panel-title"><span class="icon">⚡</span>Quick Controls</div>
+        <div class="panel-badges">
+          <span class="badge note">Most adjusted</span>
+        </div>
+      </div>
 
       <div class="row">
         <label>Pellets per feeding (count)</label>
@@ -612,7 +609,7 @@
       <div class="calendar tiles" id="feedCalendar"></div>
     </div>
 
-    <div class="panel-section" style="margin-top:12px">
+    <div class="panel-section compact" style="margin-top:12px">
       <div class="panel-header">
         <div class="panel-title"><span class="icon">💥</span>Pop Events</div>
         <div class="panel-badges">
@@ -653,7 +650,7 @@
       </div>
     </div>
 
-    <div class="panel-section" style="margin-top:12px">
+    <div class="panel-section compact" style="margin-top:12px">
       <div class="panel-header">
         <div class="panel-title"><span class="icon">🧯</span>Model Status</div>
         <div class="panel-badges">
@@ -1218,7 +1215,8 @@ function syncCalendarToggleState(){
   btns.forEach((btn)=>{
     const key = btn.getAttribute('data-month-toggle');
     const expanded = Boolean(calendarExpandedKey && key === calendarExpandedKey);
-    btn.textContent = expanded ? 'Collapse' : 'Expand';
+    btn.textContent = expanded ? '⤢' : '⤡';
+    btn.setAttribute('title', expanded ? 'Collapse month' : 'Expand month');
     btn.setAttribute('aria-pressed', expanded ? 'true' : 'false');
   });
 }
@@ -1342,14 +1340,28 @@ function renderFeedingCalendar(params, feedPlan, popEvents){
       if(feed.powder_g) meta.push(`${feed.powder_g.toFixed(2)} g pow`);
     }
     if(pop) meta.push(`pop ${Math.round(pop)}`);
+    const metaText = meta.join(' • ');
+    if(!metaText){
+      cell.classList.add('no-meta');
+    }
     cell.innerHTML = `
       <div class="day-num">${dayDate.getDate()}</div>
-      <div class="day-meta">${meta.join(' • ') || '—'}</div>
+      <div class="day-meta">${metaText || ''}</div>
     `;
     monthGrid.appendChild(cell);
   }
   DEBUG_STATE.lastFeedCalendarMonths = monthCount;
   DEBUG_STATE.lastFeedCalendarCompact = compact;
+  const calWidth = cal.getBoundingClientRect().width;
+  DEBUG_STATE.lastCalendarTileWidth = Number.isFinite(calWidth) ? (calWidth / Math.max(1, monthCount)) : null;
+  if(Number.isFinite(DEBUG_STATE.lastCalendarTileWidth) && DEBUG_STATE.lastCalendarTileWidth < 180){
+    if(!DEBUG_STATE.lastCalendarTileWarnedISO){
+      addWarning('Calendar tiles are narrow; consider expanding a month for readability.');
+      DEBUG_STATE.lastCalendarTileWarnedISO = new Date().toISOString();
+    }
+  }else{
+    DEBUG_STATE.lastCalendarTileWarnedISO = null;
+  }
   if(calendarExpandedKey && !cal.querySelector(`[data-month-key="${calendarExpandedKey}"]`)){
     calendarExpandedKey = null;
   }
@@ -1464,6 +1476,8 @@ const DEBUG_STATE = {
   lastFeedCalendarCompact: null,
   lastFeedCalendarStartISO: null,
   lastCalendarExpandedKey: null,
+  lastCalendarTileWidth: null,
+  lastCalendarTileWarnedISO: null,
   panelOverflowPx: null,
   panelOverflowLimitPx: 0,
   panelOverflowWarnedISO: null,
@@ -1596,6 +1610,9 @@ lines.push(`surface=${p.lenCm}×${p.widCm} cm, blanket=${p.blanketPct}%, ripple=
     lines.push(`days=${DEBUG_STATE.lastFeedCalendarDays}, months=${DEBUG_STATE.lastFeedCalendarMonths}, compact=${DEBUG_STATE.lastFeedCalendarCompact}, start=${DEBUG_STATE.lastFeedCalendarStartISO}`);
     if(DEBUG_STATE.lastCalendarExpandedKey){
       lines.push(`expanded=${DEBUG_STATE.lastCalendarExpandedKey}`);
+    }
+    if(Number.isFinite(DEBUG_STATE.lastCalendarTileWidth)){
+      lines.push(`tileWidth=${DEBUG_STATE.lastCalendarTileWidth.toFixed(1)}px`);
     }
   }
   if(Number.isFinite(DEBUG_STATE.panelOverflowPx)){
