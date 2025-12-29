@@ -1519,6 +1519,7 @@ const DEBUG_STATE = {
   lastUpdateISO: null,
   lastOxyMissingCount: 0,
   lastMCSeriesFallbacks: null,
+  lastBiofilmMetaMissing: null,
   debounceQueued: 0,
   debounceMs: null,
   missingContainers: [],
@@ -6238,6 +6239,10 @@ function fmtVal(value, unit='', decimals=null){
   return `${value.toFixed(d)}${unit ? ` ${unit}` : ''}`;
 }
 
+function renderFixedValue(value, decimals, fallback='n/a'){
+  return Number.isFinite(value) ? Number(value).toFixed(decimals) : fallback;
+}
+
 function fmtBandLine(mode, good, warn, unit=''){
   if(mode === 'min'){
     return `Safe ≥ ${fmtVal(good, unit)} • Watch ${fmtVal(warn, unit)}–${fmtVal(good, unit)} • Risk < ${fmtVal(warn, unit)}`;
@@ -6769,6 +6774,26 @@ function setRecomputeBubbleState(isActive){
   bubble.setAttribute('aria-hidden', isActive ? 'false' : 'true');
 }
 
+function composeBiofilmDebugLine(baseSim, params, context){
+  const biofilmMass = baseSim.meta?.biofilmMass_g;
+  const biofilmMult = baseSim.meta?.biofilmMult;
+  const missing = !Number.isFinite(biofilmMass) || !Number.isFinite(biofilmMult);
+  if(missing){
+    DEBUG_STATE.lastBiofilmMetaMissing = {
+      timeISO: new Date().toISOString(),
+      context: context || 'unknown',
+      biofilmMass_g: Number.isFinite(biofilmMass) ? biofilmMass : null,
+      biofilmMult: Number.isFinite(biofilmMult) ? biofilmMult : null
+    };
+    addWarning(`Biofilm meta missing for ${context || 'unknown'}; debug values may be incomplete.`);
+  }else{
+    DEBUG_STATE.lastBiofilmMetaMissing = null;
+  }
+  const massLabel = renderFixedValue(biofilmMass, 2, 'n/a');
+  const multLabel = renderFixedValue(biofilmMult, 2, 'n/a');
+  return `Biofilm: ${params.biofilmMm} mm • mass ${massLabel} g • mult ${multLabel} • slowFrac ${params.slowFrac}`;
+}
+
 function recompute(){
   clearError();
   if(debounceTimerId !== null){
@@ -6781,6 +6806,7 @@ function recompute(){
   DEBUG_STATE.warnings = [];
   DEBUG_STATE.lastOxyMissingCount = 0;
   DEBUG_STATE.lastMCSeriesFallbacks = null;
+  DEBUG_STATE.lastBiofilmMetaMissing = null;
   const recomputeStart = performance.now();
 
   try{
@@ -7037,7 +7063,7 @@ function recompute(){
       }
       dbg.push(`Rate peaks: demand ${baseSim.meta.maxDemand.toFixed(3)} g/day • supply ${baseSim.meta.maxSupply.toFixed(3)} g/day`);
       dbg.push('Metabolism mode: grazing-linked heterotrophs + photosynthesis (modernized kinetics)');
-      dbg.push(`Biofilm: ${params.biofilmMm} mm • mass ${baseSim.meta.biofilmMass_g.toFixed(2)} g • mult ${baseSim.meta.biofilmMult.toFixed(2)} • slowFrac ${params.slowFrac}`);
+      dbg.push(composeBiofilmDebugLine(baseSim, params, 'mc'));
       if(baseSim.meta.tempSmoothRange){
         dbg.push(`Temp smoothing: τ=${baseSim.meta.tempTauHours}h, smooth ${baseSim.meta.tempSmoothRange.min.toFixed(2)}–${baseSim.meta.tempSmoothRange.max.toFixed(2)}°C (target ${baseSim.meta.tempSmoothRange.targetMin.toFixed(2)}–${baseSim.meta.tempSmoothRange.targetMax.toFixed(2)}°C)`);
       }
@@ -7158,7 +7184,7 @@ function recompute(){
       }
       dbg.push(`Rate peaks: demand ${baseSim.meta.maxDemand.toFixed(3)} g/day • supply ${baseSim.meta.maxSupply.toFixed(3)} g/day`);
       dbg.push('Metabolism mode: grazing-linked heterotrophs + photosynthesis (modernized kinetics)');
-      dbg.push(`Biofilm: ${params.biofilmMm} mm • mass ${baseSim.meta.biofilmMass_g.toFixed(2)} g • mult ${baseSim.meta.biofilmMult.toFixed(2)} • slowFrac ${params.slowFrac}`);
+      dbg.push(composeBiofilmDebugLine(baseSim, params, 'deterministic'));
       if(baseSim.meta.tempSmoothRange){
         dbg.push(`Temp smoothing: τ=${baseSim.meta.tempTauHours}h, smooth ${baseSim.meta.tempSmoothRange.min.toFixed(2)}–${baseSim.meta.tempSmoothRange.max.toFixed(2)}°C (target ${baseSim.meta.tempSmoothRange.targetMin.toFixed(2)}–${baseSim.meta.tempSmoothRange.targetMax.toFixed(2)}°C)`);
       }
