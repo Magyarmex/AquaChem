@@ -158,6 +158,35 @@
     .tag-line .tag-chip.warn{background:rgba(255,207,90,.18); color:#fff3d1; border-color:rgba(255,207,90,.45)}
     .tag-line .tag-chip.danger{background:rgba(255,107,107,.18); color:#ffd1d1; border-color:rgba(255,107,107,.45)}
     .tag-details{margin-top:8px;color:var(--muted);font-size:12px;line-height:1.45}
+    .calendar{
+      display:grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap:6px;
+      margin-top:10px;
+    }
+    .cal-cell{
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:10px;
+      padding:6px 6px;
+      background:rgba(0,0,0,.18);
+      min-height:54px;
+      position:relative;
+      font-size:11px;
+    }
+    .cal-cell .day-num{font-weight:600;color:#dfe6ff}
+    .cal-cell .day-meta{color:var(--muted);font-size:10px;margin-top:4px}
+    .cal-cell.feed{background:rgba(99,230,190,.12); border-color:rgba(99,230,190,.4)}
+    .cal-cell.pop{background:rgba(255,207,90,.14); border-color:rgba(255,207,90,.4)}
+    .cal-cell.feed.pop{
+      background:linear-gradient(135deg, rgba(99,230,190,.18) 0%, rgba(99,230,190,.18) 45%, rgba(255,207,90,.18) 55%, rgba(255,207,90,.18) 100%);
+    }
+    .cal-label{
+      text-transform:uppercase;
+      letter-spacing:.08em;
+      font-size:10px;
+      color:rgba(231,236,255,.65);
+      text-align:center;
+    }
     .btn{
       background:rgba(122,162,255,.18);
       border:1px solid rgba(122,162,255,.35);
@@ -221,18 +250,25 @@
     <h2>Inputs</h2>
 
     <div class="row">
-      <label>Pellet mass added (as-fed, g)</label>
-      <input id="pelMass" type="range" min="0" max="5" step="0.01" value="1.00"/>
-      <input id="pelMassN" type="number" min="0" max="50" step="0.01" value="1.00"/>
+      <label>Pellets per feeding (count)</label>
+      <input id="pelMass" type="range" min="0" max="200" step="1" value="20"/>
+      <input id="pelMassN" type="number" min="0" max="500" step="1" value="20"/>
+    </div>
+    <div class="small" style="margin-top:-6px">
+      This rate ≈ <b id="pelCount">—</b> (<span id="pelEach">—</span> each).
     </div>
     <div class="small" style="margin-top:-6px">
       Provided feed mass ≈ <b id="pelCount">—</b> (<span id="pelEach">—</span> each).
     </div>
 
     <div class="row">
-      <label>Powder mass added (as-fed, g)</label>
+      <label>Powder mass per feeding (as-fed, g)</label>
       <input id="powMass" type="range" min="0" max="5" step="0.01" value="0.00"/>
       <input id="powMassN" type="number" min="0" max="50" step="0.01" value="0.00"/>
+    </div>
+    <div class="row">
+      <label>Feeding interval (days)</label>
+      <input id="feedInterval" type="number" min="0.25" step="0.25" value="1"/>
     </div>
 
     <div class="row">
@@ -322,6 +358,14 @@
     </details>
 
 
+
+    <div class="hr"></div>
+
+    <h2>Feeding calendar</h2>
+    <div class="note">
+      Feeding events add pellets + powder at your chosen interval. Green = feed day, yellow = pellet pop day.
+    </div>
+    <div class="calendar" id="feedCalendar"></div>
 
     <div class="hr"></div>
 
@@ -782,6 +826,81 @@ function buildCumulativeSeries(seriesDict, dt){
   return {series, info:{invalidCount, totals, dt}};
 }
 
+function buildFeedSchedule(params, mEach){
+  const interval = Number(params.feedIntervalDays ?? 0);
+  const pelletsPerFeed = Math.max(0, Math.round(Number(params.feedPellets ?? 0)));
+  const powderPerFeed_g = Math.max(0, Number(params.feedPowder_g ?? 0));
+  if(!Number.isFinite(interval) || interval <= 0) return [];
+  if(pelletsPerFeed <= 0 && powderPerFeed_g <= 0) return [];
+  const totalDays = Math.max(0, Number(params.days ?? 0));
+  const schedule = [];
+  let day = 0;
+  while(day <= totalDays + 1e-9){
+    schedule.push({
+      day,
+      pellets: pelletsPerFeed,
+      powder_g: powderPerFeed_g,
+      mass_g: pelletsPerFeed * mEach + powderPerFeed_g
+    });
+    day += interval;
+  }
+  return schedule;
+}
+
+function renderFeedingCalendar(params, feedSchedule, popEvents){
+  const cal = el('feedCalendar');
+  if(!cal){
+    addWarning('Feeding calendar missing (#feedCalendar).');
+    DEBUG_STATE.missingContainers.push({timeISO: new Date().toISOString(), id:'feedCalendar', context:'renderFeedingCalendar'});
+    return;
+  }
+  const days = Math.max(0, Math.ceil(Number(params.days ?? 0)));
+  DEBUG_STATE.lastFeedCalendarDays = days;
+  cal.innerHTML = '';
+  const labels = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  for(const label of labels){
+    const div = document.createElement('div');
+    div.className = 'cal-label';
+    div.textContent = label;
+    cal.appendChild(div);
+  }
+  const feedMap = new Map();
+  for(const f of feedSchedule){
+    const idx = Math.floor(f.day);
+    if(idx < 0 || idx >= days) continue;
+    const prev = feedMap.get(idx) || {pellets:0, powder_g:0};
+    prev.pellets += Number(f.pellets || 0);
+    prev.powder_g += Number(f.powder_g || 0);
+    feedMap.set(idx, prev);
+  }
+  const popMap = new Map();
+  for(const e of popEvents || []){
+    const idx = Math.floor(Number(e.day || 0));
+    if(idx < 0 || idx >= days) continue;
+    const prev = popMap.get(idx) || 0;
+    popMap.set(idx, prev + Number(e.pellets || 0));
+  }
+  for(let i=0;i<days;i++){
+    const cell = document.createElement('div');
+    const feed = feedMap.get(i);
+    const pop = popMap.get(i);
+    if(feed) cell.classList.add('feed');
+    if(pop) cell.classList.add('pop');
+    cell.classList.add('cal-cell');
+    const meta = [];
+    if(feed){
+      if(feed.pellets) meta.push(`${feed.pellets} pel`);
+      if(feed.powder_g) meta.push(`${feed.powder_g.toFixed(2)} g pow`);
+    }
+    if(pop) meta.push(`pop ${Math.round(pop)}`);
+    cell.innerHTML = `
+      <div class="day-num">Day ${i + 1}</div>
+      <div class="day-meta">${meta.join(' • ') || '—'}</div>
+    `;
+    cal.appendChild(cell);
+  }
+}
+
 /* =========================================================
    DOM helpers + error plumbing
 ========================================================= */
@@ -878,6 +997,8 @@ const DEBUG_STATE = {
   lastPlantLimitedSteps: null,
   lastBiomassSummary: null,
   lastTagSparkCount: null,
+  lastFeedScheduleCount: null,
+  lastFeedCalendarDays: null,
   lastUpdateISO: null,
   missingContainers: [],
   initReadyState: null,
@@ -1031,6 +1152,14 @@ lines.push(`surface=${p.lenCm}×${p.widCm} cm, blanket=${p.blanketPct}%, ripple=
     lines.push('');
     lines.push('--- Chemistry tag sparklines ---');
     lines.push(`Rendered: ${DEBUG_STATE.lastTagSparkCount}`);
+  }
+  if(Number.isFinite(DEBUG_STATE.lastFeedScheduleCount)){
+    lines.push('');
+    lines.push('--- Feeding schedule ---');
+    lines.push(`Feed events: ${DEBUG_STATE.lastFeedScheduleCount}`);
+    if(Number.isFinite(DEBUG_STATE.lastFeedCalendarDays)){
+      lines.push(`Calendar days: ${DEBUG_STATE.lastFeedCalendarDays}`);
+    }
   }
   if(DEBUG_STATE.lastRateBandKeys){
     lines.push('');
@@ -1432,17 +1561,9 @@ function runSimulation(params){
   const oxBottom= (heaterLevel === 2) ? 0.75 : (heaterLevel === 1 ? 0.55 : 0.45);
 
   // Pools (g as-fed broken into components)
-  let pelFloat = {
-    carb: params.pelletMass_g * FRACTIONS.carb,
-    prot: params.pelletMass_g * FRACTIONS.protein,
-    fat:  params.pelletMass_g * FRACTIONS.fat
-  };
+  let pelFloat = {carb:0, prot:0, fat:0};
   let pelBot = {carb:0, prot:0, fat:0};
-  let powBot = {
-    carb: params.powderMass_g * FRACTIONS.carb,
-    prot: params.powderMass_g * FRACTIONS.protein,
-    fat:  params.powderMass_g * FRACTIONS.fat
-  };
+  let powBot = {carb:0, prot:0, fat:0};
 
   let S = {carb:0, prot:0, fat:0}; // soluble pool (g)
   let S_slow = {carb:0, prot:0, fat:0}; // refractory pool (g)
@@ -1598,13 +1719,18 @@ function runSimulation(params){
     micro: new Array(n).fill(0),
   };
 
+  const mEach = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
+  const feedSchedule = params.feedSchedule || buildFeedSchedule(params, mEach);
+
   // Events sorted
   const ev = [...params.events]
     .filter(e=>Number.isFinite(e.day) && Number.isFinite(e.pellets) && e.pellets>0)
     .sort((a,b)=>a.day-b.day);
   let evIdx = 0;
-
-  const mEach = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
+  const feeds = [...feedSchedule]
+    .filter(e=>Number.isFinite(e.day))
+    .sort((a,b)=>a.day-b.day);
+  let feedIdx = 0;
 
   function blend(a,b,w){ return a*(1-w) + b*w; }
 
@@ -1642,12 +1768,11 @@ function runSimulation(params){
     return Math.min(flux, mass/dt);
   }
 
-  const initialN = params.pelletMass_g * FRACTIONS.protein * CHEM.gN_per_g_protein
-    + params.powderMass_g * FRACTIONS.protein * CHEM.gN_per_g_protein;
-  const initialC = params.pelletMass_g + params.powderMass_g;
-  out.audit.n_balance_init = initialN;
-  out.audit.c_balance_init = initialC;
-  out.meta.feedStart = initialC;
+  let feedAddedN_g = 0;
+  let feedAddedC_g = 0;
+  out.audit.n_balance_init = 0;
+  out.audit.c_balance_init = 0;
+  out.meta.feedStart = 0;
   const photoO2_g_day_peak = (PHOTO_MODEL.o2_mg_g_day_peak * photoMass) / 1000;
   const macroUptakeRate_g_day = (FEED_PROFILE.modeling.macroUptake_mgL_per_g_photo_day * photoMass * params.volL) / 1000;
   const microUptakeRate_g_day = (FEED_PROFILE.modeling.microUptake_mgL_per_g_photo_day * photoMass * params.volL) / 1000;
@@ -1669,6 +1794,31 @@ function runSimulation(params){
     const dNit = dNit_base * tempFNit;
     const rDen_grow = rDen_base * tempF;
     const dDen = dDen_base * tempF;
+
+    // Apply feed events at this time slice
+    while(feedIdx < feeds.length && feeds[feedIdx].day <= day + dt/2){
+      const f = feeds[feedIdx];
+      const feedPellets = Math.max(0, Math.round(Number(f.pellets || 0)));
+      const feedPowder_g = Math.max(0, Number(f.powder_g || 0));
+      if(feedPellets > 0){
+        const feedMass = feedPellets * mEach;
+        pelFloat.carb += feedMass * FRACTIONS.carb;
+        pelFloat.prot += feedMass * FRACTIONS.protein;
+        pelFloat.fat += feedMass * FRACTIONS.fat;
+        feedAddedC_g += feedMass;
+        feedAddedN_g += feedMass * FRACTIONS.protein * CHEM.gN_per_g_protein;
+      }
+      if(feedPowder_g > 0){
+        powBot.carb += feedPowder_g * FRACTIONS.carb;
+        powBot.prot += feedPowder_g * FRACTIONS.protein;
+        powBot.fat += feedPowder_g * FRACTIONS.fat;
+        feedAddedC_g += feedPowder_g;
+        feedAddedN_g += feedPowder_g * FRACTIONS.protein * CHEM.gN_per_g_protein;
+      }
+      feeds[feedIdx].mass_g = feedPellets * mEach + feedPowder_g;
+      feeds[feedIdx].n_g = feedAddedN_g;
+      feedIdx++;
+    }
 
     // Apply pop events at this time slice
     while(evIdx < ev.length && ev[evIdx].day <= day + dt/2){
@@ -1803,6 +1953,20 @@ function runSimulation(params){
     phytoMass_g = Math.max(0, phytoMass_g + phytoGrowth - phytoDecay);
     phytoGrowthTotal += phytoGrowth;
     phytoDecayTotal += phytoDecay;
+
+    const decayMass = heteroDecay + phytoDecay;
+    if(decayMass > 0){
+      const decayMacro_g = (macroRelease * decayMass * params.volL) / 1000;
+      const decayMicro_g = (microRelease * decayMass * params.volL) / 1000;
+      macro_g += decayMacro_g;
+      micro_g += decayMicro_g;
+      out.audit.macro_release += decayMacro_g;
+      out.audit.micro_release += decayMicro_g;
+      S.carb += decayMass * FRACTIONS.carb;
+      S.prot += decayMass * FRACTIONS.protein;
+      S.fat  += decayMass * FRACTIONS.fat;
+      NH4 += decayMass * FRACTIONS.protein * CHEM.gN_per_g_protein * 0.3;
+    }
 
     const heteroMacroUptake_g = Math.min(macro_g, (HET_MODEL.macroUptake_mgL_per_g_day * heteroMass_g * params.volL / 1000) * foodIndex * dt);
     const heteroMicroUptake_g = Math.min(micro_g, (HET_MODEL.microUptake_mgL_per_g_day * heteroMass_g * params.volL / 1000) * foodIndex * dt);
@@ -2000,6 +2164,8 @@ function runSimulation(params){
   out.chemProdCum = chemProdCumResult.series;
   out.meta.chemProdCumInfo = chemProdCumResult.info;
 
+  out.audit.n_balance_init = feedAddedN_g;
+  out.audit.c_balance_init = feedAddedC_g;
   out.audit.n_balance_end = NH4 + NO2 + NO3 + N_bio;
   out.audit.c_balance_end = CO2_g + COD_bio + S.carb + S.prot + S.fat + S_slow.carb + S_slow.prot + S_slow.fat
     + pelFloat.carb + pelFloat.prot + pelFloat.fat + pelBot.carb + pelBot.prot + pelBot.fat + powBot.carb + powBot.prot + powBot.fat;
@@ -2009,10 +2175,10 @@ function runSimulation(params){
   out.meta.phytoGrowthTotal = phytoGrowthTotal;
   out.meta.phytoDecayTotal = phytoDecayTotal;
   out.meta.co2FloorHits = co2FloorHits;
-  if(initialN > 0 && Math.abs(out.audit.n_balance_end - initialN)/initialN > 0.15){
+  if(feedAddedN_g > 0 && Math.abs(out.audit.n_balance_end - feedAddedN_g)/feedAddedN_g > 0.15){
     addWarning('Nitrogen balance drift exceeds 15% — check kinetics or timestep.');
   }
-  if(initialC > 0 && Math.abs(out.audit.c_balance_end - initialC)/initialC > 0.25){
+  if(feedAddedC_g > 0 && Math.abs(out.audit.c_balance_end - feedAddedC_g)/feedAddedC_g > 0.25){
     addWarning('Carbon balance drift exceeds 25% — check hydrolysis/CO2 terms.');
   }
 
@@ -3103,7 +3269,7 @@ function renderEvents(){
 /* =========================================================
    State persistence
 ========================================================= */
-const STATE_VERSION = 6;
+const STATE_VERSION = 7;
 
 function saveState(){
   const s = {
@@ -3111,6 +3277,7 @@ function saveState(){
     // main sliders
     pelMass: Number(el('pelMassN').value),
     powMass: Number(el('powMassN').value),
+    feedIntervalDays: Number(el('feedInterval').value),
     blanket: Number(el('blanketN').value),
     days: Number(el('daysN').value),
 
@@ -3207,6 +3374,7 @@ function loadState(){
     // sliders (range+number pairs)
     if(s.pelMass !== undefined){ el('pelMass').value = s.pelMass; el('pelMassN').value = s.pelMass; }
     if(s.powMass !== undefined){ el('powMass').value = s.powMass; el('powMassN').value = s.powMass; }
+    if(s.feedIntervalDays !== undefined && el('feedInterval')) el('feedInterval').value = s.feedIntervalDays;
     if(s.blanket !== undefined){ el('blanket').value = s.blanket; el('blanketN').value = s.blanket; }
     if(s.days !== undefined){ el('days').value = s.days; el('daysN').value = s.days; }
 
@@ -3566,7 +3734,8 @@ function setFlags(sim, params, mc){
   };
 
   const estPellets = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
-  const pelCount = estPellets > 0 ? (params.pelletMass_g / estPellets) : 0;
+  const feedSchedule = params.feedSchedule || [];
+  const pelCount = feedSchedule.reduce((acc, f)=>acc + (Number(f.pellets) || 0), 0);
   const eventTotal = (params.events || []).reduce((acc, e)=>acc + (Number(e.pellets) || 0), 0);
   if(eventTotal > pelCount + 1){
     add('warn', 'Pop events exceed pellets', `Total pops (${eventTotal.toFixed(0)}) exceed estimated pellet count (${pelCount.toFixed(0)}). The model caps pops automatically, but the schedule is probably too aggressive.`);
@@ -3841,8 +4010,9 @@ function getParams(){
   }catch(_){}
 
   const p = {
-    pelletMass_g: Number(el('pelMassN').value),
-    powderMass_g: Number(el('powMassN').value),
+    feedPellets: Number(el('pelMassN').value),
+    feedPowder_g: Number(el('powMassN').value),
+    feedIntervalDays: Number(el('feedInterval').value),
     blanketPct: Number(el('blanketN').value),
     days: Number(el('daysN').value),
 
@@ -3922,6 +4092,7 @@ function getParams(){
 
   // light sanitization
   p.mcRuns = clamp(Math.round(p.mcRuns || 0), 10, 5000);
+  p.feedIntervalDays = clamp(Number.isFinite(p.feedIntervalDays) ? p.feedIntervalDays : 1, 0.25, 365);
   p.pH = clamp(Number.isFinite(p.pH) ? p.pH : 7.0, 5.0, 9.5);
   p.nitCap = clamp(Number.isFinite(p.nitCap) ? p.nitCap : 1.0, 0, 1);
   p.denitCap = clamp(Number.isFinite(p.denitCap) ? p.denitCap : 1.0, 0, 1);
@@ -3984,12 +4155,17 @@ function recompute(){
 
     saveState();
 
-    // Pellet derived quantities
+    // Pellet derived quantities + feeding schedule
     setStage('Pellets', 'derive pellet count');
     const mEach = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
-    const nPel = (mEach > 0) ? (params.pelletMass_g / mEach) : 0;
-    setText('pelCount', `${nPel.toFixed(1)} pellets`);
+    const perFeedPellets = Math.max(0, Math.round(Number(params.feedPellets || 0)));
+    const perFeedMass_g = perFeedPellets * mEach;
+    setText('pelCount', `${perFeedPellets.toFixed(0)} pellets`);
     setText('pelEach', `${mEach.toFixed(4)} g`);
+    const feedSchedule = buildFeedSchedule(params, mEach);
+    params.feedSchedule = feedSchedule;
+    DEBUG_STATE.lastFeedScheduleCount = feedSchedule.length;
+    renderFeedingCalendar(params, feedSchedule, EVENTS);
 
     // Base sim (used for breakdown lines + UI even in uncertainty mode)
     setStage('Simulation', 'run base sim');
@@ -4092,6 +4268,15 @@ function recompute(){
         bandColors: Object.fromEntries(CHEM_SERIES.map(s=>[s.key, s.color])),
         bandPattern: true
       });
+
+      setStage('Plots', 'biomass');
+      bioGeom = drawBiomassPlot(el('bioCanvas'), baseSim, {
+        bioBands: mc.q.bioBands,
+        bioPctBands: mc.q.bioPctBands
+      });
+      if(!mc.q.bioBands || !mc.q.bioPctBands){
+        addWarning('Missing biomass uncertainty bands; check Monte Carlo aggregation.');
+      }
 
       setStage('Plots', 'biomass');
       bioGeom = drawBiomassPlot(el('bioCanvas'), baseSim, {
@@ -4415,7 +4600,7 @@ function init(){
 
   // Inputs that trigger recompute
   [
-    'volL','airFlow','Tnow','pH','altM','tds','ripplePct',
+    'volL','airFlow','Tnow','pH','altM','tds','ripplePct','feedInterval',
     'lenCm','widCm','tankHCm','waterSurfCm','blanketGapCm','diffDepthCm','heaters',
     'sotePerM','kCalm','kRipple','tight','otrCal',
     'doInitPct','kDoNit','kNH4Nit','kNO2Nit','nitCap','nitQ10','nUnits',
