@@ -36,16 +36,40 @@
       z-index:0;
     }
     header{
-      padding:22px 20px 16px;
-      border-bottom:1px solid var(--line);
+      padding:18px 20px 14px;
+      border-bottom:1px solid rgba(122,162,255,.18);
       position:sticky;
       top:0;
-      background:linear-gradient(180deg, rgba(11,16,32,.98), rgba(11,16,32,.88));
+      background:linear-gradient(180deg, rgba(10,15,30,.98), rgba(10,15,30,.92));
       backdrop-filter: blur(12px);
       z-index:10;
     }
-    header h1{margin:0;font-size:20px;font-weight:700;letter-spacing:.3px}
-    header p{margin:8px 0 0;color:var(--muted);font-size:13px;max-width:1100px;line-height:1.45}
+    .app-title{
+      display:flex;
+      align-items:center;
+      gap:12px;
+    }
+    .app-mark{
+      width:44px;
+      height:44px;
+      border-radius:14px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background:linear-gradient(140deg, rgba(122,162,255,.28), rgba(99,230,190,.16));
+      border:1px solid rgba(122,162,255,.35);
+      box-shadow:0 10px 18px rgba(0,0,0,.3);
+      font-size:20px;
+    }
+    header h1{margin:0;font-size:18px;font-weight:700;letter-spacing:.4px}
+    .app-subtitle{
+      margin:4px 0 0;
+      color:rgba(231,236,255,.78);
+      font-size:12px;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+    }
+    header p{margin:10px 0 0;color:var(--muted);font-size:12px;max-width:960px;line-height:1.45}
     .wrap{max-width:1280px;margin:0 auto;padding:20px;display:grid;gap:16px;grid-template-columns: 480px 1fr;position:relative;z-index:1;}
     @media (max-width: 1100px){ .wrap{grid-template-columns:1fr;} header{position:static;} }
     .card{
@@ -57,6 +81,125 @@
       backdrop-filter: blur(6px);
     }
     .card h2{margin:0 0 12px;font-size:14px;color:#dfe6ff;text-transform:uppercase;letter-spacing:.12em}
+    .left-panel{
+      position:relative;
+      background:linear-gradient(180deg,rgba(15,22,44,.98),rgba(12,18,38,.97));
+    }
+    .panel-section{
+      position:relative;
+      padding:10px 12px 10px 14px;
+      border-radius:16px;
+      background:linear-gradient(180deg,rgba(12,19,39,.92),rgba(9,14,30,.92));
+      border:1px solid rgba(122,162,255,.14);
+      box-shadow:0 12px 24px rgba(0,0,0,.28);
+      display:grid;
+      gap:8px;
+      overflow:hidden;
+    }
+    .panel-section::before{
+      content:"";
+      position:absolute;
+      left:0;
+      top:0;
+      bottom:0;
+      width:4px;
+      background:linear-gradient(180deg, rgba(122,162,255,.75), rgba(99,230,190,.35));
+      opacity:.7;
+    }
+    .panel-header{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding-left:8px;
+    }
+    .panel-title{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      font-size:12px;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+      color:#dfe6ff;
+      font-weight:700;
+    }
+    .panel-title .icon{
+      width:28px;
+      height:28px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      border-radius:10px;
+      background:rgba(122,162,255,.18);
+      border:1px solid rgba(122,162,255,.25);
+      font-size:13px;
+    }
+    .panel-sub{
+      color:var(--muted);
+      font-size:11px;
+      line-height:1.45;
+      padding-left:8px;
+    }
+    .panel-badges{
+      display:flex;
+      gap:6px;
+      flex-wrap:wrap;
+    }
+    .badge{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:4px 8px;
+      border-radius:999px;
+      font-size:10px;
+      text-transform:uppercase;
+      letter-spacing:.12em;
+      border:1px solid transparent;
+      background:rgba(122,162,255,.12);
+      color:#dfe6ff;
+    }
+    .badge.warn{background:rgba(255,207,90,.18); border-color:rgba(255,207,90,.35); color:#fff3d1;}
+    .badge.ok{background:rgba(99,230,190,.16); border-color:rgba(99,230,190,.35); color:#d5fff1;}
+    .badge.note{background:rgba(122,162,255,.2); border-color:rgba(122,162,255,.35);}
+    .badge.alert{background:rgba(255,107,107,.18); border-color:rgba(255,107,107,.35); color:#ffd1d1;}
+    .panel-divider{height:1px;background:rgba(255,255,255,.08);margin:4px 0}
+    .panel-quick{
+      display:grid;
+      gap:8px;
+      padding:8px 10px;
+      border-radius:16px;
+      background:linear-gradient(140deg, rgba(122,162,255,.16), rgba(99,230,190,.08));
+      border:1px solid rgba(122,162,255,.2);
+    }
+    .panel-quick .row{margin:0}
+    .panel-drawer{
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:12px;
+      padding:6px 8px;
+      background:rgba(0,0,0,.18);
+    }
+    .panel-drawer summary{font-size:12px;color:#dfe6ff;font-weight:600}
+    .panel-drawer .drawer-text{color:var(--muted);font-size:11px;line-height:1.45;margin-top:6px}
+    .left-panel .row label{font-size:11px;letter-spacing:.03em}
+    .left-panel input[type="number"],
+    .left-panel input[type="text"],
+    .left-panel select{padding:8px 10px;font-size:12px;border-radius:10px}
+    .control-active{
+      box-shadow:0 0 0 3px rgba(122,162,255,.18), 0 0 18px rgba(122,162,255,.22);
+      border-color:rgba(122,162,255,.6);
+    }
+    .left-panel .row input[type="range"]{min-width:180px}
+    .left-panel .grid2{gap:6px}
+    .left-panel .grid3{gap:6px}
+    .left-panel .small{font-size:11px}
+    .left-panel .note{font-size:11px}
+    .panel-section.compact{
+      padding:8px 10px 8px 12px;
+      gap:6px;
+    }
+    .panel-section.compact .panel-title{font-size:11px}
+    .panel-section.compact .panel-title .icon{width:24px;height:24px;font-size:12px}
+    .panel-section.compact .panel-sub{font-size:10px}
     .grid2{display:grid;gap:10px;grid-template-columns:1fr 1fr;}
 
     .grid3{display:grid;gap:10px;grid-template-columns:1fr 1fr 1fr;}
@@ -164,62 +307,91 @@
     .tag-details{margin-top:8px;color:var(--muted);font-size:12px;line-height:1.45}
     .calendar{
       display:grid;
-      gap:12px;
-      margin-top:10px;
+      gap:8px;
+      margin-top:6px;
     }
-    .calendar.compact{
-      gap:10px;
+    .calendar.tiles{
+      grid-template-columns:repeat(3, minmax(0, 1fr));
+    }
+    @media (max-width: 900px){
+      .calendar.tiles{grid-template-columns:repeat(2, minmax(0, 1fr));}
+    }
+    @media (max-width: 560px){
+      .calendar.tiles{grid-template-columns:1fr;}
     }
     .calendar-month{
       border:1px solid rgba(255,255,255,.12);
       border-radius:12px;
-      padding:10px;
+      padding:8px 7px;
       background:rgba(0,0,0,.18);
+      display:grid;
+      gap:4px;
+      position:relative;
+      min-width:0;
+    }
+    .calendar-month.expanded{
+      grid-column:1 / -1;
+      padding:12px;
+      background:linear-gradient(180deg, rgba(17,26,51,.96), rgba(10,16,34,.94));
+      border-color:rgba(122,162,255,.3);
+      box-shadow:0 18px 30px rgba(0,0,0,.35);
     }
     .calendar-header{
       display:flex;
       align-items:center;
       justify-content:space-between;
-      font-size:12px;
+      font-size:11px;
       color:#dfe6ff;
       letter-spacing:.08em;
       text-transform:uppercase;
+      gap:6px;
+      flex-wrap:wrap;
     }
     .calendar-header .summary{
       color:var(--muted);
-      font-size:10px;
+      font-size:9px;
       letter-spacing:.04em;
+    }
+    .calendar-header .month-actions{
+      display:flex;
+      gap:4px;
+      align-items:center;
+    }
+    .calendar-header .month-toggle{
+      border:1px solid rgba(122,162,255,.35);
+      background:rgba(122,162,255,.16);
+      color:#dfe6ff;
+      border-radius:999px;
+      padding:2px 6px;
+      font-size:10px;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+      cursor:pointer;
     }
     .calendar-grid{
       display:grid;
       grid-template-columns: repeat(7, 1fr);
-      gap:6px;
-      margin-top:8px;
-    }
-    .calendar.compact .calendar-grid{
-      gap:4px;
+      gap:3px;
+      margin-top:2px;
     }
     .cal-cell{
       border:1px solid rgba(255,255,255,.12);
-      border-radius:10px;
-      padding:6px 6px;
+      border-radius:8px;
+      padding:3px 3px;
       background:rgba(0,0,0,.18);
-      min-height:54px;
+      min-height:30px;
       position:relative;
-      font-size:11px;
-    }
-    .calendar.compact .cal-cell{
-      min-height:42px;
-      font-size:10px;
-      padding:5px 5px;
+      font-size:9.5px;
+      line-height:1.2;
+      overflow:hidden;
     }
     .cal-cell.empty{
       background:transparent;
       border-color:transparent;
       box-shadow:none;
     }
-    .cal-cell .day-num{font-weight:600;color:#dfe6ff}
-    .cal-cell .day-meta{color:var(--muted);font-size:10px;margin-top:4px}
+    .cal-cell .day-num{font-weight:600;color:#dfe6ff;font-size:10px}
+    .cal-cell .day-meta{display:none}
     .cal-cell.feed{background:rgba(99,230,190,.12); border-color:rgba(99,230,190,.4)}
     .cal-cell.pop{background:rgba(255,207,90,.14); border-color:rgba(255,207,90,.4)}
     .cal-cell.feed.pop{
@@ -250,6 +422,8 @@
     .btn.ghost:hover{background:rgba(255,255,255,.06)}
     details{border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:12px;background:rgba(0,0,0,.16)}
     details summary{cursor:pointer;color:#dfe6ff;font-weight:600;font-size:13px}
+    details.panel-drawer{border:1px solid rgba(255,255,255,.12);padding:8px 10px;background:rgba(0,0,0,.18)}
+    details.panel-drawer summary{font-size:12px}
     table{width:100%;border-collapse:collapse}
     th,td{padding:8px 6px;border-bottom:1px solid rgba(255,255,255,.08);font-size:12px;color:var(--muted)}
     tr:nth-child(even) td{background:rgba(255,255,255,.02)}
@@ -277,62 +451,106 @@
     .hr{height:1px;background:rgba(255,255,255,.10);margin:10px 0}
     .errbox{border:1px solid rgba(255,107,107,.35);background:rgba(255,107,107,.08);padding:10px;border-radius:12px;color:#ffd1d1;font-size:12px;display:none}
     .errbox pre{margin:8px 0 0;white-space:pre-wrap;word-break:break-word;color:#ffd1d1}
+    .copy-toast{
+      font-size:11px;
+      color:var(--ok);
+      padding:2px 8px;
+      border-radius:999px;
+      border:1px solid rgba(99,230,190,.35);
+      background:rgba(99,230,190,.12);
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+    }
+    .copy-toast.warn{
+      color:#fff3d1;
+      border-color:rgba(255,207,90,.45);
+      background:rgba(255,207,90,.16);
+    }
+    .calendar-month.expanded .cal-cell{
+      min-height:52px;
+      font-size:11px;
+      padding:6px;
+    }
   </style>
 </head>
 <body>
 <header class="app-header">
-  <h1>O₂ Demand Planner — pellets + powder + “pop” events + DO simulation</h1>
+  <div class="app-title">
+    <div class="app-mark">🫧</div>
+    <div>
+      <h1>Aquarium Oxygen Planner</h1>
+      <div class="app-subtitle">Demand modeling · Oxygenation inference · Feeding cadence</div>
+    </div>
+  </div>
   <p>
-    This sim estimates <b>oxygen demand</b> from decomposing feed and (optionally) nitrification.
-    It also simulates <b>dissolved oxygen (DO)</b> using an inferred oxygenation model:
-    <b>bubble transfer</b> (airflow + depth + diffuser efficiency) + <b>surface transfer</b> (ripples + blanket coverage + headspace ventilation).
-    The goal is inference: plausible numbers you can tune later with even one real-world measurement.
+    Estimate oxygen demand from feed decomposition and nitrification, then simulate dissolved oxygen with bubble + surface transfer.
+    Calibrate with real-world measurements to tighten uncertainty bands over time.
   </p>
 </header>
 
 <div class="wrap">
-  <div class="card">
-    <h2>Inputs</h2>
-
-    <div class="row">
-      <label>Pellets per feeding (count)</label>
-      <input id="pelMass" type="range" min="0" max="200" step="1" value="20"/>
-      <input id="pelMassN" type="number" min="0" max="500" step="1" value="20"/>
-    </div>
-    <div class="small" style="margin-top:-6px">
-      This rate ≈ <b id="pelCount">—</b> (<span id="pelEach">—</span> each).
-    </div>
-
-    <div class="row">
-      <label>Powder mass per feeding (as-fed, g)</label>
-      <input id="powMass" type="range" min="0" max="5" step="0.01" value="0.00"/>
-      <input id="powMassN" type="number" min="0" max="50" step="0.01" value="0.00"/>
-    </div>
-    <div class="row">
-      <label>Feeding interval (days)</label>
-      <input id="feedInterval" type="number" min="0.25" step="0.25" value="1"/>
-    </div>
-
-    <div class="row">
-      <label>Blanket cover (%) — uncovered = chimney</label>
-      <input id="blanket" type="range" min="0" max="100" step="1" value="80"/>
-      <input id="blanketN" type="number" min="0" max="100" step="1" value="80"/>
-    </div>
-
-    <div class="row">
-      <label>Simulation time (days)</label>
-      <input id="days" type="range" min="7" max="180" step="1" value="30"/>
-      <input id="daysN" type="number" min="1" max="365" step="1" value="30"/>
-    </div>
-
-    <details id="uncModeDetails" open style="margin-top:10px">
-      <summary>Uncertainty Mode (Monte Carlo)</summary>
-      <div class="small" style="margin-top:10px">
-        Default mode: the sim runs many plausible “nearby realities” and shows a band (not a single pretend-precise line).
-        Without a real DO measurement, this is the honest way to use the model.
+  <div class="card left-panel">
+    <div class="panel-quick">
+      <div class="panel-header">
+        <div class="panel-title"><span class="icon">⚡</span>Quick Controls</div>
+        <div class="panel-badges">
+          <span class="badge note">Most adjusted</span>
+        </div>
       </div>
 
-      <div class="grid2" style="margin-top:10px">
+      <div class="row">
+        <label>Pellets per feeding (count)</label>
+        <input id="pelMass" type="range" min="0" max="200" step="1" value="20"/>
+        <input id="pelMassN" type="number" min="0" max="500" step="1" value="20"/>
+      </div>
+      <div class="small" style="margin-top:-6px">
+        This rate ≈ <b id="pelCount">—</b> (<span id="pelEach">—</span> each).
+      </div>
+
+      <div class="row">
+        <label>Powder mass per feeding (as-fed, g)</label>
+        <input id="powMass" type="range" min="0" max="5" step="0.01" value="0.00"/>
+        <input id="powMassN" type="number" min="0" max="50" step="0.01" value="0.00"/>
+      </div>
+
+      <div class="row">
+        <label>Feeding interval (days)</label>
+        <input id="feedInterval" type="number" min="0.25" step="0.25" value="1"/>
+      </div>
+
+      <div class="row">
+        <label>Blanket cover (%) — uncovered = chimney</label>
+        <input id="blanket" type="range" min="0" max="100" step="1" value="80"/>
+        <input id="blanketN" type="number" min="0" max="100" step="1" value="80"/>
+      </div>
+
+      <div class="row">
+        <label>Simulation time (days)</label>
+        <input id="days" type="range" min="7" max="180" step="1" value="30"/>
+        <input id="daysN" type="number" min="1" max="365" step="1" value="30"/>
+      </div>
+    </div>
+
+    <div class="panel-section" id="uncModeDetails" style="margin-top:12px">
+      <div class="panel-header">
+        <div class="panel-title"><span class="icon">🧭</span>Uncertainty Mode</div>
+        <div class="panel-badges">
+          <span class="badge warn">Uncertainty Mode</span>
+        </div>
+      </div>
+      <div class="panel-sub">
+        Runs multiple plausible realities and shows a confidence band instead of a single line.
+      </div>
+      <details class="panel-drawer">
+        <summary>What this means</summary>
+        <div class="drawer-text">
+          Default mode: the sim runs many plausible “nearby realities” and shows a band (not a single pretend-precise line).
+          Without a real DO measurement, this is the honest way to use the model.
+        </div>
+      </details>
+
+      <div class="grid2">
         <div class="row">
           <label>Run mode</label>
           <select id="runMode">
@@ -377,14 +595,14 @@
         </div>
       </div>
 
-      <div style="margin-top:10px">
+      <div>
         <button class="btn" id="recomputeBtn" style="display:none">Recompute</button>
       </div>
 
-      <div class="hr"></div>
+      <div class="panel-divider"></div>
 
       <div class="small"><b>What varies across runs:</b></div>
-      <div class="grid2" style="margin-top:8px">
+      <div class="grid2">
         <div class="row"><label><input id="uAir" type="checkbox" checked> Pump delivered airflow</label></div>
         <div class="row"><label><input id="uDiff" type="checkbox" checked> Bubble transfer efficiency</label></div>
         <div class="row"><label><input id="uSurf" type="checkbox" checked> Surface exchange (k values)</label></div>
@@ -394,333 +612,385 @@
         <div class="row"><label><input id="uInitDO" type="checkbox" checked> Initial DO</label></div>
       </div>
 
-      <div class="small" style="margin-top:8px">
-        The band is a <b>distribution</b>, not a promise. If you calibrate with real DO data later, the band shrinks and gets less “vibes, more physics”.
-      </div>
-    </details>
-
-
-
-    <div class="hr"></div>
-
-    <h2>Feeding calendar</h2>
-    <div class="note">
-      Feeding events add pellets + powder at your chosen interval. Green = feed day, yellow = pellet pop day.
-    </div>
-    <div class="calendar" id="feedCalendar"></div>
-
-    <div class="hr"></div>
-
-    <h2>Pop events (convert pellets → powder)</h2>
-    <div class="note">
-      Click the <span class="kbd">RATE</span> graph to add an event at that day, or use the table below.
-      Each event converts whole pellets into powder at that moment (mass is conserved).
-    </div>
-    <div class="grid3" style="margin-top:10px">
-      <div class="row">
-        <label>Event day</label>
-        <input id="evDay" type="number" min="0" step="0.1" value="3.0"/>
-      </div>
-      <div class="row">
-        <label>Pellets to pop</label>
-        <input id="evPellets" type="number" min="0" step="1" value="10"/>
-      </div>
-      <div class="row" style="justify-content:flex-end">
-        <button class="btn" id="addEventBtn">Add event</button>
-      </div>
-    </div>
-    <div style="margin-top:8px">
-      <button class="btn ghost" id="clearEventsBtn">Clear events</button>
+      <details class="panel-drawer">
+        <summary>What this means</summary>
+        <div class="drawer-text">
+          The band is a <b>distribution</b>, not a promise. If you calibrate with real DO data later, the band shrinks and gets less “vibes, more physics”.
+        </div>
+      </details>
     </div>
 
-    <div style="margin-top:10px; max-height:220px; overflow:auto;">
-      <table id="eventsTable">
-        <thead>
-          <tr><th>Day</th><th>Pellets to pop</th><th></th></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+    <div class="panel-section" style="margin-top:12px">
+      <div class="panel-header">
+        <div class="panel-title"><span class="icon">📅</span>Feeding Calendar</div>
+        <div class="panel-badges">
+          <span class="badge ok">Feeding Calendar</span>
+        </div>
+      </div>
+      <details class="panel-drawer">
+        <summary>What this means</summary>
+        <div class="drawer-text">
+          Feeding events add pellets + powder at your chosen interval. Green = feed day, yellow = pellet pop day.
+        </div>
+      </details>
+      <div class="calendar tiles" id="feedCalendar"></div>
     </div>
 
-    <div class="hr"></div>
-    <div class="errbox" id="errBox">
-      <b>Model error</b>
-      <div class="small" style="margin-top:6px">
-        If this repeats, open Dev / debug and copy the stack trace.
+    <div class="panel-section compact" style="margin-top:12px">
+      <div class="panel-header">
+        <div class="panel-title"><span class="icon">💥</span>Pop Events</div>
+        <div class="panel-badges">
+          <span class="badge warn">Pop Events</span>
+        </div>
       </div>
-      <pre id="errText"></pre>
+      <details class="panel-drawer">
+        <summary>What this means</summary>
+        <div class="drawer-text">
+          Click the <span class="kbd">RATE</span> graph to add an event at that day, or use the table below.
+          Each event converts whole pellets into powder at that moment (mass is conserved).
+        </div>
+      </details>
+      <div class="grid3">
+        <div class="row">
+          <label>Event day</label>
+          <input id="evDay" type="number" min="0" step="0.1" value="3.0"/>
+        </div>
+        <div class="row">
+          <label>Pellets to pop</label>
+          <input id="evPellets" type="number" min="0" step="1" value="10"/>
+        </div>
+        <div class="row" style="justify-content:flex-end">
+          <button class="btn" id="addEventBtn">Add event</button>
+        </div>
+      </div>
+      <div>
+        <button class="btn ghost" id="clearEventsBtn">Clear events</button>
+      </div>
+
+      <div style="max-height:220px; overflow:auto;">
+        <table id="eventsTable">
+          <thead>
+            <tr><th>Day</th><th>Pellets to pop</th><th></th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </div>
 
-    <details style="margin-top:12px" open>
-      <summary>Advanced: Environment & tank</summary>
-
-      <div class="grid2" style="margin-top:10px">
-        <div class="row">
-          <label>Tank water volume (L)</label>
-          <input id="volL" type="number" step="0.1" value="65.0"/>
-        </div>
-        <div class="row">
-          <label>Water temp (°C) at current blanket setting</label>
-          <input id="Tnow" type="number" step="0.1" value="22.0"/>
-        </div>
-
-        <div class="row">
-          <label>Water pH (for NH₃ fraction)</label>
-          <input id="pH" type="number" step="0.05" value="7.4"/>
-        </div>
-        <div class="row">
-          <label>Altitude (m)</label>
-          <input id="altM" type="number" step="10" value="2300"/>
-        </div>
-        <div class="row">
-          <label>TDS (mg/L)</label>
-          <input id="tds" type="number" step="10" value="660"/>
-        </div>
-
-        <div class="row">
-          <label>Tank length (cm)</label>
-          <input id="lenCm" type="number" step="0.1" value="78.0"/>
-        </div>
-        <div class="row">
-          <label>Tank width (cm)</label>
-          <input id="widCm" type="number" step="0.1" value="31.0"/>
-        </div>
-        <div class="row">
-          <label>Tank height (cm)</label>
-          <input id="tankHCm" type="number" step="0.1" value="48.0"/>
-        </div>
-        <div class="row">
-          <label>Water surface from bottom (cm)</label>
-          <input id="waterSurfCm" type="number" step="0.1" value="22.0"/>
-        </div>
-        <div class="row">
-          <label>Blanket gap above rim (cm)</label>
-          <input id="blanketGapCm" type="number" step="0.1" value="0.0"/>
-        </div>
-        <div class="row">
-          <label>Diffuser depth below surface (cm)</label>
-          <input id="diffDepthCm" type="number" step="0.1" value="17.0"/>
-        </div>
-        <div class="row">
-          <label>Water column heaters (0–2)</label>
-          <input id="heaters" type="number" step="1" min="0" max="2" value="0"/>
+    <div class="panel-section compact" style="margin-top:12px">
+      <div class="panel-header">
+        <div class="panel-title"><span class="icon">🧯</span>Model Status</div>
+        <div class="panel-badges">
+          <span class="badge alert">Alerts</span>
         </div>
       </div>
-    </details>
+      <div class="small" id="modelStatusNote">No errors reported yet.</div>
+      <div class="errbox" id="errBox">
+        <b>Model error</b>
+        <div class="small" style="margin-top:6px">
+          If this repeats, open Dev / debug and copy the stack trace.
+        </div>
+        <pre id="errText"></pre>
+      </div>
+    </div>
 
-    <details style="margin-top:12px" open>
-      <summary>Advanced: Aeration & surface exchange</summary>
-
-      <div class="grid2" style="margin-top:10px">
-        <div class="row">
-          <label>Air pump delivered flow (L/min)</label>
-          <input id="airFlow" type="number" step="0.1" value="4.0"/>
-        </div>
-        <div class="row">
-          <label>Surface ripples (% of surface)</label>
-          <input id="ripplePct" type="number" step="1" value="50"/>
-        </div>
-
-        <div class="row">
-          <label>Bubble transfer preset</label>
-          <select id="diffType">
-            <option value="airstone_med" selected>Typical airstones (medium bubbles)</option>
-            <option value="airstone_fine">Fine airstone (smaller bubbles)</option>
-            <option value="microbubble">Microbubble diffuser (very fine)</option>
-            <option value="wood">Wooden airstone (very fine, higher backpressure)</option>
-            <option value="custom">Custom</option>
-          </select>
-        </div>
-
-        <div class="row">
-          <label>Custom bubble efficiency: SOTE per meter (%)</label>
-          <input id="sotePerM" type="number" step="0.1" value="2.5"/>
-        </div>
-        <div class="small" style="margin-top:-6px; opacity:.85">
-          SOTE per meter is a <b>rough transfer efficiency</b> (how much O₂ in the air actually dissolves per meter of bubble travel).
-          If you’re unsure, use the preset — the uncertainty mode already widens results around it.
-        </div>
-
-        <div class="row" style="margin-top:10px">
-          <label>Surface exchange preset</label>
-          <select id="surfacePreset">
-            <option value="still">Still water (low exchange)</option>
-            <option value="typical" selected>Typical aquarium (some ripples)</option>
-            <option value="rippling">Strong ripples (good exchange)</option>
-            <option value="splashy">Splashy / fan / very agitated (very high)</option>
-            <option value="custom">Custom</option>
-          </select>
-        </div>
-
-        <div class="row">
-          <label>Surface k (calm) (m/day)</label>
-          <input id="kCalm" type="number" step="0.05" value="0.30"/>
-        </div>
-        <div class="row">
-          <label>Surface k (rippling) (m/day)</label>
-          <input id="kRipple" type="number" step="0.05" value="1.00"/>
-        </div>
-
-        <div class="row" style="margin-top:10px">
-          <label>Cover leakiness preset</label>
-          <select id="tightPreset">
-            <option value="open">No cover (open tank)</option>
-            <option value="loose_high" selected>Loose blanket (high above water)</option>
-            <option value="typical">Typical blanket (some restriction)</option>
-            <option value="near_sealed">Near-sealed lid (strong restriction)</option>
-            <option value="custom">Custom</option>
-          </select>
-        </div>
-        <div class="row">
-          <label>Leakiness number (0 drafty → 1 sealed)</label>
-          <input id="tight" type="number" step="0.05" min="0" max="1" value="0.25"/>
-        </div>
-
-        <div class="row" style="margin-top:10px">
-          <label>Aeration performance preset</label>
-          <select id="otrPreset">
-            <option value="typical" selected>Typical (as expected)</option>
-            <option value="under">Underperforming (backpressure / leaks)</option>
-            <option value="over">Overperforming (very efficient)</option>
-            <option value="custom">Custom</option>
-          </select>
-        </div>
-        <div class="row">
-          <label>Aeration performance factor</label>
-          <input id="otrCal" type="number" step="0.05" value="1.00"/>
+    <div class="panel-section" style="margin-top:12px">
+      <div class="panel-header">
+        <div class="panel-title"><span class="icon">🧪</span>Environment & Tank</div>
+        <div class="panel-badges">
+          <span class="badge note">Advanced</span>
         </div>
       </div>
+      <details class="panel-drawer" open>
+        <summary>Controls</summary>
+        <div class="grid2" style="margin-top:10px">
+          <div class="row">
+            <label>Tank water volume (L)</label>
+            <input id="volL" type="number" step="0.1" value="65.0"/>
+          </div>
+          <div class="row">
+            <label>Water temp (°C) at current blanket setting</label>
+            <input id="Tnow" type="number" step="0.1" value="22.0"/>
+          </div>
 
-      <div class="footer">
-        <b>How the oxygenation estimate works</b> (in plain talk):
-        <ul style="margin:6px 0 0 18px; padding:0; color:var(--muted)">
-          <li><b>Bubble side</b>: compute O₂ mass entering per day from the airflow (altitude affects pressure), then multiply by an efficiency fraction that scales with depth and diffuser type.</li>
-          <li><b>Surface side</b>: use a gas-film “speed” k (m/day) times surface area. Ripples get a higher k. Covered area gets k multiplied by a leak factor based on tightness + headspace ventilation.</li>
-          <li>Combine both into an <b>OTRmax</b> (g/day at DO≈0). Convert that into an inferred <b>kLa</b> so supply increases as DO drops: supply = kLa·(C*−DO)·V.</li>
-        </ul>
-      </div>
-    </details>
+          <div class="row">
+            <label>Water pH (for NH₃ fraction)</label>
+            <input id="pH" type="number" step="0.05" value="7.4"/>
+          </div>
+          <div class="row">
+            <label>Altitude (m)</label>
+            <input id="altM" type="number" step="10" value="2300"/>
+          </div>
+          <div class="row">
+            <label>TDS (mg/L)</label>
+            <input id="tds" type="number" step="10" value="660"/>
+          </div>
 
-    <details style="margin-top:12px" open>
-      <summary>Advanced: Biology & chemistry</summary>
+          <div class="row">
+            <label>Tank length (cm)</label>
+            <input id="lenCm" type="number" step="0.1" value="78.0"/>
+          </div>
+          <div class="row">
+            <label>Tank width (cm)</label>
+            <input id="widCm" type="number" step="0.1" value="31.0"/>
+          </div>
+          <div class="row">
+            <label>Tank height (cm)</label>
+            <input id="tankHCm" type="number" step="0.1" value="48.0"/>
+          </div>
+          <div class="row">
+            <label>Water surface from bottom (cm)</label>
+            <input id="waterSurfCm" type="number" step="0.1" value="22.0"/>
+          </div>
+          <div class="row">
+            <label>Blanket gap above rim (cm)</label>
+            <input id="blanketGapCm" type="number" step="0.1" value="0.0"/>
+          </div>
+          <div class="row">
+            <label>Diffuser depth below surface (cm)</label>
+            <input id="diffDepthCm" type="number" step="0.1" value="17.0"/>
+          </div>
+          <div class="row">
+            <label>Water column heaters (0–2)</label>
+            <input id="heaters" type="number" step="1" min="0" max="2" value="0"/>
+          </div>
+        </div>
+      </details>
+    </div>
 
-      <div class="grid2" style="margin-top:10px">
-        <div class="row">
-          <label>Initial DO assumption</label>
-          <select id="initDOPreset">
-            <option value="100">Near saturation (100%)</option>
-            <option value="95" selected>High (95%)</option>
-            <option value="85">Moderate (85%)</option>
-            <option value="70">Low (70%)</option>
-            <option value="custom">Custom</option>
-          </select>
-        </div>
-        <div class="row">
-          <label>Initial DO (% of local saturation)</label>
-          <input id="doInitPct" type="number" step="1" min="0" max="150" value="95"/>
-        </div>
-
-        <div class="row">
-          <label>Heterotroph biomass (g) — respiration inferred</label>
-          <input id="heteroMass" type="number" step="1" min="0" value="0"/>
-        </div>
-        <div class="row">
-          <label>Photosynthetic mass (g wet biomass)</label>
-          <input id="photoMass" type="number" step="1" min="0" value="0"/>
-        </div>
-        <div class="small" style="margin-top:-6px; opacity:.85">
-          Photosynthetic mass combines plants, algae, and phytoplankton. Oxygen production + nutrient uptake are inferred from this.
-        </div>
-
-        <div class="row">
-          <label>Diurnal temp amplitude (°C)</label>
-          <input id="tempAmp" type="number" step="0.1" min="0" value="0.6"/>
-        </div>
-        <div class="row">
-          <label>Lights on (hour 0–23)</label>
-          <input id="lightHour" type="number" step="1" min="0" max="23" value="9"/>
-        </div>
-
-        <div class="row">
-          <label>Enable oxygen limitation for nitrification</label>
-          <select id="o2Limit">
-            <option value="off">Off (demand not reduced when DO is low)</option>
-            <option value="on">On (nitrification slows as DO drops)</option>
-          </select>
-        </div>
-        <div class="row">
-          <label>Nitrifier DO half-saturation K (mg/L)</label>
-          <input id="kDoNit" type="number" step="0.05" value="0.50"/>
-        </div>
-        <div class="row">
-          <label>NH₄ half-saturation K (mg/L as N)</label>
-          <input id="kNH4Nit" type="number" step="0.05" value="0.40"/>
-        </div>
-        <div class="row">
-          <label>NO₂ half-saturation K (mg/L as N)</label>
-          <input id="kNO2Nit" type="number" step="0.05" value="0.25"/>
-        </div>
-        <div class="row">
-          <label>Nitrifier capacity (0–1)</label>
-          <input id="nitCap" type="number" step="0.05" min="0" max="1" value="0.80"/>
-        </div>
-        <div class="row">
-          <label>Nitrifier Q10 (temperature response)</label>
-          <input id="nitQ10" type="number" step="0.05" value="2.0"/>
-        </div>
-        <div class="row">
-          <label>Heterotroph DO half-saturation K (mg/L)</label>
-          <input id="kDoHet" type="number" step="0.05" value="0.80"/>
-        </div>
-        <div class="row">
-          <label>Refractory fraction (slow COD)</label>
-          <input id="slowFrac" type="number" step="0.05" min="0" max="0.9" value="0.25"/>
-        </div>
-        <div class="row">
-          <label>Biofilm thickness proxy (mm)</label>
-          <input id="biofilmMm" type="number" step="0.1" min="0" value="0.6"/>
-        </div>
-        <div class="row">
-          <label>Denitrification rate (1/day)</label>
-          <input id="kDenit" type="number" step="0.05" value="0.15"/>
-        </div>
-        <div class="row">
-          <label>Denitrifier capacity (0–1)</label>
-          <input id="denitCap" type="number" step="0.05" min="0" max="1" value="0.60"/>
-        </div>
-
-        <div class="row">
-          <label>Nitrogen display units</label>
-          <select id="nUnits">
-            <option value="asN" selected>as N (mg/L)</option>
-            <option value="asIon">as ion (mg/L)</option>
-          </select>
-        </div>
-        <div class="row">
-          <label>Chemistry audit (nerd mode)</label>
-          <input id="chemNerd" type="checkbox"/>
+    <div class="panel-section" style="margin-top:12px">
+      <div class="panel-header">
+        <div class="panel-title"><span class="icon">🌬️</span>Aeration & Surface Exchange</div>
+        <div class="panel-badges">
+          <span class="badge note">Advanced</span>
         </div>
       </div>
-    </details>
+      <details class="panel-drawer" open>
+        <summary>Controls</summary>
+        <div class="grid2" style="margin-top:10px">
+          <div class="row">
+            <label>Air pump delivered flow (L/min)</label>
+            <input id="airFlow" type="number" step="0.1" value="4.0"/>
+          </div>
+          <div class="row">
+            <label>Surface ripples (% of surface)</label>
+            <input id="ripplePct" type="number" step="1" value="50"/>
+          </div>
 
-    <details style="margin-top:12px" open>
-      <summary>Advanced: Pellet geometry</summary>
+          <div class="row">
+            <label>Bubble transfer preset</label>
+            <select id="diffType">
+              <option value="airstone_med" selected>Typical airstones (medium bubbles)</option>
+              <option value="airstone_fine">Fine airstone (smaller bubbles)</option>
+              <option value="microbubble">Microbubble diffuser (very fine)</option>
+              <option value="wood">Wooden airstone (very fine, higher backpressure)</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
 
-      <div class="grid2" style="margin-top:10px">
-        <div class="row">
-          <label>Pellet length (cm)</label>
-          <input id="pelLen" type="number" step="0.01" value="1.00" disabled title="Hardcoded: 1.00 cm"/>
+          <div class="row">
+            <label>Custom bubble efficiency: SOTE per meter (%)</label>
+            <input id="sotePerM" type="number" step="0.1" value="2.5"/>
+          </div>
+          <div class="small" style="margin-top:-6px; opacity:.85">
+            SOTE per meter is a <b>rough transfer efficiency</b> (how much O₂ in the air actually dissolves per meter of bubble travel).
+            If you’re unsure, use the preset — the uncertainty mode already widens results around it.
+          </div>
+
+          <div class="row" style="margin-top:10px">
+            <label>Surface exchange preset</label>
+            <select id="surfacePreset">
+              <option value="still">Still water (low exchange)</option>
+              <option value="typical" selected>Typical aquarium (some ripples)</option>
+              <option value="rippling">Strong ripples (good exchange)</option>
+              <option value="splashy">Splashy / fan / very agitated (very high)</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+
+          <div class="row">
+            <label>Surface k (calm) (m/day)</label>
+            <input id="kCalm" type="number" step="0.05" value="0.30"/>
+          </div>
+          <div class="row">
+            <label>Surface k (rippling) (m/day)</label>
+            <input id="kRipple" type="number" step="0.05" value="1.00"/>
+          </div>
+
+          <div class="row" style="margin-top:10px">
+            <label>Cover leakiness preset</label>
+            <select id="tightPreset">
+              <option value="open">No cover (open tank)</option>
+              <option value="loose_high" selected>Loose blanket (high above water)</option>
+              <option value="typical">Typical blanket (some restriction)</option>
+              <option value="near_sealed">Near-sealed lid (strong restriction)</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+          <div class="row">
+            <label>Leakiness number (0 drafty → 1 sealed)</label>
+            <input id="tight" type="number" step="0.05" min="0" max="1" value="0.25"/>
+          </div>
+
+          <div class="row" style="margin-top:10px">
+            <label>Aeration performance preset</label>
+            <select id="otrPreset">
+              <option value="typical" selected>Typical (as expected)</option>
+              <option value="under">Underperforming (backpressure / leaks)</option>
+              <option value="over">Overperforming (very efficient)</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+          <div class="row">
+            <label>Aeration performance factor</label>
+            <input id="otrCal" type="number" step="0.05" value="1.00"/>
+          </div>
         </div>
-        <div class="row">
-          <label>Pellet diameter (cm)</label>
-          <input id="pelDia" type="number" step="0.01" value="0.20" disabled title="Hardcoded: 0.20 cm"/>
+      </details>
+      <details class="panel-drawer">
+        <summary>What this means</summary>
+        <div class="drawer-text">
+          <b>Bubble side</b>: compute O₂ mass entering per day from the airflow (altitude affects pressure), then multiply by an efficiency fraction that scales with depth and diffuser type.
+          <br/><b>Surface side</b>: use a gas-film “speed” k (m/day) times surface area. Ripples get a higher k. Covered area gets k multiplied by a leak factor based on tightness + headspace ventilation.
+          <br/><b>OTRmax</b> combines both sides (g/day at DO≈0) and becomes an inferred <b>kLa</b> so supply increases as DO drops: supply = kLa·(C*−DO)·V.
         </div>
-        <div class="row">
-          <label>Pellet density (g/cm³)</label>
-          <input id="pelRho" type="number" step="0.01" value="0.55"/>
+      </details>
+    </div>
+
+    <div class="panel-section" style="margin-top:12px">
+      <div class="panel-header">
+        <div class="panel-title"><span class="icon">🧬</span>Biology & Chemistry</div>
+        <div class="panel-badges">
+          <span class="badge note">Advanced</span>
         </div>
       </div>
-    </details>
+      <details class="panel-drawer" open>
+        <summary>Controls</summary>
+        <div class="grid2" style="margin-top:10px">
+          <div class="row">
+            <label>Initial DO assumption</label>
+            <select id="initDOPreset">
+              <option value="100">Near saturation (100%)</option>
+              <option value="95" selected>High (95%)</option>
+              <option value="85">Moderate (85%)</option>
+              <option value="70">Low (70%)</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+          <div class="row">
+            <label>Initial DO (% of local saturation)</label>
+            <input id="doInitPct" type="number" step="1" min="0" max="150" value="95"/>
+          </div>
+
+          <div class="row">
+            <label>Heterotroph biomass (g) — respiration inferred</label>
+            <input id="heteroMass" type="number" step="1" min="0" value="0"/>
+          </div>
+          <div class="row">
+            <label>Photosynthetic mass (g wet biomass)</label>
+            <input id="photoMass" type="number" step="1" min="0" value="0"/>
+          </div>
+          <div class="small" style="margin-top:-6px; opacity:.85">
+            Photosynthetic mass combines plants, algae, and phytoplankton. Oxygen production + nutrient uptake are inferred from this.
+          </div>
+
+          <div class="row">
+            <label>Diurnal temp amplitude (°C)</label>
+            <input id="tempAmp" type="number" step="0.1" min="0" value="0.6"/>
+          </div>
+          <div class="row">
+            <label>Lights on (hour 0–23)</label>
+            <input id="lightHour" type="number" step="1" min="0" max="23" value="9"/>
+          </div>
+
+          <div class="row">
+            <label>Enable oxygen limitation for nitrification</label>
+            <select id="o2Limit">
+              <option value="off">Off (demand not reduced when DO is low)</option>
+              <option value="on">On (nitrification slows as DO drops)</option>
+            </select>
+          </div>
+          <div class="row">
+            <label>Nitrifier DO half-saturation K (mg/L)</label>
+            <input id="kDoNit" type="number" step="0.05" value="0.50"/>
+          </div>
+          <div class="row">
+            <label>NH₄ half-saturation K (mg/L as N)</label>
+            <input id="kNH4Nit" type="number" step="0.05" value="0.40"/>
+          </div>
+          <div class="row">
+            <label>NO₂ half-saturation K (mg/L as N)</label>
+            <input id="kNO2Nit" type="number" step="0.05" value="0.25"/>
+          </div>
+          <div class="row">
+            <label>Nitrifier capacity (0–1)</label>
+            <input id="nitCap" type="number" step="0.05" min="0" max="1" value="0.80"/>
+          </div>
+          <div class="row">
+            <label>Nitrifier Q10 (temperature response)</label>
+            <input id="nitQ10" type="number" step="0.05" value="2.0"/>
+          </div>
+          <div class="row">
+            <label>Heterotroph DO half-saturation K (mg/L)</label>
+            <input id="kDoHet" type="number" step="0.05" value="0.80"/>
+          </div>
+          <div class="row">
+            <label>Refractory fraction (slow COD)</label>
+            <input id="slowFrac" type="number" step="0.05" min="0" max="0.9" value="0.25"/>
+          </div>
+          <div class="row">
+            <label>Biofilm thickness proxy (mm)</label>
+            <input id="biofilmMm" type="number" step="0.1" min="0" value="0.6"/>
+          </div>
+          <div class="row">
+            <label>Denitrification rate (1/day)</label>
+            <input id="kDenit" type="number" step="0.05" value="0.15"/>
+          </div>
+          <div class="row">
+            <label>Denitrifier capacity (0–1)</label>
+            <input id="denitCap" type="number" step="0.05" min="0" max="1" value="0.60"/>
+          </div>
+
+          <div class="row">
+            <label>Nitrogen display units</label>
+            <select id="nUnits">
+              <option value="asN" selected>as N (mg/L)</option>
+              <option value="asIon">as ion (mg/L)</option>
+            </select>
+          </div>
+          <div class="row">
+            <label>Chemistry audit (nerd mode)</label>
+            <input id="chemNerd" type="checkbox"/>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <div class="panel-section" style="margin-top:12px">
+      <div class="panel-header">
+        <div class="panel-title"><span class="icon">🔬</span>Pellet Geometry</div>
+        <div class="panel-badges">
+          <span class="badge note">Advanced</span>
+        </div>
+      </div>
+      <details class="panel-drawer" open>
+        <summary>Controls</summary>
+        <div class="grid2" style="margin-top:10px">
+          <div class="row">
+            <label>Pellet length (cm)</label>
+            <input id="pelLen" type="number" step="0.01" value="1.00" disabled title="Hardcoded: 1.00 cm"/>
+          </div>
+          <div class="row">
+            <label>Pellet diameter (cm)</label>
+            <input id="pelDia" type="number" step="0.01" value="0.20" disabled title="Hardcoded: 0.20 cm"/>
+          </div>
+          <div class="row">
+            <label>Pellet density (g/cm³)</label>
+            <input id="pelRho" type="number" step="0.01" value="0.55"/>
+          </div>
+        </div>
+      </details>
+    </div>
 
   </div>
 
@@ -787,6 +1057,10 @@
   </div>
   <div class="hr"></div>
   <div class="small"><b>Last recompute diagnostics</b></div>
+  <div class="row" style="margin-top:8px; align-items:center;">
+    <button class="btn ghost" id="copyDebugBtn">Copy Debug Log</button>
+    <span class="copy-toast" id="copyDebugStatus" style="display:none"></span>
+  </div>
   <pre id="dbg" class="mono" style="white-space:pre-wrap; word-break:break-word; color:rgba(231,236,255,.82)"></pre>
 </details>
 
@@ -834,6 +1108,7 @@ const BIOMASS_SERIES = [
 
 let visibleRate = Object.fromEntries(RATE_SERIES.map(s=>[s.key, true]));
 let visibleChem = Object.fromEntries(CHEM_SERIES.map(s=>[s.key, true]));
+let calendarExpandedKey = null;
 
 function updateChemSeriesLabels(nUnits){
   if(nUnits === 'asIon'){
@@ -951,6 +1226,28 @@ function buildFeedPulse(feedPlan, dt, days, windowDays){
   return {pellets, powder, windowSteps, windowDays, totalPellets, totalPowder};
 }
 
+function setCalendarTileFocus(targetKey){
+  const nextKey = calendarExpandedKey === targetKey ? null : targetKey;
+  calendarExpandedKey = nextKey;
+  DEBUG_STATE.lastCalendarExpandedKey = calendarExpandedKey;
+  document.querySelectorAll('.calendar-month').forEach((month)=>{
+    const key = month.dataset.monthKey;
+    month.classList.toggle('expanded', Boolean(calendarExpandedKey && key === calendarExpandedKey));
+  });
+  syncCalendarToggleState();
+}
+
+function syncCalendarToggleState(){
+  const btns = document.querySelectorAll('[data-month-toggle]');
+  btns.forEach((btn)=>{
+    const key = btn.getAttribute('data-month-toggle');
+    const expanded = Boolean(calendarExpandedKey && key === calendarExpandedKey);
+    btn.textContent = expanded ? '⤢' : '⤡';
+    btn.setAttribute('title', expanded ? 'Collapse month' : 'Expand month');
+    btn.setAttribute('aria-pressed', expanded ? 'true' : 'false');
+  });
+}
+
 function renderFeedingCalendar(params, feedPlan, popEvents){
   const cal = el('feedCalendar');
   if(!cal){
@@ -961,12 +1258,12 @@ function renderFeedingCalendar(params, feedPlan, popEvents){
   const days = Math.max(0, Math.ceil(Number(params.days ?? 0)));
   DEBUG_STATE.lastFeedCalendarDays = days;
   const compact = days > 45;
-  cal.classList.toggle('compact', compact);
+  cal.classList.toggle('tiles', true);
   const startDate = new Date();
   startDate.setHours(12, 0, 0, 0);
   DEBUG_STATE.lastFeedCalendarStartISO = startDate.toISOString();
   cal.innerHTML = '';
-  const labels = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const labels = ['S','M','T','W','T','F','S'];
   const feedMap = new Map();
   for(const f of feedPlan){
     const idx = Math.floor(f.day);
@@ -1008,11 +1305,36 @@ function renderFeedingCalendar(params, feedPlan, popEvents){
       monthCount++;
       const month = document.createElement('div');
       month.className = 'calendar-month';
+      month.dataset.monthKey = key;
+      if(calendarExpandedKey === key){
+        month.classList.add('expanded');
+      }
       const header = document.createElement('div');
       header.className = 'calendar-header';
       const stats = monthStats.get(key);
       const summary = stats ? `${stats.feedDays} feed • ${stats.popDays} pop` : '';
-      header.innerHTML = `<span>${stats ? stats.label : 'Month'}</span><span class="summary">${summary}</span>`;
+      const monthLabel = stats
+        ? dayDate.toLocaleString(undefined, {month:'short', year:'2-digit'})
+        : 'Month';
+      const labelSpan = document.createElement('span');
+      labelSpan.textContent = monthLabel;
+      const actionWrap = document.createElement('div');
+      actionWrap.className = 'month-actions';
+      const summarySpan = document.createElement('span');
+      summarySpan.className = 'summary';
+      summarySpan.textContent = summary;
+      const toggleBtn = document.createElement('button');
+      toggleBtn.className = 'month-toggle';
+      toggleBtn.type = 'button';
+      toggleBtn.setAttribute('data-month-toggle', key);
+      toggleBtn.addEventListener('click', (event)=>{
+        event.stopPropagation();
+        setCalendarTileFocus(key);
+      });
+      actionWrap.appendChild(summarySpan);
+      actionWrap.appendChild(toggleBtn);
+      header.appendChild(labelSpan);
+      header.appendChild(actionWrap);
       month.appendChild(header);
       monthGrid = document.createElement('div');
       monthGrid.className = 'calendar-grid';
@@ -1047,12 +1369,28 @@ function renderFeedingCalendar(params, feedPlan, popEvents){
     if(pop) meta.push(`pop ${Math.round(pop)}`);
     cell.innerHTML = `
       <div class="day-num">${dayDate.getDate()}</div>
-      <div class="day-meta">${meta.join(' • ') || '—'}</div>
+      <div class="day-meta"></div>
     `;
     monthGrid.appendChild(cell);
   }
   DEBUG_STATE.lastFeedCalendarMonths = monthCount;
   DEBUG_STATE.lastFeedCalendarCompact = compact;
+  const calWidth = cal.getBoundingClientRect().width;
+  DEBUG_STATE.lastCalendarTileWidth = Number.isFinite(calWidth) ? (calWidth / Math.max(1, monthCount)) : null;
+  DEBUG_STATE.lastCalendarMetaHidden = true;
+  if(Number.isFinite(DEBUG_STATE.lastCalendarTileWidth) && DEBUG_STATE.lastCalendarTileWidth < 180){
+    if(!DEBUG_STATE.lastCalendarTileWarnedISO){
+      addWarning('Calendar tiles are narrow; consider expanding a month for readability.');
+      DEBUG_STATE.lastCalendarTileWarnedISO = new Date().toISOString();
+    }
+  }else{
+    DEBUG_STATE.lastCalendarTileWarnedISO = null;
+  }
+  if(calendarExpandedKey && !cal.querySelector(`[data-month-key="${calendarExpandedKey}"]`)){
+    calendarExpandedKey = null;
+  }
+  DEBUG_STATE.lastCalendarExpandedKey = calendarExpandedKey;
+  syncCalendarToggleState();
 }
 
 /* =========================================================
@@ -1080,6 +1418,7 @@ function clamp(x,a,b){ return Math.max(a, Math.min(b, x)); }
 function showError(err){
   let box = el('errBox');
   let txt = el('errText');
+  const note = el('modelStatusNote');
   const msg = (err && err.stack) ? err.stack : String(err);
 
   if(!box || !txt){
@@ -1095,6 +1434,7 @@ function showError(err){
   // Visible error banner
   if(box) box.style.display = 'block';
   if(txt) txt.textContent = msg;
+  if(note) note.style.display = 'none';
 
   // Record into debug state
   try{
@@ -1124,8 +1464,10 @@ function showError(err){
 function clearError(){
   const box = el('errBox');
   const text = el('errText');
+  const note = el('modelStatusNote');
   if(box) box.style.display = 'none';
   if(text) text.textContent = '';
+  if(note) note.style.display = 'block';
 }
 
 
@@ -1157,6 +1499,16 @@ const DEBUG_STATE = {
   lastFeedCalendarMonths: null,
   lastFeedCalendarCompact: null,
   lastFeedCalendarStartISO: null,
+  lastCalendarExpandedKey: null,
+  lastCalendarTileWidth: null,
+  lastCalendarMetaHidden: null,
+  lastCalendarTileWarnedISO: null,
+  panelOverflowPx: null,
+  panelOverflowLimitPx: 0,
+  panelOverflowWarnedISO: null,
+  lastPanelMeasureISO: null,
+  lastDebugCopyStatus: null,
+  lastDebugCopyError: null,
   lastUpdateISO: null,
   missingContainers: [],
   initReadyState: null,
@@ -1279,6 +1631,23 @@ lines.push(`surface=${p.lenCm}×${p.widCm} cm, blanket=${p.blanketPct}%, ripple=
     lines.push('');
     lines.push('--- Calendar (last) ---');
     lines.push(`days=${DEBUG_STATE.lastFeedCalendarDays}, months=${DEBUG_STATE.lastFeedCalendarMonths}, compact=${DEBUG_STATE.lastFeedCalendarCompact}, start=${DEBUG_STATE.lastFeedCalendarStartISO}`);
+    if(DEBUG_STATE.lastCalendarExpandedKey){
+      lines.push(`expanded=${DEBUG_STATE.lastCalendarExpandedKey}`);
+    }
+    if(Number.isFinite(DEBUG_STATE.lastCalendarTileWidth)){
+      lines.push(`tileWidth=${DEBUG_STATE.lastCalendarTileWidth.toFixed(1)}px`);
+    }
+    if(DEBUG_STATE.lastCalendarMetaHidden != null){
+      lines.push(`metaHidden=${DEBUG_STATE.lastCalendarMetaHidden ? 'yes' : 'no'}`);
+    }
+  }
+  if(Number.isFinite(DEBUG_STATE.panelOverflowPx)){
+    lines.push('');
+    lines.push('--- Panel overflow ---');
+    lines.push(`panelOverflowPx=${DEBUG_STATE.panelOverflowPx.toFixed(1)} (limit ${DEBUG_STATE.panelOverflowLimitPx}px)`);
+    if(DEBUG_STATE.lastPanelMeasureISO){
+      lines.push(`measured=${DEBUG_STATE.lastPanelMeasureISO}`);
+    }
   }
   if(DEBUG_STATE.lastTagSummary){
     lines.push('');
@@ -1309,6 +1678,14 @@ lines.push(`surface=${p.lenCm}×${p.widCm} cm, blanket=${p.blanketPct}%, ripple=
     lines.push(`Profile: ${DEBUG_STATE.lastFeedProfileId}`);
     if(DEBUG_STATE.lastFeedProfileStoredAt){
       lines.push(`Stored: ${DEBUG_STATE.lastFeedProfileStoredAt}`);
+    }
+  }
+  if(DEBUG_STATE.lastDebugCopyStatus){
+    lines.push('');
+    lines.push('--- Debug copy ---');
+    lines.push(`status=${DEBUG_STATE.lastDebugCopyStatus}`);
+    if(DEBUG_STATE.lastDebugCopyError){
+      lines.push(`error=${DEBUG_STATE.lastDebugCopyError}`);
     }
   }
   if(DEBUG_STATE.lastBiomassSummary){
@@ -1419,6 +1796,104 @@ function linkRangeAndNumber(rangeEl, numEl, onChange){
   const sync = (src, dst)=>{ dst.value = src.value; onChange(); };
   rangeEl.addEventListener("input", ()=>sync(rangeEl, numEl));
   numEl.addEventListener("input", ()=>sync(numEl, rangeEl));
+}
+
+function wireActiveControlGlow(){
+  const inputs = Array.from(document.querySelectorAll('input, select, textarea'));
+  if(!inputs.length) return;
+  inputs.forEach((input)=>{
+    if(input.__glowBound) return;
+    input.__glowBound = true;
+    input.addEventListener('focus', ()=>{
+      if(input.matches('input[type="range"]')) return;
+      input.classList.add('control-active');
+    });
+    input.addEventListener('blur', ()=>{
+      input.classList.remove('control-active');
+    });
+    input.addEventListener('change', ()=>{
+      if(input.matches('select')){
+        input.classList.add('control-active');
+        setTimeout(()=>input.classList.remove('control-active'), 450);
+      }
+    });
+  });
+}
+
+function measurePanelOverflow(){
+  const panel = document.querySelector('.left-panel');
+  if(!panel){
+    addWarning('Left panel missing for overflow metrics.');
+    DEBUG_STATE.missingContainers.push({timeISO: new Date().toISOString(), id:'left-panel', context:'measurePanelOverflow'});
+    return;
+  }
+  const panelHeight = panel.getBoundingClientRect().height;
+  const viewportHeight = window.innerHeight || 0;
+  const limit = Math.max(140, Math.round(viewportHeight * 0.18));
+  const overflow = Math.max(0, panelHeight - (viewportHeight - 24));
+  DEBUG_STATE.panelOverflowPx = overflow;
+  DEBUG_STATE.panelOverflowLimitPx = limit;
+  DEBUG_STATE.lastPanelMeasureISO = new Date().toISOString();
+  if(overflow > limit){
+    if(!DEBUG_STATE.panelOverflowWarnedISO){
+      addWarning(`Left panel exceeds viewport by ${overflow.toFixed(0)}px; consider collapsing drawers.`);
+      DEBUG_STATE.panelOverflowWarnedISO = new Date().toISOString();
+    }
+  }else{
+    DEBUG_STATE.panelOverflowWarnedISO = null;
+  }
+}
+
+function enableDebugCopyRoutine(){
+  const btn = el('copyDebugBtn');
+  const status = el('copyDebugStatus');
+  if(!btn || !status){
+    addWarning('Copy debug controls missing (#copyDebugBtn or #copyDebugStatus).');
+    return;
+  }
+  const announce = (message, isWarn=false)=>{
+    status.textContent = message;
+    status.classList.toggle('warn', isWarn);
+    status.style.display = 'inline-flex';
+    setTimeout(()=>{ status.style.display = 'none'; }, 2400);
+  };
+  if(btn.__copyBound) return;
+  btn.__copyBound = true;
+  btn.addEventListener('click', async ()=>{
+    const dbgText = el('dbg') ? el('dbg').textContent : '';
+    if(!dbgText || !dbgText.trim()){
+      DEBUG_STATE.lastDebugCopyStatus = 'empty';
+      DEBUG_STATE.lastDebugCopyError = 'Debug log empty';
+      addWarning('Debug log copy requested but debug log is empty.');
+      announce('Nothing to copy', true);
+      return;
+    }
+    try{
+      if(navigator.clipboard?.writeText){
+        await navigator.clipboard.writeText(dbgText);
+      }else{
+        const helper = document.createElement('textarea');
+        helper.value = dbgText;
+        helper.setAttribute('readonly', '');
+        helper.style.position = 'absolute';
+        helper.style.left = '-9999px';
+        document.body.appendChild(helper);
+        helper.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(helper);
+        if(!ok) throw new Error('execCommand copy failed');
+      }
+      DEBUG_STATE.lastDebugCopyStatus = 'copied';
+      DEBUG_STATE.lastDebugCopyError = null;
+      announce('Debug log copied');
+    }catch(err){
+      const message = err?.message || String(err);
+      DEBUG_STATE.lastDebugCopyStatus = 'failed';
+      DEBUG_STATE.lastDebugCopyError = message;
+      addWarning(`Debug log copy failed: ${message}`);
+      announce('Copy failed', true);
+    }
+  });
 }
 
 window.addEventListener('error', (e)=>{ try{ showError(e.error || e.message || e); }catch(_){ }});
@@ -4827,6 +5302,7 @@ function recompute(){
     params.feedSchedule = feedPlan;
     DEBUG_STATE.lastFeedScheduleCount = feedPlan.length;
     renderFeedingCalendar(params, feedPlan, EVENTS);
+    measurePanelOverflow();
 
     // Base sim (used for breakdown lines + UI even in uncertainty mode)
     setStage('Simulation', 'run base sim');
@@ -5363,6 +5839,13 @@ function init(){
 
   updateModeUI();
   setDebugText(buildDebugSnapshot(['Init: handlers ready, awaiting recompute.']));
+  wireActiveControlGlow();
+  enableDebugCopyRoutine();
+  measurePanelOverflow();
+  if(!window.__panelOverflowBound){
+    window.__panelOverflowBound = true;
+    window.addEventListener('resize', ()=>measurePanelOverflow());
+  }
 
   // Link sliders
   linkRangeAndNumber(el('pelMass'), el('pelMassN'), ()=>{ scheduleRecompute(); });
