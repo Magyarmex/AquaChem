@@ -1104,7 +1104,7 @@
 
 <div class="tooltip" id="tip"></div>
 
-<script>
+<script type="module">
 (() => {
   const bootToken = 'aquachem-inline-v4';
   const bootKey = '__AQUACHEM_BOOT__';
@@ -1286,6 +1286,7 @@ const DEBUG_STATE = {
   bootLoadedISO: window[bootKey].firstSeenISO,
   bootDuplicateCount: window[bootKey].count,
   bootScriptTagCount: document.querySelectorAll('script[data-aquachem-boot]').length,
+  bootModuleScript: document.currentScript ? document.currentScript.type === 'module' : true,
   dedupeReport: null,
   recomputeBubbleState: null,
   recomputeBubbleMeta: null,
@@ -1440,6 +1441,7 @@ lines.push(`surface=${p.lenCm}×${p.widCm} cm, blanket=${p.blanketPct}%, ripple=
     lines.push(`Loaded: ${DEBUG_STATE.bootLoadedISO}`);
     lines.push(`Duplicate loads: ${DEBUG_STATE.bootDuplicateCount}`);
     lines.push(`Script tags: ${DEBUG_STATE.bootScriptTagCount}`);
+    lines.push(`Module script: ${DEBUG_STATE.bootModuleScript}`);
   }
   if(DEBUG_STATE.dedupeReport){
     lines.push('');
@@ -2077,6 +2079,8 @@ function runSimulation(params){
   const mEach = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
 
   const mEach = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
+
+  const pelletEachMass = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
 
   const pelletEachMass = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
 
@@ -3190,7 +3194,7 @@ function drawDOPlot(canvas, sim, overlay=null){
     ctx.restore();
   }
 
-  return {m, pw, ph, xMax, yTop, tArr, seriesDict, opts};
+  return {m, pw, ph, xMax, yTop, tArr, sim, overlay};
 }
 
 /* =========================================================
