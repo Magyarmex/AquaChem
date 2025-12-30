@@ -1520,7 +1520,6 @@ const DEBUG_STATE = {
   lastOxyMissingCount: 0,
   lastMCSeriesFallbacks: null,
   lastBiofilmMetaMissing: null,
-  lastMetaDebugMissing: null,
   debounceQueued: 0,
   debounceMs: null,
   missingContainers: [],
@@ -6244,19 +6243,6 @@ function renderFixedValue(value, decimals, fallback='n/a'){
   return Number.isFinite(value) ? Number(value).toFixed(decimals) : fallback;
 }
 
-function recordMetaDebugGaps(missingKeys, context){
-  if(!Array.isArray(missingKeys) || missingKeys.length === 0){
-    DEBUG_STATE.lastMetaDebugMissing = null;
-    return;
-  }
-  DEBUG_STATE.lastMetaDebugMissing = {
-    timeISO: new Date().toISOString(),
-    context: context || 'unknown',
-    keys: missingKeys.slice()
-  };
-  addWarning(`Missing meta values for ${context || 'debug'}: ${missingKeys.join(', ')}.`);
-}
-
 function fmtBandLine(mode, good, warn, unit=''){
   if(mode === 'min'){
     return `Safe ≥ ${fmtVal(good, unit)} • Watch ${fmtVal(warn, unit)}–${fmtVal(good, unit)} • Risk < ${fmtVal(warn, unit)}`;
@@ -6821,7 +6807,6 @@ function recompute(){
   DEBUG_STATE.lastOxyMissingCount = 0;
   DEBUG_STATE.lastMCSeriesFallbacks = null;
   DEBUG_STATE.lastBiofilmMetaMissing = null;
-  DEBUG_STATE.lastMetaDebugMissing = null;
   const recomputeStart = performance.now();
 
   try{
@@ -7071,46 +7056,40 @@ function recompute(){
       dbg.push(`Base OTR bubble max: ${oxy.OTR_bubble_max.toFixed(3)} g/day`);
       dbg.push(`Base OTR max: ${oxy.OTR_max.toFixed(3)} g/day`);
       dbg.push(`Base kLa inferred: ${oxy.kLa.toFixed(4)} 1/day`);
-      const mcMetaMissing = [];
-      const mcMetaValue = (key, value, decimals)=> {
-        if(!Number.isFinite(value)) mcMetaMissing.push(key);
-        return renderFixedValue(value, decimals, 'n/a');
-      };
-      dbg.push(`Sim dt: ${mcMetaValue('dt', baseSim.meta.dt, 4)} days (~${mcMetaValue('dt_hours', baseSim.meta.dt * 24, 2)} h)`);
-      dbg.push(`Feed mass: start ${mcMetaValue('feedStart', baseSim.meta.feedStart, 3)} g → end ${mcMetaValue('feedEnd', baseSim.meta.feedEnd, 3)} g`);
+      dbg.push(`Sim dt: ${baseSim.meta.dt.toFixed(4)} days (~${(baseSim.meta.dt*24).toFixed(2)} h)`);
+      dbg.push(`Feed mass: start ${baseSim.meta.feedStart.toFixed(3)} g → end ${baseSim.meta.feedEnd.toFixed(3)} g`);
       if(baseSim.meta.feedPulse){
-        const pulse = baseSim.meta.feedPulse;
-        dbg.push(`Feed pulse: ${mcMetaValue('feedPulse.windowHours', pulse.windowHours, 0)}h window • ${mcMetaValue('feedPulse.windowSteps', pulse.windowSteps, 0)} steps • ${mcMetaValue('feedPulse.totalPellets', pulse.totalPellets, 0)} pellets, ${mcMetaValue('feedPulse.totalPowder_g', pulse.totalPowder_g, 2)} g powder`);
+        dbg.push(`Feed pulse: ${baseSim.meta.feedPulse.windowHours}h window • ${baseSim.meta.feedPulse.windowSteps} steps • ${baseSim.meta.feedPulse.totalPellets} pellets, ${baseSim.meta.feedPulse.totalPowder_g.toFixed(2)} g powder`);
       }
-      dbg.push(`Rate peaks: demand ${mcMetaValue('maxDemand', baseSim.meta.maxDemand, 3)} g/day • supply ${mcMetaValue('maxSupply', baseSim.meta.maxSupply, 3)} g/day`);
+      dbg.push(`Rate peaks: demand ${baseSim.meta.maxDemand.toFixed(3)} g/day • supply ${baseSim.meta.maxSupply.toFixed(3)} g/day`);
       dbg.push('Metabolism mode: grazing-linked heterotrophs + photosynthesis (modernized kinetics)');
       dbg.push(composeBiofilmDebugLine(baseSim, params, 'mc'));
       if(baseSim.meta.tempSmoothRange){
-        dbg.push(`Temp smoothing: τ=${mcMetaValue('tempTauHours', baseSim.meta.tempTauHours, 0)}h, smooth ${mcMetaValue('tempSmoothRange.min', baseSim.meta.tempSmoothRange.min, 2)}–${mcMetaValue('tempSmoothRange.max', baseSim.meta.tempSmoothRange.max, 2)}°C (target ${mcMetaValue('tempSmoothRange.targetMin', baseSim.meta.tempSmoothRange.targetMin, 2)}–${mcMetaValue('tempSmoothRange.targetMax', baseSim.meta.tempSmoothRange.targetMax, 2)}°C)`);
+        dbg.push(`Temp smoothing: τ=${baseSim.meta.tempTauHours}h, smooth ${baseSim.meta.tempSmoothRange.min.toFixed(2)}–${baseSim.meta.tempSmoothRange.max.toFixed(2)}°C (target ${baseSim.meta.tempSmoothRange.targetMin.toFixed(2)}–${baseSim.meta.tempSmoothRange.targetMax.toFixed(2)}°C)`);
       }
       if(baseSim.meta.heteroGrowthTotal != null || baseSim.meta.phytoGrowthTotal != null){
-        dbg.push(`Biomass totals: hetero +${mcMetaValue('heteroGrowthTotal', baseSim.meta.heteroGrowthTotal ?? 0, 2)} g (consumed ${mcMetaValue('heteroConsumedTotal', baseSim.meta.heteroConsumedTotal ?? 0, 2)} g), phyto +${mcMetaValue('phytoGrowthTotal', baseSim.meta.phytoGrowthTotal ?? 0, 2)} g (consumed ${mcMetaValue('phytoConsumedTotal', baseSim.meta.phytoConsumedTotal ?? 0, 2)} g)`);
+        dbg.push(`Biomass totals: hetero +${(baseSim.meta.heteroGrowthTotal ?? 0).toFixed(2)} g (consumed ${(baseSim.meta.heteroConsumedTotal ?? 0).toFixed(2)} g), phyto +${(baseSim.meta.phytoGrowthTotal ?? 0).toFixed(2)} g (consumed ${(baseSim.meta.phytoConsumedTotal ?? 0).toFixed(2)} g)`);
       }
       if(baseSim.meta.phytoAlgae_g != null || baseSim.meta.biofilm_g != null){
         const phytoTotal = (baseSim.meta.phytoAlgae_g ?? 0) + (baseSim.meta.phytoPlankton_g ?? 0) + (baseSim.meta.phytoPlants_g ?? 0);
         const heteroTotal = (baseSim.meta.biofilm_g ?? 0) + (baseSim.meta.predator_g ?? 0);
         const phytoDenom = phytoTotal > 1e-9 ? phytoTotal : 1;
         const heteroDenom = heteroTotal > 1e-9 ? heteroTotal : 1;
-        dbg.push(`Phyto split: algae ${mcMetaValue('phytoAlgae_g', baseSim.meta.phytoAlgae_g ?? 0, 2)} g (${mcMetaValue('phytoAlgae_pct', 100*(baseSim.meta.phytoAlgae_g ?? 0)/phytoDenom, 1)}%), plankton ${mcMetaValue('phytoPlankton_g', baseSim.meta.phytoPlankton_g ?? 0, 2)} g (${mcMetaValue('phytoPlankton_pct', 100*(baseSim.meta.phytoPlankton_g ?? 0)/phytoDenom, 1)}%), plants ${mcMetaValue('phytoPlants_g', baseSim.meta.phytoPlants_g ?? 0, 2)} g (${mcMetaValue('phytoPlants_pct', 100*(baseSim.meta.phytoPlants_g ?? 0)/phytoDenom, 1)}%)`);
-        dbg.push(`Hetero split: biofilm ${mcMetaValue('biofilm_g', baseSim.meta.biofilm_g ?? 0, 2)} g (${mcMetaValue('biofilm_pct', 100*(baseSim.meta.biofilm_g ?? 0)/heteroDenom, 1)}%), predator ${mcMetaValue('predator_g', baseSim.meta.predator_g ?? 0, 2)} g (${mcMetaValue('predator_pct', 100*(baseSim.meta.predator_g ?? 0)/heteroDenom, 1)}%)`);
+        dbg.push(`Phyto split: algae ${(baseSim.meta.phytoAlgae_g ?? 0).toFixed(2)} g (${(100*(baseSim.meta.phytoAlgae_g ?? 0)/phytoDenom).toFixed(1)}%), plankton ${(baseSim.meta.phytoPlankton_g ?? 0).toFixed(2)} g (${(100*(baseSim.meta.phytoPlankton_g ?? 0)/phytoDenom).toFixed(1)}%), plants ${(baseSim.meta.phytoPlants_g ?? 0).toFixed(2)} g (${(100*(baseSim.meta.phytoPlants_g ?? 0)/phytoDenom).toFixed(1)}%)`);
+        dbg.push(`Hetero split: biofilm ${(baseSim.meta.biofilm_g ?? 0).toFixed(2)} g (${(100*(baseSim.meta.biofilm_g ?? 0)/heteroDenom).toFixed(1)}%), predator ${(baseSim.meta.predator_g ?? 0).toFixed(2)} g (${(100*(baseSim.meta.predator_g ?? 0)/heteroDenom).toFixed(1)}%)`);
       }
       if(baseSim.meta.biomassExtinction){
         dbg.push(`Biomass extinctions: hetero ${baseSim.meta.biomassExtinction.heteroHits} steps, phyto ${baseSim.meta.biomassExtinction.phytoHits} steps • algae ${baseSim.meta.biomassExtinction.phytoAlgaeHits} • plankton ${baseSim.meta.biomassExtinction.phytoPlanktonHits} • plants ${baseSim.meta.biomassExtinction.phytoPlantsHits} • biofilm ${baseSim.meta.biomassExtinction.biofilmHits} • predator ${baseSim.meta.biomassExtinction.predatorHits}`);
       }
-      dbg.push(`Grazing limits: biofilm ${baseSim.meta.grazingLimitedSteps ?? 0} steps • max ${mcMetaValue('biofilmGrazingMax_g_g_day', baseSim.meta.biofilmGrazingMax_g_g_day ?? 0, 2)} g/g/day; predator ${baseSim.meta.predatorGrazingLimitedSteps ?? 0} steps • max ${mcMetaValue('predatorGrazingMax_g_g_day', baseSim.meta.predatorGrazingMax_g_g_day ?? 0, 2)} g/g/day`);
-      dbg.push(`Phyto reserve: built ${mcMetaValue('phytoReserveBuilt', baseSim.meta.phytoReserveBuilt, 2)} g • used ${mcMetaValue('phytoReserveUsed', baseSim.meta.phytoReserveUsed, 2)} g • night growth ${mcMetaValue('phytoNightGrowthTotal', baseSim.meta.phytoNightGrowthTotal, 2)} g`);
-      dbg.push(`Phyto recruitment: ${mcMetaValue('phytoRecruitTotal', baseSim.meta.phytoRecruitTotal ?? 0, 2)} g • refugia ${mcMetaValue('phytoRefugiaFrac', baseSim.meta.phytoRefugiaFrac, 2)} • grazing shield min ${mcMetaValue('grazingShieldMin', baseSim.meta.grazingShieldMin ?? 0, 2)} • predator shield min ${mcMetaValue('predatorShieldMin', baseSim.meta.predatorShieldMin ?? 0, 2)}`);
+      dbg.push(`Grazing limits: biofilm ${baseSim.meta.grazingLimitedSteps ?? 0} steps • max ${(baseSim.meta.biofilmGrazingMax_g_g_day ?? 0).toFixed(2)} g/g/day; predator ${baseSim.meta.predatorGrazingLimitedSteps ?? 0} steps • max ${(baseSim.meta.predatorGrazingMax_g_g_day ?? 0).toFixed(2)} g/g/day`);
+      dbg.push(`Phyto reserve: built ${baseSim.meta.phytoReserveBuilt.toFixed(2)} g • used ${baseSim.meta.phytoReserveUsed.toFixed(2)} g • night growth ${baseSim.meta.phytoNightGrowthTotal.toFixed(2)} g`);
+      dbg.push(`Phyto recruitment: ${(baseSim.meta.phytoRecruitTotal ?? 0).toFixed(2)} g • refugia ${baseSim.meta.phytoRefugiaFrac.toFixed(2)} • grazing shield min ${(baseSim.meta.grazingShieldMin ?? 0).toFixed(2)} • predator shield min ${(baseSim.meta.predatorShieldMin ?? 0).toFixed(2)}`);
       dbg.push('Biomass dynamics:');
-      dbg.push(`  CO2 free ${mcMetaValue('co2FreeLast_mgL', baseSim.meta.co2FreeLast_mgL ?? 0, 2)} mg/L • buffer capacity ${mcMetaValue('bufferCapacityLast', baseSim.meta.bufferCapacityLast ?? 0, 2)} • phyto store fill ${mcMetaValue('phytoStoreFillPct', (baseSim.meta.phytoStoreFillPct ?? 0) * 100, 1)}%`);
-      dbg.push(`  refuge fraction ${mcMetaValue('refugeFractionLast', baseSim.meta.refugeFractionLast ?? 0, 2)} • biofilm activity ${mcMetaValue('biofilmActivityLast', baseSim.meta.biofilmActivityLast ?? 0, 2)} • predator activity ${mcMetaValue('predatorActivityLast', baseSim.meta.predatorActivityLast ?? 0, 2)}`);
-      dbg.push(`  lagged grazing: biofilm ${mcMetaValue('laggedBiofilmConsumptionTotal', baseSim.meta.laggedBiofilmConsumptionTotal ?? 0, 2)} g • predator ${mcMetaValue('laggedPredatorConsumptionTotal', baseSim.meta.laggedPredatorConsumptionTotal ?? 0, 2)} g`);
-      dbg.push(`O2 degassed: ${mcMetaValue('oxygenDegassed_g', baseSim.meta.oxygenDegassed_g ?? 0, 3)} g (steps ${baseSim.meta.oxygenDegasSteps ?? 0})`);
-      dbg.push(`CO2 init: ${mcMetaValue('co2Init_mgL', baseSim.meta.co2Init_mgL ?? 0, 2)} mg/L • sat ${mcMetaValue('co2Sat_mgL', baseSim.meta.co2Sat_mgL ?? 0, 2)} mg/L • zero hits ${baseSim.meta.co2ZeroHits ?? 0} • degas ${baseSim.meta.co2DegasSteps ?? 0} • air in ${mcMetaValue('co2AirIn_g', baseSim.meta.co2AirIn_g ?? 0, 2)} g • air out ${mcMetaValue('co2AirOut_g', baseSim.meta.co2AirOut_g ?? 0, 2)} g`);
+      dbg.push(`  CO2 free ${(baseSim.meta.co2FreeLast_mgL ?? 0).toFixed(2)} mg/L • buffer capacity ${(baseSim.meta.bufferCapacityLast ?? 0).toFixed(2)} • phyto store fill ${((baseSim.meta.phytoStoreFillPct ?? 0) * 100).toFixed(1)}%`);
+      dbg.push(`  refuge fraction ${(baseSim.meta.refugeFractionLast ?? 0).toFixed(2)} • biofilm activity ${(baseSim.meta.biofilmActivityLast ?? 0).toFixed(2)} • predator activity ${(baseSim.meta.predatorActivityLast ?? 0).toFixed(2)}`);
+      dbg.push(`  lagged grazing: biofilm ${(baseSim.meta.laggedBiofilmConsumptionTotal ?? 0).toFixed(2)} g • predator ${(baseSim.meta.laggedPredatorConsumptionTotal ?? 0).toFixed(2)} g`);
+      dbg.push(`O2 degassed: ${(baseSim.meta.oxygenDegassed_g ?? 0).toFixed(3)} g (steps ${baseSim.meta.oxygenDegasSteps ?? 0})`);
+      dbg.push(`CO2 init: ${(baseSim.meta.co2Init_mgL ?? 0).toFixed(2)} mg/L • sat ${(baseSim.meta.co2Sat_mgL ?? 0).toFixed(2)} mg/L • zero hits ${baseSim.meta.co2ZeroHits ?? 0} • degas ${baseSim.meta.co2DegasSteps ?? 0} • air in ${(baseSim.meta.co2AirIn_g ?? 0).toFixed(2)} g • air out ${(baseSim.meta.co2AirOut_g ?? 0).toFixed(2)} g`);
       dbg.push(`Denit: k=${params.kDenit} 1/day • cap=${params.denitCap}`);
       dbg.push(`Heterotroph mass: ${params.heteroMass} g (base ${FISH_MODEL.o2_mg_g_day_base} mg/g/day @ ${FISH_MODEL.refTempC}°C)`);
       dbg.push(`Photosynthetic mass: ${params.photoMass} g (peak ${PHOTO_MODEL.o2_mg_g_day_peak} mg/g/day)`);
@@ -7119,7 +7098,6 @@ function recompute(){
       dbg.push(`Chem display: ${chemMode}`);
       const phDisplay = baseSim.meta.pHLast ?? params.pH ?? 7.0;
       dbg.push(`N units: ${params.nUnits} • pH=${phDisplay.toFixed(2)} • NH3 frac=${nh3Fraction(phDisplay, params.Tnow).toFixed(3)}`);
-      recordMetaDebugGaps(mcMetaMissing, 'mc');
       if(DEBUG_STATE.lastBandDiagnostics){
         dbg.push(`Band sanitation: rate invalid ${DEBUG_STATE.lastBandDiagnostics.rateInvalid} (inverted ${DEBUG_STATE.lastBandDiagnostics.rateInverted}), chem invalid ${DEBUG_STATE.lastBandDiagnostics.chemInvalid} (inverted ${DEBUG_STATE.lastBandDiagnostics.chemInverted}), bio invalid ${DEBUG_STATE.lastBandDiagnostics.bioInvalid} (inverted ${DEBUG_STATE.lastBandDiagnostics.bioInverted}), DO invalid ${DEBUG_STATE.lastBandDiagnostics.doInvalid} (inverted ${DEBUG_STATE.lastBandDiagnostics.doInverted})`);
       }
@@ -7199,55 +7177,47 @@ function recompute(){
       dbg.push(`OTR bubble max: ${oxy.OTR_bubble_max.toFixed(3)} g/day`);
       dbg.push(`OTR max: ${oxy.OTR_max.toFixed(3)} g/day`);
       dbg.push(`kLa inferred: ${oxy.kLa.toFixed(4)} 1/day`);
-      const detMetaMissing = [];
-      const detMetaValue = (key, value, decimals)=> {
-        if(!Number.isFinite(value)) detMetaMissing.push(key);
-        return renderFixedValue(value, decimals, 'n/a');
-      };
-      dbg.push(`Sim dt: ${detMetaValue('dt', baseSim.meta.dt, 4)} days (~${detMetaValue('dt_hours', baseSim.meta.dt * 24, 2)} h)`);
-      dbg.push(`Feed mass: start ${detMetaValue('feedStart', baseSim.meta.feedStart, 3)} g → end ${detMetaValue('feedEnd', baseSim.meta.feedEnd, 3)} g`);
+      dbg.push(`Sim dt: ${baseSim.meta.dt.toFixed(4)} days (~${(baseSim.meta.dt*24).toFixed(2)} h)`);
+      dbg.push(`Feed mass: start ${baseSim.meta.feedStart.toFixed(3)} g → end ${baseSim.meta.feedEnd.toFixed(3)} g`);
       if(baseSim.meta.feedPulse){
-        const pulse = baseSim.meta.feedPulse;
-        dbg.push(`Feed pulse: ${detMetaValue('feedPulse.windowHours', pulse.windowHours, 0)}h window • ${detMetaValue('feedPulse.windowSteps', pulse.windowSteps, 0)} steps • ${detMetaValue('feedPulse.totalPellets', pulse.totalPellets, 0)} pellets, ${detMetaValue('feedPulse.totalPowder_g', pulse.totalPowder_g, 2)} g powder`);
+        dbg.push(`Feed pulse: ${baseSim.meta.feedPulse.windowHours}h window • ${baseSim.meta.feedPulse.windowSteps} steps • ${baseSim.meta.feedPulse.totalPellets} pellets, ${baseSim.meta.feedPulse.totalPowder_g.toFixed(2)} g powder`);
       }
-      dbg.push(`Rate peaks: demand ${detMetaValue('maxDemand', baseSim.meta.maxDemand, 3)} g/day • supply ${detMetaValue('maxSupply', baseSim.meta.maxSupply, 3)} g/day`);
+      dbg.push(`Rate peaks: demand ${baseSim.meta.maxDemand.toFixed(3)} g/day • supply ${baseSim.meta.maxSupply.toFixed(3)} g/day`);
       dbg.push('Metabolism mode: grazing-linked heterotrophs + photosynthesis (modernized kinetics)');
       dbg.push(composeBiofilmDebugLine(baseSim, params, 'deterministic'));
       if(baseSim.meta.tempSmoothRange){
-        dbg.push(`Temp smoothing: τ=${detMetaValue('tempTauHours', baseSim.meta.tempTauHours, 0)}h, smooth ${detMetaValue('tempSmoothRange.min', baseSim.meta.tempSmoothRange.min, 2)}–${detMetaValue('tempSmoothRange.max', baseSim.meta.tempSmoothRange.max, 2)}°C (target ${detMetaValue('tempSmoothRange.targetMin', baseSim.meta.tempSmoothRange.targetMin, 2)}–${detMetaValue('tempSmoothRange.targetMax', baseSim.meta.tempSmoothRange.targetMax, 2)}°C)`);
+        dbg.push(`Temp smoothing: τ=${baseSim.meta.tempTauHours}h, smooth ${baseSim.meta.tempSmoothRange.min.toFixed(2)}–${baseSim.meta.tempSmoothRange.max.toFixed(2)}°C (target ${baseSim.meta.tempSmoothRange.targetMin.toFixed(2)}–${baseSim.meta.tempSmoothRange.targetMax.toFixed(2)}°C)`);
       }
       if(baseSim.meta.heteroGrowthTotal != null || baseSim.meta.phytoGrowthTotal != null){
-        dbg.push(`Biomass totals: hetero +${detMetaValue('heteroGrowthTotal', baseSim.meta.heteroGrowthTotal ?? 0, 2)} g (consumed ${detMetaValue('heteroConsumedTotal', baseSim.meta.heteroConsumedTotal ?? 0, 2)} g), phyto +${detMetaValue('phytoGrowthTotal', baseSim.meta.phytoGrowthTotal ?? 0, 2)} g (consumed ${detMetaValue('phytoConsumedTotal', baseSim.meta.phytoConsumedTotal ?? 0, 2)} g)`);
+        dbg.push(`Biomass totals: hetero +${(baseSim.meta.heteroGrowthTotal ?? 0).toFixed(2)} g (consumed ${(baseSim.meta.heteroConsumedTotal ?? 0).toFixed(2)} g), phyto +${(baseSim.meta.phytoGrowthTotal ?? 0).toFixed(2)} g (consumed ${(baseSim.meta.phytoConsumedTotal ?? 0).toFixed(2)} g)`);
       }
       if(baseSim.meta.phytoAlgae_g != null || baseSim.meta.biofilm_g != null){
         const phytoTotal = (baseSim.meta.phytoAlgae_g ?? 0) + (baseSim.meta.phytoPlankton_g ?? 0) + (baseSim.meta.phytoPlants_g ?? 0);
         const heteroTotal = (baseSim.meta.biofilm_g ?? 0) + (baseSim.meta.predator_g ?? 0);
         const phytoDenom = phytoTotal > 1e-9 ? phytoTotal : 1;
         const heteroDenom = heteroTotal > 1e-9 ? heteroTotal : 1;
-        dbg.push(`Phyto split: algae ${detMetaValue('phytoAlgae_g', baseSim.meta.phytoAlgae_g ?? 0, 2)} g (${detMetaValue('phytoAlgae_pct', 100*(baseSim.meta.phytoAlgae_g ?? 0)/phytoDenom, 1)}%), plankton ${detMetaValue('phytoPlankton_g', baseSim.meta.phytoPlankton_g ?? 0, 2)} g (${detMetaValue('phytoPlankton_pct', 100*(baseSim.meta.phytoPlankton_g ?? 0)/phytoDenom, 1)}%), plants ${detMetaValue('phytoPlants_g', baseSim.meta.phytoPlants_g ?? 0, 2)} g (${detMetaValue('phytoPlants_pct', 100*(baseSim.meta.phytoPlants_g ?? 0)/phytoDenom, 1)}%)`);
-        dbg.push(`Hetero split: biofilm ${detMetaValue('biofilm_g', baseSim.meta.biofilm_g ?? 0, 2)} g (${detMetaValue('biofilm_pct', 100*(baseSim.meta.biofilm_g ?? 0)/heteroDenom, 1)}%), predator ${detMetaValue('predator_g', baseSim.meta.predator_g ?? 0, 2)} g (${detMetaValue('predator_pct', 100*(baseSim.meta.predator_g ?? 0)/heteroDenom, 1)}%)`);
+        dbg.push(`Phyto split: algae ${(baseSim.meta.phytoAlgae_g ?? 0).toFixed(2)} g (${(100*(baseSim.meta.phytoAlgae_g ?? 0)/phytoDenom).toFixed(1)}%), plankton ${(baseSim.meta.phytoPlankton_g ?? 0).toFixed(2)} g (${(100*(baseSim.meta.phytoPlankton_g ?? 0)/phytoDenom).toFixed(1)}%), plants ${(baseSim.meta.phytoPlants_g ?? 0).toFixed(2)} g (${(100*(baseSim.meta.phytoPlants_g ?? 0)/phytoDenom).toFixed(1)}%)`);
+        dbg.push(`Hetero split: biofilm ${(baseSim.meta.biofilm_g ?? 0).toFixed(2)} g (${(100*(baseSim.meta.biofilm_g ?? 0)/heteroDenom).toFixed(1)}%), predator ${(baseSim.meta.predator_g ?? 0).toFixed(2)} g (${(100*(baseSim.meta.predator_g ?? 0)/heteroDenom).toFixed(1)}%)`);
       }
       if(baseSim.meta.biomassExtinction){
         dbg.push(`Biomass extinctions: hetero ${baseSim.meta.biomassExtinction.heteroHits} steps, phyto ${baseSim.meta.biomassExtinction.phytoHits} steps • algae ${baseSim.meta.biomassExtinction.phytoAlgaeHits} • plankton ${baseSim.meta.biomassExtinction.phytoPlanktonHits} • plants ${baseSim.meta.biomassExtinction.phytoPlantsHits} • biofilm ${baseSim.meta.biomassExtinction.biofilmHits} • predator ${baseSim.meta.biomassExtinction.predatorHits}`);
       }
-      dbg.push(`Grazing limits: biofilm ${baseSim.meta.grazingLimitedSteps ?? 0} steps • max ${detMetaValue('biofilmGrazingMax_g_g_day', baseSim.meta.biofilmGrazingMax_g_g_day ?? 0, 2)} g/g/day; predator ${baseSim.meta.predatorGrazingLimitedSteps ?? 0} steps • max ${detMetaValue('predatorGrazingMax_g_g_day', baseSim.meta.predatorGrazingMax_g_g_day ?? 0, 2)} g/g/day`);
-      dbg.push(`Phyto reserve: built ${detMetaValue('phytoReserveBuilt', baseSim.meta.phytoReserveBuilt, 2)} g • used ${detMetaValue('phytoReserveUsed', baseSim.meta.phytoReserveUsed, 2)} g • night growth ${detMetaValue('phytoNightGrowthTotal', baseSim.meta.phytoNightGrowthTotal, 2)} g`);
-      dbg.push(`Phyto recruitment: ${detMetaValue('phytoRecruitTotal', baseSim.meta.phytoRecruitTotal ?? 0, 2)} g • refugia ${detMetaValue('phytoRefugiaFrac', baseSim.meta.phytoRefugiaFrac, 2)} • grazing shield min ${detMetaValue('grazingShieldMin', baseSim.meta.grazingShieldMin ?? 0, 2)} • predator shield min ${detMetaValue('predatorShieldMin', baseSim.meta.predatorShieldMin ?? 0, 2)}`);
+      dbg.push(`Grazing limits: biofilm ${baseSim.meta.grazingLimitedSteps ?? 0} steps • max ${(baseSim.meta.biofilmGrazingMax_g_g_day ?? 0).toFixed(2)} g/g/day; predator ${baseSim.meta.predatorGrazingLimitedSteps ?? 0} steps • max ${(baseSim.meta.predatorGrazingMax_g_g_day ?? 0).toFixed(2)} g/g/day`);
+      dbg.push(`Phyto reserve: built ${baseSim.meta.phytoReserveBuilt.toFixed(2)} g • used ${baseSim.meta.phytoReserveUsed.toFixed(2)} g • night growth ${baseSim.meta.phytoNightGrowthTotal.toFixed(2)} g`);
+      dbg.push(`Phyto recruitment: ${(baseSim.meta.phytoRecruitTotal ?? 0).toFixed(2)} g • refugia ${baseSim.meta.phytoRefugiaFrac.toFixed(2)} • grazing shield min ${(baseSim.meta.grazingShieldMin ?? 0).toFixed(2)} • predator shield min ${(baseSim.meta.predatorShieldMin ?? 0).toFixed(2)}`);
       dbg.push('Biomass dynamics:');
-      dbg.push(`  CO2 free ${detMetaValue('co2FreeLast_mgL', baseSim.meta.co2FreeLast_mgL ?? 0, 2)} mg/L • buffer capacity ${detMetaValue('bufferCapacityLast', baseSim.meta.bufferCapacityLast ?? 0, 2)} • phyto store fill ${detMetaValue('phytoStoreFillPct', (baseSim.meta.phytoStoreFillPct ?? 0) * 100, 1)}%`);
-      dbg.push(`  refuge fraction ${detMetaValue('refugeFractionLast', baseSim.meta.refugeFractionLast ?? 0, 2)} • biofilm activity ${detMetaValue('biofilmActivityLast', baseSim.meta.biofilmActivityLast ?? 0, 2)} • predator activity ${detMetaValue('predatorActivityLast', baseSim.meta.predatorActivityLast ?? 0, 2)}`);
-      dbg.push(`  lagged grazing: biofilm ${detMetaValue('laggedBiofilmConsumptionTotal', baseSim.meta.laggedBiofilmConsumptionTotal ?? 0, 2)} g • predator ${detMetaValue('laggedPredatorConsumptionTotal', baseSim.meta.laggedPredatorConsumptionTotal ?? 0, 2)} g`);
-      dbg.push(`O2 degassed: ${detMetaValue('oxygenDegassed_g', baseSim.meta.oxygenDegassed_g ?? 0, 3)} g (steps ${baseSim.meta.oxygenDegasSteps ?? 0})`);
-      dbg.push(`CO2 init: ${detMetaValue('co2Init_mgL', baseSim.meta.co2Init_mgL ?? 0, 2)} mg/L • sat ${detMetaValue('co2Sat_mgL', baseSim.meta.co2Sat_mgL ?? 0, 2)} mg/L • zero hits ${baseSim.meta.co2ZeroHits ?? 0} • degas ${baseSim.meta.co2DegasSteps ?? 0} • air in ${detMetaValue('co2AirIn_g', baseSim.meta.co2AirIn_g ?? 0, 2)} g • air out ${detMetaValue('co2AirOut_g', baseSim.meta.co2AirOut_g ?? 0, 2)} g`);
+      dbg.push(`  CO2 free ${(baseSim.meta.co2FreeLast_mgL ?? 0).toFixed(2)} mg/L • buffer capacity ${(baseSim.meta.bufferCapacityLast ?? 0).toFixed(2)} • phyto store fill ${((baseSim.meta.phytoStoreFillPct ?? 0) * 100).toFixed(1)}%`);
+      dbg.push(`  refuge fraction ${(baseSim.meta.refugeFractionLast ?? 0).toFixed(2)} • biofilm activity ${(baseSim.meta.biofilmActivityLast ?? 0).toFixed(2)} • predator activity ${(baseSim.meta.predatorActivityLast ?? 0).toFixed(2)}`);
+      dbg.push(`  lagged grazing: biofilm ${(baseSim.meta.laggedBiofilmConsumptionTotal ?? 0).toFixed(2)} g • predator ${(baseSim.meta.laggedPredatorConsumptionTotal ?? 0).toFixed(2)} g`);
+      dbg.push(`O2 degassed: ${(baseSim.meta.oxygenDegassed_g ?? 0).toFixed(3)} g (steps ${baseSim.meta.oxygenDegasSteps ?? 0})`);
+      dbg.push(`CO2 init: ${(baseSim.meta.co2Init_mgL ?? 0).toFixed(2)} mg/L • sat ${(baseSim.meta.co2Sat_mgL ?? 0).toFixed(2)} mg/L • zero hits ${baseSim.meta.co2ZeroHits ?? 0} • degas ${baseSim.meta.co2DegasSteps ?? 0} • air in ${(baseSim.meta.co2AirIn_g ?? 0).toFixed(2)} g • air out ${(baseSim.meta.co2AirOut_g ?? 0).toFixed(2)} g`);
       dbg.push(`Denit: k=${params.kDenit} 1/day • cap=${params.denitCap}`);
       dbg.push(`Heterotroph mass: ${params.heteroMass} g (base ${FISH_MODEL.o2_mg_g_day_base} mg/g/day @ ${FISH_MODEL.refTempC}°C)`);
       dbg.push(`Photosynthetic mass: ${params.photoMass} g (peak ${PHOTO_MODEL.o2_mg_g_day_peak} mg/g/day)`);
       dbg.push(`Diurnal: tempAmp ${params.tempAmp}°C • lights @ ${params.lightHour}:00`);
       dbg.push(`Feed profile: ${FEED_PROFILE.name}`);
       dbg.push(`Chem display: ${chemMode}`);
-      const phDisplay = baseSim.meta.pHLast ?? params.pH ?? 7.0;
-      dbg.push(`N units: ${params.nUnits} • pH=${phDisplay.toFixed(2)} • NH3 frac=${nh3Fraction(phDisplay, params.Tnow).toFixed(3)}`);
-      recordMetaDebugGaps(detMetaMissing, 'deterministic');
+      dbg.push(`N units: ${params.nUnits} • pH=${params.pH} • NH3 frac=${nh3Fraction(params.pH ?? 7.0, params.Tnow).toFixed(3)}`);
       dbg.push('');
       dbg.push('--- Snapshot ---');
       dbg.push(...buildDebugSnapshot([]));
