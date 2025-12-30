@@ -569,6 +569,14 @@
           <label>Water temp (°C) at current blanket setting</label>
           <input id="Tnow" type="number" step="0.1" value="22.0"/>
         </div>
+        <div class="row">
+          <label>Water pH</label>
+          <input id="pH" type="number" step="0.05" min="5" max="9.5" value="7.2"/>
+        </div>
+        <div class="row">
+          <label>Altitude (m)</label>
+          <input id="altM" type="number" step="1" min="0" value="0"/>
+        </div>
 
         <div class="row">
           <label>TDS (mg/L)</label>
@@ -1097,6 +1105,8 @@ const DEBUG_STATE = {
   recomputeBubbleUpdatedISO: null,
   recomputeBubbleMissing: false,
   missingContainers: [],
+  missingInputs: [],
+  lastMissingInputsCount: null,
   initReadyState: null,
   errors: [],  // newest last
   warnings: []
@@ -1115,6 +1125,17 @@ function addWarning(message){
     stage: DEBUG_STATE.stage,
     stageExtra: DEBUG_STATE.stageExtra
   });
+}
+
+function logMissingInput(id, context){
+  const entry = {
+    timeISO: new Date().toISOString(),
+    id,
+    context: context || 'unknown'
+  };
+  DEBUG_STATE.missingInputs.push(entry);
+  DEBUG_STATE.lastMissingInputsCount = DEBUG_STATE.missingInputs.length;
+  addWarning(`Missing input #${id} (${entry.context}).`);
 }
 
 if(DEBUG_STATE.bootScriptTagCount > 1){
@@ -1291,6 +1312,14 @@ lines.push(`surface=${p.lenCm}×${p.widCm} cm, blanket=${p.blanketPct}%, ripple=
       lines.push(`#${DEBUG_STATE.missingContainers.length - recent.length + i + 1} ${m.timeISO} — ${m.id} (${m.context})`);
     });
   }
+  if(DEBUG_STATE.missingInputs.length){
+    lines.push('');
+    lines.push('--- Missing inputs (recent) ---');
+    const recent = DEBUG_STATE.missingInputs.slice(-3);
+    recent.forEach((m, i)=>{
+      lines.push(`#${DEBUG_STATE.missingInputs.length - recent.length + i + 1} ${m.timeISO} — ${m.id} (${m.context})`);
+    });
+  }
   if(Number.isFinite(DEBUG_STATE.lastRecomputeMs)){
     lines.push('');
     lines.push('--- Recompute timing (last) ---');
@@ -1344,6 +1373,38 @@ lines.push(`surface=${p.lenCm}×${p.widCm} cm, blanket=${p.blanketPct}%, ripple=
 function assertFinite(name, v){
   if(!Number.isFinite(v)) throw new Error(`Non-finite value for ${name}: ${v}`);
   return v;
+}
+
+function grabNumField(id, fallback, context){
+  const node = el(id);
+  if(!node){
+    logMissingInput(id, context || 'number');
+    return fallback;
+  }
+  const value = Number(node.value);
+  if(!Number.isFinite(value)){
+    addWarning(`Non-finite numeric input #${id}: ${node.value}`);
+    return fallback;
+  }
+  return value;
+}
+
+function grabSelectField(id, fallback, context){
+  const node = el(id);
+  if(!node){
+    logMissingInput(id, context || 'select');
+    return fallback;
+  }
+  return node.value ?? fallback;
+}
+
+function grabCheckField(id, fallback, context){
+  const node = el(id);
+  if(!node){
+    logMissingInput(id, context || 'checkbox');
+    return fallback;
+  }
+  return !!node.checked;
 }
 
 function installGlobalErrorHandlers(){
@@ -3680,85 +3741,85 @@ function getParams(){
   }catch(_){}
 
   const p = {
-    pelletMass_g: Number(el('pelMassN').value),
-    powderMass_g: Number(el('powMassN').value),
-    blanketPct: Number(el('blanketN').value),
-    days: Number(el('daysN').value),
+    pelletMass_g: grabNumField('pelMassN', 0, 'params'),
+    powderMass_g: grabNumField('powMassN', 0, 'params'),
+    blanketPct: grabNumField('blanketN', 0, 'params'),
+    days: grabNumField('daysN', 30, 'params'),
 
-    volL: Number(el('volL').value),
-    airFlow: Number(el('airFlow').value),
-    Tnow: Number(el('Tnow').value),
-    pH: Number(el('pH').value),
-    altM: Number(el('altM').value),
-    tds: Number(el('tds').value),
+    volL: grabNumField('volL', 65, 'params'),
+    airFlow: grabNumField('airFlow', 4, 'params'),
+    Tnow: grabNumField('Tnow', 22, 'params'),
+    pH: grabNumField('pH', 7.2, 'params'),
+    altM: grabNumField('altM', 0, 'params'),
+    tds: grabNumField('tds', 0, 'params'),
 
-    ripplePct: Number(el('ripplePct').value),
+    ripplePct: grabNumField('ripplePct', 50, 'params'),
 
-    lenCm: Number(el('lenCm').value),
-    widCm: Number(el('widCm').value),
-    tankHCm: Number(el('tankHCm').value),
-    waterSurfCm: Number(el('waterSurfCm').value),
-    blanketGapCm: Number(el('blanketGapCm').value),
-    diffDepthCm: Number(el('diffDepthCm').value),
-    heaters: Number(el('heaters').value),
+    lenCm: grabNumField('lenCm', 78, 'params'),
+    widCm: grabNumField('widCm', 31, 'params'),
+    tankHCm: grabNumField('tankHCm', 48, 'params'),
+    waterSurfCm: grabNumField('waterSurfCm', 22, 'params'),
+    blanketGapCm: grabNumField('blanketGapCm', 0, 'params'),
+    diffDepthCm: grabNumField('diffDepthCm', 17, 'params'),
+    heaters: grabNumField('heaters', 0, 'params'),
 
-    diffType: el('diffType').value,
-    sotePerM: Number(el('sotePerM').value),
-    surfacePreset: el('surfacePreset') ? el('surfacePreset').value : 'typical',
-    kCalm: Number(el('kCalm').value),
-    kRipple: Number(el('kRipple').value),
+    diffType: grabSelectField('diffType', 'airstone_med', 'params'),
+    sotePerM: grabNumField('sotePerM', 2.5, 'params'),
+    surfacePreset: grabSelectField('surfacePreset', 'typical', 'params'),
+    kCalm: grabNumField('kCalm', 0.3, 'params'),
+    kRipple: grabNumField('kRipple', 1.0, 'params'),
 
-    tightPreset: el('tightPreset') ? el('tightPreset').value : 'loose_high',
-    tight: Number(el('tight').value),
+    tightPreset: grabSelectField('tightPreset', 'loose_high', 'params'),
+    tight: grabNumField('tight', 0.25, 'params'),
 
-    otrPreset: el('otrPreset') ? el('otrPreset').value : 'typical',
-    otrCal: Number(el('otrCal').value),
+    otrPreset: grabSelectField('otrPreset', 'typical', 'params'),
+    otrCal: grabNumField('otrCal', 1.0, 'params'),
 
-    initDOPreset: el('initDOPreset') ? el('initDOPreset').value : '95',
-    doInitPct: Number(el('doInitPct').value),
+    initDOPreset: grabSelectField('initDOPreset', '95', 'params'),
+    doInitPct: grabNumField('doInitPct', 95, 'params'),
 
-    o2Limit: el('o2Limit').value,
-    kDoNit: Number(el('kDoNit').value),
-    kDoHet: Number(el('kDoHet').value),
-    slowFrac: Number(el('slowFrac').value),
-    biofilmMm: Number(el('biofilmMm').value),
-    kDenit: Number(el('kDenit').value),
-    denitCap: Number(el('denitCap').value),
-    fishMass: Number(el('fishMass').value),
-    fishO2: Number(el('fishO2').value),
-    plantO2: Number(el('plantO2').value),
-    tempAmp: Number(el('tempAmp').value),
-    lightHour: Number(el('lightHour').value),
-    kNH4Nit: Number(el('kNH4Nit').value),
-    kNO2Nit: Number(el('kNO2Nit').value),
-    nitCap: Number(el('nitCap').value),
-    nitQ10: Number(el('nitQ10').value),
-    nUnits: el('nUnits').value,
-    chemNerd: !!el('chemNerd').checked,
-    macroRelease: Number(el('macroRelease').value),
-    microRelease: Number(el('microRelease').value),
-    macroUptake: Number(el('macroUptake').value),
-    microUptake: Number(el('microUptake').value),
+    o2Limit: grabSelectField('o2Limit', 'off', 'params'),
+    kDoNit: grabNumField('kDoNit', 0.5, 'params'),
+    kDoHet: grabNumField('kDoHet', 0.8, 'params'),
+    slowFrac: grabNumField('slowFrac', 0.25, 'params'),
+    biofilmMm: grabNumField('biofilmMm', 0.6, 'params'),
+    kDenit: grabNumField('kDenit', 0.15, 'params'),
+    denitCap: grabNumField('denitCap', 0.6, 'params'),
+    fishMass: grabNumField('fishMass', 0, 'params'),
+    fishO2: grabNumField('fishO2', 0, 'params'),
+    plantO2: grabNumField('plantO2', 0, 'params'),
+    tempAmp: grabNumField('tempAmp', 0.6, 'params'),
+    lightHour: grabNumField('lightHour', 9, 'params'),
+    kNH4Nit: grabNumField('kNH4Nit', 0.4, 'params'),
+    kNO2Nit: grabNumField('kNO2Nit', 0.25, 'params'),
+    nitCap: grabNumField('nitCap', 0.8, 'params'),
+    nitQ10: grabNumField('nitQ10', 2.0, 'params'),
+    nUnits: grabSelectField('nUnits', 'asN', 'params'),
+    chemNerd: grabCheckField('chemNerd', false, 'params'),
+    macroRelease: grabNumField('macroRelease', 8.0, 'params'),
+    microRelease: grabNumField('microRelease', 1.2, 'params'),
+    macroUptake: grabNumField('macroUptake', 0.35, 'params'),
+    microUptake: grabNumField('microUptake', 0.08, 'params'),
 
-    pelLen: Number(el('pelLen').value),
-    pelDia: Number(el('pelDia').value),
-    pelRho: Number(el('pelRho').value),
+    pelLen: grabNumField('pelLen', 1.0, 'params'),
+    pelDia: grabNumField('pelDia', 0.2, 'params'),
+    pelRho: grabNumField('pelRho', 0.55, 'params'),
 
     // Uncertainty mode controls
-    runMode: el('runMode') ? el('runMode').value : 'uncertainty',
-    uncLevel: el('uncLevel') ? el('uncLevel').value : 'typical',
-    mcRuns: el('mcRuns') ? Number(el('mcRuns').value) : 200,
-    bandPreset: el('bandPreset') ? el('bandPreset').value : '10-90',
-    seed: el('seed') ? Number(el('seed').value) : 12345,
-    liveRecompute: el('liveRecompute') ? el('liveRecompute').value : 'on',
+    runMode: grabSelectField('runMode', 'uncertainty', 'params'),
+    uncLevel: grabSelectField('uncLevel', 'typical', 'params'),
+    mcRuns: grabNumField('mcRuns', 200, 'params'),
+    bandPreset: grabSelectField('bandPreset', '10-90', 'params'),
+    seed: grabNumField('seed', 12345, 'params'),
+    liveRecompute: grabSelectField('liveRecompute', 'on', 'params'),
     u: {
-      air: el('uAir') ? el('uAir').checked : true,
-      diff: el('uDiff') ? el('uDiff').checked : true,
-      surf: el('uSurf') ? el('uSurf').checked : true,
-      tight: el('uTight') ? el('uTight').checked : true,
-      bio: el('uBio') ? el('uBio').checked : true,
-      temp: el('uTemp') ? el('uTemp').checked : true,
-      initDO: el('uInitDO') ? el('uInitDO').checked : true,
+      air: grabCheckField('uAir', true, 'params'),
+      diff: grabCheckField('uDiff', true, 'params'),
+      surf: grabCheckField('uSurf', true, 'params'),
+      tight: grabCheckField('uTight', true, 'params'),
+      bio: grabCheckField('uBio', true, 'params'),
+      temp: grabCheckField('uTemp', true, 'params'),
+      initDO: grabCheckField('uInitDO', true, 'params'),
     },
 
     events: EVENTS
@@ -3816,6 +3877,8 @@ function recompute(){
   DEBUG_STATE.lastOxyMissingCount = 0;
   DEBUG_STATE.lastMCSeriesFallbacks = null;
   DEBUG_STATE.lastBiofilmMetaMissing = null;
+  DEBUG_STATE.missingInputs = [];
+  DEBUG_STATE.lastMissingInputsCount = 0;
   const recomputeStart = performance.now();
   setRecomputeBubbleState('running', {phase: 'start'});
 
