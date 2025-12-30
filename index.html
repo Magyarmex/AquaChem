@@ -3,6 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <title>Aquarium O₂ Demand Planner (DO + oxygenation model)</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop stop-color='%237aa2ff'/%3E%3Cstop offset='1' stop-color='%2363e6be'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='%230b1020'/%3E%3Cpath d='M32 10c9.5 0 17.2 7.7 17.2 17.2S41.5 50 32 50 14.8 42.3 14.8 32 22.5 10 32 10Z' fill='url(%23g)' fill-opacity='.35'/%3E%3Cpath d='M32 17c7.2 0 13 5.8 13 13s-5.8 13-13 13-13-5.8-13-13 5.8-13 13-13Z' fill='url(%23g)'/%3E%3Cpath d='M31.7 23.5c2.7 4 5.3 7.2 5.3 10.2 0 3-2.4 5.4-5.3 5.4s-5.3-2.4-5.3-5.4c0-3 2.6-6.2 5.3-10.2Z' fill='%230b1020' fill-opacity='.85'/%3E%3C/svg%3E" />
   <style>
@@ -1103,8 +1106,12 @@
 
 <script>
 (() => {
-  const bootToken = 'aquachem-inline-v3';
+  const bootToken = 'aquachem-inline-v4';
   const bootKey = '__AQUACHEM_BOOT__';
+  const currentScript = document.currentScript;
+  if(currentScript){
+    currentScript.dataset.aquachemBoot = bootToken;
+  }
   const existingBoot = window[bootKey];
   if(existingBoot){
     existingBoot.count = (existingBoot.count || 1) + 1;
@@ -1278,6 +1285,7 @@ const DEBUG_STATE = {
   bootToken: bootToken,
   bootLoadedISO: window[bootKey].firstSeenISO,
   bootDuplicateCount: window[bootKey].count,
+  bootScriptTagCount: document.querySelectorAll('script[data-aquachem-boot]').length,
   dedupeReport: null,
   recomputeBubbleState: null,
   recomputeBubbleMeta: null,
@@ -1302,6 +1310,10 @@ function addWarning(message){
     stage: DEBUG_STATE.stage,
     stageExtra: DEBUG_STATE.stageExtra
   });
+}
+
+if(DEBUG_STATE.bootScriptTagCount > 1){
+  addWarning(`Detected ${DEBUG_STATE.bootScriptTagCount} inline AquaChem script tags; this can trigger duplicate-load parse errors.`);
 }
 
 function setRecomputeBubbleState(state, meta = null){
@@ -1427,6 +1439,7 @@ lines.push(`surface=${p.lenCm}×${p.widCm} cm, blanket=${p.blanketPct}%, ripple=
     lines.push(`Token: ${DEBUG_STATE.bootToken}`);
     lines.push(`Loaded: ${DEBUG_STATE.bootLoadedISO}`);
     lines.push(`Duplicate loads: ${DEBUG_STATE.bootDuplicateCount}`);
+    lines.push(`Script tags: ${DEBUG_STATE.bootScriptTagCount}`);
   }
   if(DEBUG_STATE.dedupeReport){
     lines.push('');
@@ -2064,6 +2077,8 @@ function runSimulation(params){
   const mEach = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
 
   const mEach = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
+
+  const pelletEachMass = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
 
   const pelletEachMass = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
 
@@ -3175,7 +3190,7 @@ function drawDOPlot(canvas, sim, overlay=null){
     ctx.restore();
   }
 
-  return {m, pw, ph, xMax, yTop, tArr, sim, overlay};
+  return {m, pw, ph, xMax, yTop, tArr, seriesDict, opts};
 }
 
 /* =========================================================
