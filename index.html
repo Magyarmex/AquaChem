@@ -69,11 +69,8 @@
       .grid3{grid-template-columns:1fr;}
       .grid4{grid-template-columns:1fr;}
     }
-    .row{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}
-    .row label{flex:1 1 180px;min-width:160px;color:var(--muted);font-size:12px;letter-spacing:.02em}
-    .row input[type="range"]{flex:1 1 220px;min-width:220px}
-    .row input[type="number"]{flex:0 0 140px}
-    .row select{flex:1 1 220px;min-width:220px}
+    .row{display:flex;gap:12px;align-items:center}
+    .row label{flex:1;color:var(--muted);font-size:12px;letter-spacing:.02em}
     input[type="range"]{width:100%}
     input[type="number"], input[type="text"], select{
       background:#0a1024;border:1px solid rgba(122,162,255,.26);color:var(--text);
@@ -163,40 +160,9 @@
     .tag-details{margin-top:8px;color:var(--muted);font-size:12px;line-height:1.45}
     .calendar{
       display:grid;
-      gap:12px;
-      margin-top:10px;
-    }
-    .calendar.compact{
-      gap:10px;
-    }
-    .calendar-month{
-      border:1px solid rgba(255,255,255,.12);
-      border-radius:12px;
-      padding:10px;
-      background:rgba(0,0,0,.18);
-    }
-    .calendar-header{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      font-size:12px;
-      color:#dfe6ff;
-      letter-spacing:.08em;
-      text-transform:uppercase;
-    }
-    .calendar-header .summary{
-      color:var(--muted);
-      font-size:10px;
-      letter-spacing:.04em;
-    }
-    .calendar-grid{
-      display:grid;
       grid-template-columns: repeat(7, 1fr);
       gap:6px;
-      margin-top:8px;
-    }
-    .calendar.compact .calendar-grid{
-      gap:4px;
+      margin-top:10px;
     }
     .cal-cell{
       border:1px solid rgba(255,255,255,.12);
@@ -206,16 +172,6 @@
       min-height:54px;
       position:relative;
       font-size:11px;
-    }
-    .calendar.compact .cal-cell{
-      min-height:42px;
-      font-size:10px;
-      padding:5px 5px;
-    }
-    .cal-cell.empty{
-      background:transparent;
-      border-color:transparent;
-      box-shadow:none;
     }
     .cal-cell .day-num{font-weight:600;color:#dfe6ff}
     .cal-cell .day-meta{color:var(--muted);font-size:10px;margin-top:4px}
@@ -300,6 +256,9 @@
     </div>
     <div class="small" style="margin-top:-6px">
       This rate ≈ <b id="pelCount">—</b> (<span id="pelEach">—</span> each).
+    </div>
+    <div class="small" style="margin-top:-6px">
+      Provided feed mass ≈ <b id="pelCount">—</b> (<span id="pelEach">—</span> each).
     </div>
 
     <div class="row">
@@ -620,8 +579,8 @@
         </div>
 
         <div class="row">
-          <label>Heterotroph biomass (g) — respiration inferred</label>
-          <input id="heteroMass" type="number" step="1" min="0" value="0"/>
+          <label>Fish biomass (g) — respiration inferred</label>
+          <input id="fishMass" type="number" step="1" min="0" value="0"/>
         </div>
         <div class="row">
           <label>Photosynthetic mass (g wet biomass)</label>
@@ -807,7 +766,7 @@ const RATE_SERIES = [
   {key:"endog", name:"Endogenous respiration", color:"#ff6b6b"},
   {key:"nh4",   name:"NH₄ → NO₂ (nitrification)", color:"#a29bfe"},
   {key:"no2",   name:"NO₂ → NO₃ (nitrification)", color:"#c8d6e5"},
-  {key:"hetero",  name:"Heterotroph respiration", color:"#ff9ff3"},
+  {key:"fish",  name:"Heterotroph respiration", color:"#ff9ff3"},
   {key:"plant", name:"Phyto O₂ production", color:"#1dd1a1"},
   {key:"total", name:"TOTAL demand", color:"#ff5fd2", bold:true},
   {key:"supply",name:"O₂ transfer into water (dynamic)", color:"#63e6be", dash:true},
@@ -867,42 +826,7 @@ function buildCumulativeSeries(seriesDict, dt){
   return {series, info:{invalidCount, totals, dt}};
 }
 
-function sanitizeBand(band, fallback, label){
-  if(!band || !band.lo || !band.hi) return {band, invalid:0, inverted:0};
-  const n = band.lo.length;
-  const out = {
-    lo: new Float32Array(n),
-    mid: new Float32Array(n),
-    hi: new Float32Array(n)
-  };
-  let invalid = 0;
-  let inverted = 0;
-  for(let i=0;i<n;i++){
-    const fallbackValue = Array.isArray(fallback) || fallback instanceof Float32Array ? fallback[i] : 0;
-    let lo = Number.isFinite(band.lo[i]) ? band.lo[i] : fallbackValue;
-    let hi = Number.isFinite(band.hi[i]) ? band.hi[i] : fallbackValue;
-    let mid = Number.isFinite(band.mid?.[i]) ? band.mid[i] : (Number.isFinite(fallbackValue) ? fallbackValue : (lo + hi) / 2);
-    if(!Number.isFinite(lo) || !Number.isFinite(hi) || !Number.isFinite(mid)){
-      invalid++;
-      lo = Number.isFinite(lo) ? lo : 0;
-      hi = Number.isFinite(hi) ? hi : lo;
-      mid = Number.isFinite(mid) ? mid : lo;
-    }
-    if(lo > hi){
-      const tmp = lo; lo = hi; hi = tmp;
-      inverted++;
-    }
-    out.lo[i] = lo;
-    out.mid[i] = mid;
-    out.hi[i] = hi;
-  }
-  if((invalid || inverted) && label){
-    addWarning(`Uncertainty band sanitized for ${label}: ${invalid} non-finite, ${inverted} inverted samples.`);
-  }
-  return {band: out, invalid, inverted};
-}
-
-function buildFeedSchedule(params, pelletEach_g){
+function buildFeedSchedule(params, mEach){
   const interval = Number(params.feedIntervalDays ?? 0);
   const pelletsPerFeed = Math.max(0, Math.round(Number(params.feedPellets ?? 0)));
   const powderPerFeed_g = Math.max(0, Number(params.feedPowder_g ?? 0));
@@ -916,40 +840,14 @@ function buildFeedSchedule(params, pelletEach_g){
       day,
       pellets: pelletsPerFeed,
       powder_g: powderPerFeed_g,
-      mass_g: pelletsPerFeed * pelletEach_g + powderPerFeed_g
+      mass_g: pelletsPerFeed * mEach + powderPerFeed_g
     });
     day += interval;
   }
   return schedule;
 }
 
-function buildFeedPulse(feedPlan, dt, days, windowDays){
-  const n = Math.floor(days/dt) + 1;
-  const pellets = new Float32Array(n);
-  const powder = new Float32Array(n);
-  const windowSteps = Math.max(1, Math.round(windowDays / dt));
-  let totalPellets = 0;
-  let totalPowder = 0;
-  for(const feed of feedPlan){
-    if(!Number.isFinite(feed.day)) continue;
-    const startIdx = clamp(Math.floor(feed.day / dt), 0, n - 1);
-    const p = Number(feed.pellets || 0);
-    const w = Number(feed.powder_g || 0);
-    const perStepPellets = p / windowSteps;
-    const perStepPowder = w / windowSteps;
-    for(let s=0;s<windowSteps;s++){
-      const idx = startIdx + s;
-      if(idx >= n) break;
-      pellets[idx] += perStepPellets;
-      powder[idx] += perStepPowder;
-    }
-    totalPellets += p;
-    totalPowder += w;
-  }
-  return {pellets, powder, windowSteps, windowDays, totalPellets, totalPowder};
-}
-
-function renderFeedingCalendar(params, feedPlan, popEvents){
+function renderFeedingCalendar(params, feedSchedule, popEvents){
   const cal = el('feedCalendar');
   if(!cal){
     addWarning('Feeding calendar missing (#feedCalendar).');
@@ -958,15 +856,16 @@ function renderFeedingCalendar(params, feedPlan, popEvents){
   }
   const days = Math.max(0, Math.ceil(Number(params.days ?? 0)));
   DEBUG_STATE.lastFeedCalendarDays = days;
-  const compact = days > 45;
-  cal.classList.toggle('compact', compact);
-  const startDate = new Date();
-  startDate.setHours(12, 0, 0, 0);
-  DEBUG_STATE.lastFeedCalendarStartISO = startDate.toISOString();
   cal.innerHTML = '';
   const labels = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  for(const label of labels){
+    const div = document.createElement('div');
+    div.className = 'cal-label';
+    div.textContent = label;
+    cal.appendChild(div);
+  }
   const feedMap = new Map();
-  for(const f of feedPlan){
+  for(const f of feedSchedule){
     const idx = Math.floor(f.day);
     if(idx < 0 || idx >= days) continue;
     const prev = feedMap.get(idx) || {pellets:0, powder_g:0};
@@ -981,56 +880,7 @@ function renderFeedingCalendar(params, feedPlan, popEvents){
     const prev = popMap.get(idx) || 0;
     popMap.set(idx, prev + Number(e.pellets || 0));
   }
-  const monthStats = new Map();
   for(let i=0;i<days;i++){
-    const dayDate = new Date(startDate);
-    dayDate.setDate(startDate.getDate() + i);
-    const key = `${dayDate.getFullYear()}-${dayDate.getMonth()}`;
-    const stats = monthStats.get(key) || {feedDays:0, popDays:0, totalDays:0, label:''};
-    stats.totalDays++;
-    stats.label = dayDate.toLocaleString(undefined, {month:'long', year:'numeric'});
-    if(feedMap.get(i)) stats.feedDays++;
-    if(popMap.get(i)) stats.popDays++;
-    monthStats.set(key, stats);
-  }
-
-  let currentKey = null;
-  let monthGrid = null;
-  let monthCount = 0;
-  for(let i=0;i<days;i++){
-    const dayDate = new Date(startDate);
-    dayDate.setDate(startDate.getDate() + i);
-    const key = `${dayDate.getFullYear()}-${dayDate.getMonth()}`;
-    if(key !== currentKey){
-      currentKey = key;
-      monthCount++;
-      const month = document.createElement('div');
-      month.className = 'calendar-month';
-      const header = document.createElement('div');
-      header.className = 'calendar-header';
-      const stats = monthStats.get(key);
-      const summary = stats ? `${stats.feedDays} feed • ${stats.popDays} pop` : '';
-      header.innerHTML = `<span>${stats ? stats.label : 'Month'}</span><span class="summary">${summary}</span>`;
-      month.appendChild(header);
-      monthGrid = document.createElement('div');
-      monthGrid.className = 'calendar-grid';
-      for(const label of labels){
-        const div = document.createElement('div');
-        div.className = 'cal-label';
-        div.textContent = label;
-        monthGrid.appendChild(div);
-      }
-      const monthStart = new Date(dayDate.getFullYear(), dayDate.getMonth(), 1);
-      const offset = monthStart.getDay();
-      for(let o=0;o<offset;o++){
-        const pad = document.createElement('div');
-        pad.className = 'cal-cell empty';
-        monthGrid.appendChild(pad);
-      }
-      month.appendChild(monthGrid);
-      cal.appendChild(month);
-    }
-
     const cell = document.createElement('div');
     const feed = feedMap.get(i);
     const pop = popMap.get(i);
@@ -1044,13 +894,11 @@ function renderFeedingCalendar(params, feedPlan, popEvents){
     }
     if(pop) meta.push(`pop ${Math.round(pop)}`);
     cell.innerHTML = `
-      <div class="day-num">${dayDate.getDate()}</div>
+      <div class="day-num">Day ${i + 1}</div>
       <div class="day-meta">${meta.join(' • ') || '—'}</div>
     `;
-    monthGrid.appendChild(cell);
+    cal.appendChild(cell);
   }
-  DEBUG_STATE.lastFeedCalendarMonths = monthCount;
-  DEBUG_STATE.lastFeedCalendarCompact = compact;
 }
 
 /* =========================================================
@@ -1145,16 +993,12 @@ const DEBUG_STATE = {
   lastFeedProfileStoredAt: null,
   lastRateBandKeys: null,
   lastChemBandKeys: null,
-  lastBandDiagnostics: null,
   lastOxygenClampCount: null,
   lastPlantLimitedSteps: null,
   lastBiomassSummary: null,
   lastTagSparkCount: null,
   lastFeedScheduleCount: null,
   lastFeedCalendarDays: null,
-  lastFeedCalendarMonths: null,
-  lastFeedCalendarCompact: null,
-  lastFeedCalendarStartISO: null,
   lastUpdateISO: null,
   missingContainers: [],
   initReadyState: null,
@@ -1267,16 +1111,6 @@ lines.push(`surface=${p.lenCm}×${p.widCm} cm, blanket=${p.blanketPct}%, ripple=
     lines.push('');
     lines.push('--- Sim meta (last) ---');
     lines.push(compactJSON(DEBUG_STATE.lastSimMeta, 900));
-  }
-  if(DEBUG_STATE.lastBandDiagnostics){
-    lines.push('');
-    lines.push('--- Band diagnostics (last) ---');
-    lines.push(compactJSON(DEBUG_STATE.lastBandDiagnostics, 600));
-  }
-  if(DEBUG_STATE.lastFeedCalendarDays != null){
-    lines.push('');
-    lines.push('--- Calendar (last) ---');
-    lines.push(`days=${DEBUG_STATE.lastFeedCalendarDays}, months=${DEBUG_STATE.lastFeedCalendarMonths}, compact=${DEBUG_STATE.lastFeedCalendarCompact}, start=${DEBUG_STATE.lastFeedCalendarStartISO}`);
   }
   if(DEBUG_STATE.lastTagSummary){
     lines.push('');
@@ -1694,17 +1528,6 @@ function sinkingHazard(day){
   return 1 / Math.max(3 - day, 0.05);
 }
 
-function estimateBiofilmMass(params){
-  const len = Math.max(0, Number(params.lenCm ?? 0));
-  const wid = Math.max(0, Number(params.widCm ?? 0));
-  const tankH = Math.max(0, Number(params.tankHCm ?? 0));
-  const waterDepth = clamp(Number(params.waterSurfCm ?? tankH), 0, tankH);
-  const area_cm2 = (len * wid) + 2 * (len * waterDepth + wid * waterDepth);
-  const thickness_cm = Math.max(0, Number(params.biofilmMm ?? 0)) / 10;
-  const density_g_cm3 = 0.12; // wet biofilm solids-equivalent density
-  return Math.max(0, area_cm2 * thickness_cm * density_g_cm3);
-}
-
 function runSimulation(params){
   // dt: keep ~1200 points for smooth plots
   const targetPts = 1200;
@@ -1752,22 +1575,15 @@ function runSimulation(params){
   let CO2_g = 0;   // g CO2 produced
   let macro_g = 0; // g (proxy)
   let micro_g = 0; // g (proxy)
-  let heteroMass_g = Math.max(0, Number(params.heteroMass ?? 0));
+  let heteroMass_g = Math.max(0, Number(params.fishMass ?? 0));
   let phytoMass_g = Math.max(0, Number(params.photoMass ?? 0));
   const heteroMass0 = heteroMass_g;
   const phytoMass0 = phytoMass_g;
-  const heteroFloor = heteroMass0 * 0.2;
-  const phytoFloor = phytoMass0 * 0.15;
-  let heteroFloorHits = 0;
-  let phytoFloorHits = 0;
   let macroConsumed_g = 0;
   let microConsumed_g = 0;
   let co2Consumed_g = 0;
   let no3Denit_g = 0;
-  let heteroGrowthTotal = 0;
-  let heteroConsumedTotal = 0;
   let phytoGrowthTotal = 0;
-  let phytoConsumedTotal = 0;
   let phytoDecayTotal = 0;
   let co2FloorHits = 0;
   let oxygenClampCount = 0;
@@ -1801,7 +1617,7 @@ function runSimulation(params){
   const slowFrac = 0; // legacy metabolism: no refractory split
   const biofilmMult = 1; // legacy metabolism: no biofilm diffusion penalty
   const kDenit = 0; // legacy metabolism: denitrification off
-  const heteroMass = Number(params.heteroMass ?? 0);
+  const fishMass = Number(params.fishMass ?? 0);
   const photoMass = Number(params.photoMass ?? 0);
   const tempAmp = Number(params.tempAmp ?? 0);
   const lightHour = Number(params.lightHour ?? 0);
@@ -1818,7 +1634,7 @@ function runSimulation(params){
       endog:new Array(n).fill(0),
       nh4:new Array(n).fill(0),
       no2:new Array(n).fill(0),
-      hetero:new Array(n).fill(0),
+      fish:new Array(n).fill(0),
       plant:new Array(n).fill(0),
       total:new Array(n).fill(0),
       supply:new Array(n).fill(0),
@@ -1876,8 +1692,8 @@ function runSimulation(params){
         microUptake_mgL_per_g_photo_day: FEED_PROFILE.modeling.microUptake_mgL_per_g_photo_day,
         copperFractionOfMicro: FEED_PROFILE.modeling.copperFractionOfMicro
       },
-      heteroModel: {
-        heteroMass_g: heteroMass,
+      fishModel: {
+        fishMass_g: fishMass,
         o2_mg_g_day_base: FISH_MODEL.o2_mg_g_day_base,
         q10: FISH_MODEL.q10
       },
@@ -1903,20 +1719,18 @@ function runSimulation(params){
     micro: new Array(n).fill(0),
   };
 
-  const pelletEachMass_g = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
-  let simFeedPlan = params.feedSchedule || buildFeedSchedule(params, pelletEachMass_g);
-  if(!Array.isArray(simFeedPlan)){
-    addWarning('Feed plan invalid; defaulting to empty schedule.');
-    simFeedPlan = [];
-  }
-  const feedWindowHours = clamp(Number(params.feedWindowHours ?? 4), 0.5, 24);
-  const feedPulse = buildFeedPulse(simFeedPlan, dt, params.days, feedWindowHours / 24);
+  const mEach = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
+  const feedSchedule = params.feedSchedule || buildFeedSchedule(params, mEach);
 
   // Events sorted
   const ev = [...params.events]
     .filter(e=>Number.isFinite(e.day) && Number.isFinite(e.pellets) && e.pellets>0)
     .sort((a,b)=>a.day-b.day);
   let evIdx = 0;
+  const feeds = [...feedSchedule]
+    .filter(e=>Number.isFinite(e.day))
+    .sort((a,b)=>a.day-b.day);
+  let feedIdx = 0;
 
   function blend(a,b,w){ return a*(1-w) + b*w; }
 
@@ -1963,13 +1777,6 @@ function runSimulation(params){
   const macroUptakeRate_g_day = (FEED_PROFILE.modeling.macroUptake_mgL_per_g_photo_day * photoMass * params.volL) / 1000;
   const microUptakeRate_g_day = (FEED_PROFILE.modeling.microUptake_mgL_per_g_photo_day * photoMass * params.volL) / 1000;
   const CO2_floor_g = (1.0 * params.volL) / 1000;
-  CO2_g = Math.max(CO2_g, CO2_floor_g);
-
-  const tempTauHours = clamp(Number(params.tempTauHours ?? 8), 1, 24);
-  const tempTauDays = tempTauHours / 24;
-  let tempSmooth = oxy.T;
-  let tempSmoothMin = tempSmooth;
-  let tempSmoothMax = tempSmooth;
 
   for(let i=0;i<n;i++){
     const day = i*dt;
@@ -1977,14 +1784,10 @@ function runSimulation(params){
 
     const dielPhase = 2 * Math.PI * ((day + lightHour/24) % 1);
     const lightFactor = Math.max(0, Math.sin(dielPhase));
-    const tempTarget = oxy.T + tempAmp * Math.sin(dielPhase);
-    const tempBlend = clamp(tempTauDays > 1e-6 ? (dt / tempTauDays) : 1, 0, 1);
-    tempSmooth = tempSmooth + (tempTarget - tempSmooth) * tempBlend;
-    tempSmoothMin = Math.min(tempSmoothMin, tempSmooth);
-    tempSmoothMax = Math.max(tempSmoothMax, tempSmooth);
-    const tempF = clamp(Math.pow(Q10, (tempSmooth - 25.0)/10) * bioMult, 0.25, 6.0);
-    const tempFNit = Math.pow(nitQ10, (tempSmooth - 25.0)/10);
-    const heteroO2Rate = FISH_MODEL.o2_mg_g_day_base * Math.pow(FISH_MODEL.q10, (tempSmooth - FISH_MODEL.refTempC)/10);
+    const tempNow = oxy.T + tempAmp * Math.sin(dielPhase);
+    const tempF = clamp(Math.pow(Q10, (tempNow - 25.0)/10) * bioMult, 0.25, 6.0);
+    const tempFNit = Math.pow(nitQ10, (tempNow - 25.0)/10);
+    const fishO2Rate = FISH_MODEL.o2_mg_g_day_base * Math.pow(FISH_MODEL.q10, (tempNow - FISH_MODEL.refTempC)/10);
     const rHet = rHet_base * tempF;
     const dHet = dHet_base * tempF;
     const rNit = rNit_base * tempFNit;
@@ -1993,28 +1796,34 @@ function runSimulation(params){
     const dDen = dDen_base * tempF;
 
     // Apply feed events at this time slice
-    const feedPellets = Math.max(0, feedPulse.pellets[i] || 0);
-    const feedPowder_g = Math.max(0, feedPulse.powder[i] || 0);
-    if(feedPellets > 0){
-      const feedMass = feedPellets * pelletEachMass_g;
-      pelFloat.carb += feedMass * FRACTIONS.carb;
-      pelFloat.prot += feedMass * FRACTIONS.protein;
-      pelFloat.fat += feedMass * FRACTIONS.fat;
-      feedAddedC_g += feedMass;
-      feedAddedN_g += feedMass * FRACTIONS.protein * CHEM.gN_per_g_protein;
-    }
-    if(feedPowder_g > 0){
-      powBot.carb += feedPowder_g * FRACTIONS.carb;
-      powBot.prot += feedPowder_g * FRACTIONS.protein;
-      powBot.fat += feedPowder_g * FRACTIONS.fat;
-      feedAddedC_g += feedPowder_g;
-      feedAddedN_g += feedPowder_g * FRACTIONS.protein * CHEM.gN_per_g_protein;
+    while(feedIdx < feeds.length && feeds[feedIdx].day <= day + dt/2){
+      const f = feeds[feedIdx];
+      const feedPellets = Math.max(0, Math.round(Number(f.pellets || 0)));
+      const feedPowder_g = Math.max(0, Number(f.powder_g || 0));
+      if(feedPellets > 0){
+        const feedMass = feedPellets * mEach;
+        pelFloat.carb += feedMass * FRACTIONS.carb;
+        pelFloat.prot += feedMass * FRACTIONS.protein;
+        pelFloat.fat += feedMass * FRACTIONS.fat;
+        feedAddedC_g += feedMass;
+        feedAddedN_g += feedMass * FRACTIONS.protein * CHEM.gN_per_g_protein;
+      }
+      if(feedPowder_g > 0){
+        powBot.carb += feedPowder_g * FRACTIONS.carb;
+        powBot.prot += feedPowder_g * FRACTIONS.protein;
+        powBot.fat += feedPowder_g * FRACTIONS.fat;
+        feedAddedC_g += feedPowder_g;
+        feedAddedN_g += feedPowder_g * FRACTIONS.protein * CHEM.gN_per_g_protein;
+      }
+      feeds[feedIdx].mass_g = feedPellets * mEach + feedPowder_g;
+      feeds[feedIdx].n_g = feedAddedN_g;
+      feedIdx++;
     }
 
     // Apply pop events at this time slice
     while(evIdx < ev.length && ev[evIdx].day <= day + dt/2){
       const e = ev[evIdx];
-      const popMass_asfed = e.pellets * pelletEachMass_g;
+      const popMass_asfed = e.pellets * mEach;
       const popComp = {
         carb: popMass_asfed * FRACTIONS.carb,
         prot: popMass_asfed * FRACTIONS.protein,
@@ -2128,96 +1937,35 @@ function runSimulation(params){
     out.audit.micro_release += microAdd_g;
 
     // Biomass growth + nutrient consumption
-    let S_tot = S.carb + S.prot + S.fat;
-    let nutrientPool = macro_g + micro_g;
-    let inorgN_g = Math.max(0, NH4 + NO3);
-    const co2Index = clamp(CO2_g / (CO2_g + CO2_floor_g * 0.6), 0, 1);
-    const phytoNutrientIndex = clamp((nutrientPool + inorgN_g * 0.6) / (nutrientPool + inorgN_g * 0.6 + 0.35), 0, 1);
-
-    const phytoGrowthRaw = phytoMass_g * PHOTO_MODEL.growth_per_day * lightFactor * phytoNutrientIndex * co2Index * dt;
-    const phytoYield = 0.55;
-    const phytoAvailable = nutrientPool + inorgN_g * 0.6;
-    const phytoRequired = phytoGrowthRaw / phytoYield;
-    const phytoConsumed = Math.min(phytoRequired, phytoAvailable);
-    const phytoGrowth = phytoConsumed * phytoYield;
-    const phytoDecay = phytoMass_g * PHOTO_MODEL.decay_per_day * (1 - lightFactor) * (1 - phytoNutrientIndex * 0.5) * dt;
-    phytoMass_g = Math.max(phytoFloor, phytoMass_g + phytoGrowth - phytoDecay);
-    if(phytoMass_g <= phytoFloor + 1e-9 && phytoFloor > 0) phytoFloorHits++;
-    phytoGrowthTotal += phytoGrowth;
-    phytoConsumedTotal += phytoConsumed;
-    phytoDecayTotal += phytoDecay;
-    if(!Number.isFinite(phytoMass_g)){
-      addWarning('Phyto mass became non-finite; resetting to 0.');
-      phytoMass_g = 0;
-    }
-    if(phytoConsumed > 0){
-      const shareNutr = nutrientPool > 0 ? (nutrientPool / phytoAvailable) : 0;
-      const takeNutr = phytoConsumed * shareNutr;
-      const takeInorg = phytoConsumed - takeNutr;
-      if(takeNutr > 0){
-        const nTot = nutrientPool || 1;
-        macro_g = Math.max(0, macro_g - takeNutr * (macro_g / nTot));
-        micro_g = Math.max(0, micro_g - takeNutr * (micro_g / nTot));
-      }
-      if(takeInorg > 0){
-        const inTot = inorgN_g || 1;
-        const takeNH4 = Math.min(NH4, takeInorg * (NH4 / inTot));
-        const takeNO3 = Math.min(NO3, takeInorg * (NO3 / inTot));
-        NH4 = Math.max(0, NH4 - takeNH4);
-        NO3 = Math.max(0, NO3 - takeNO3);
-      }
-    }
-
-    nutrientPool = macro_g + micro_g;
-    inorgN_g = Math.max(0, NH4 + NO3);
-    S_tot = S.carb + S.prot + S.fat;
+    const S_tot = S.carb + S.prot + S.fat;
+    const nutrientPool = macro_g + micro_g;
+    const inorgN_g = Math.max(0, NH4 + NO3);
     const foodIndex = clamp((S_tot + nutrientPool * 0.3) / (S_tot + nutrientPool * 0.3 + 0.25), 0, 1);
+    const phytoNutrientIndex = clamp((nutrientPool + inorgN_g * 0.6) / (nutrientPool + inorgN_g * 0.6 + 0.35), 0, 1);
+    const co2Index = clamp(CO2_g / (CO2_g + CO2_floor_g * 0.6), 0, 1);
 
-    const heteroGrowthRaw = heteroMass_g * HET_MODEL.growth_per_day * foodIndex * tempF * dt;
-    const heteroYield = 0.45;
-    const heteroAvailable = S_tot + nutrientPool;
-    const heteroRequired = heteroGrowthRaw / heteroYield;
-    const heteroConsumed = Math.min(heteroRequired, heteroAvailable);
-    const heteroGrowth = heteroConsumed * heteroYield;
+    const heteroGrowth = heteroMass_g * HET_MODEL.growth_per_day * foodIndex * tempF * dt;
     const heteroDecay = heteroMass_g * HET_MODEL.decay_per_day * (1 - foodIndex) * dt;
-    heteroMass_g = Math.max(heteroFloor, heteroMass_g + heteroGrowth - heteroDecay);
-    if(heteroMass_g <= heteroFloor + 1e-9 && heteroFloor > 0) heteroFloorHits++;
-    heteroGrowthTotal += heteroGrowth;
-    heteroConsumedTotal += heteroConsumed;
-    if(!Number.isFinite(heteroMass_g)){
-      addWarning('Heterotroph mass became non-finite; resetting to 0.');
-      heteroMass_g = 0;
-    }
-    if(heteroConsumed > 0){
-      const shareS = S_tot > 0 ? (S_tot / heteroAvailable) : 0;
-      const takeS = heteroConsumed * shareS;
-      const takeNutr = heteroConsumed - takeS;
-      if(takeS > 0){
-        const sTot = S_tot || 1;
-        S.carb = Math.max(0, S.carb - takeS * (S.carb / sTot));
-        S.prot = Math.max(0, S.prot - takeS * (S.prot / sTot));
-        S.fat = Math.max(0, S.fat - takeS * (S.fat / sTot));
-      }
-      if(takeNutr > 0){
-        const nTot = nutrientPool || 1;
-        macro_g = Math.max(0, macro_g - takeNutr * (macro_g / nTot));
-        micro_g = Math.max(0, micro_g - takeNutr * (micro_g / nTot));
-      }
-    }
+    heteroMass_g = Math.max(0, heteroMass_g + heteroGrowth - heteroDecay);
+
+    const phytoGrowth = phytoMass_g * PHOTO_MODEL.growth_per_day * lightFactor * phytoNutrientIndex * co2Index * dt;
+    const phytoDecay = phytoMass_g * PHOTO_MODEL.decay_per_day * (1 - lightFactor) * (1 - phytoNutrientIndex * 0.5) * dt;
+    phytoMass_g = Math.max(0, phytoMass_g + phytoGrowth - phytoDecay);
+    phytoGrowthTotal += phytoGrowth;
+    phytoDecayTotal += phytoDecay;
 
     const decayMass = heteroDecay + phytoDecay;
     if(decayMass > 0){
-      const decayReturnMass = decayMass * 0.35;
-      const decayMacro_g = (macroRelease * decayReturnMass * params.volL) / 1000;
-      const decayMicro_g = (microRelease * decayReturnMass * params.volL) / 1000;
+      const decayMacro_g = (macroRelease * decayMass * params.volL) / 1000;
+      const decayMicro_g = (microRelease * decayMass * params.volL) / 1000;
       macro_g += decayMacro_g;
       micro_g += decayMicro_g;
       out.audit.macro_release += decayMacro_g;
       out.audit.micro_release += decayMicro_g;
-      S.carb += decayReturnMass * FRACTIONS.carb;
-      S.prot += decayReturnMass * FRACTIONS.protein;
-      S.fat  += decayReturnMass * FRACTIONS.fat;
-      NH4 += decayReturnMass * FRACTIONS.protein * CHEM.gN_per_g_protein * 0.3;
+      S.carb += decayMass * FRACTIONS.carb;
+      S.prot += decayMass * FRACTIONS.protein;
+      S.fat  += decayMass * FRACTIONS.fat;
+      NH4 += decayMass * FRACTIONS.protein * CHEM.gN_per_g_protein * 0.3;
     }
 
     const heteroMacroUptake_g = Math.min(macro_g, (HET_MODEL.macroUptake_mgL_per_g_day * heteroMass_g * params.volL / 1000) * foodIndex * dt);
@@ -2324,8 +2072,8 @@ function runSimulation(params){
     const photoO2_g_day_peak = (PHOTO_MODEL.o2_mg_g_day_peak * phytoMass_g) / 1000;
     const plant_g_day = photoO2_g_day_peak * lightFactor * satFrac;
     if(plant_g_day < (photoO2_g_day_peak * lightFactor) && lightFactor > 0) plantLimitedSteps++;
-    const heteroO2_g_day = (heteroMass_g * heteroO2Rate) / 1000;
-    const dDO = ((supply_g_day + plant_g_day - demand - heteroO2_g_day) * 1000 / params.volL) * dt; // mg/L
+    const fish_g_day = (heteroMass_g * fishO2Rate) / 1000;
+    const dDO = ((supply_g_day + plant_g_day - demand - fish_g_day) * 1000 / params.volL) * dt; // mg/L
     DO = clamp(DO + dDO, 0, Cstar);
     if(DO >= Cstar - 1e-6) oxygenClampCount++;
 
@@ -2336,9 +2084,9 @@ function runSimulation(params){
     out.rate.endog[i] = O2_endog;
     out.rate.nh4[i]   = O2_nh4;
     out.rate.no2[i]   = O2_no2;
-    out.rate.hetero[i]  = heteroO2_g_day;
+    out.rate.fish[i]  = fish_g_day;
     out.rate.plant[i] = plant_g_day;
-    out.rate.total[i] = demand + heteroO2_g_day;
+    out.rate.total[i] = demand + fish_g_day;
     out.rate.supply[i]= supply_g_day + plant_g_day;
     out.meta.maxDemand = Math.max(out.meta.maxDemand, out.rate.total[i]);
     out.meta.maxSupply = Math.max(out.meta.maxSupply, out.rate.supply[i]);
@@ -2424,25 +2172,8 @@ function runSimulation(params){
   out.meta.feedEnd = pelFloat.carb + pelFloat.prot + pelFloat.fat + pelBot.carb + pelBot.prot + pelBot.fat + powBot.carb + powBot.prot + powBot.fat;
   out.meta.oxygenClampCount = oxygenClampCount;
   out.meta.plantLimitedSteps = plantLimitedSteps;
-  out.meta.heteroGrowthTotal = heteroGrowthTotal;
-  out.meta.heteroConsumedTotal = heteroConsumedTotal;
   out.meta.phytoGrowthTotal = phytoGrowthTotal;
-  out.meta.phytoConsumedTotal = phytoConsumedTotal;
   out.meta.phytoDecayTotal = phytoDecayTotal;
-  out.meta.tempTauHours = tempTauHours;
-  out.meta.tempSmoothRange = {min: tempSmoothMin, max: tempSmoothMax, targetMin: oxy.T - tempAmp, targetMax: oxy.T + tempAmp};
-  out.meta.feedPulse = {
-    totalPellets: feedPulse.totalPellets,
-    totalPowder_g: feedPulse.totalPowder,
-    windowHours: feedWindowHours,
-    windowSteps: feedPulse.windowSteps
-  };
-  out.meta.feedPlanStats = {
-    entries: simFeedPlan.length,
-    pellets: simFeedPlan.reduce((acc, f)=>acc + (Number(f.pellets) || 0), 0),
-    powder_g: simFeedPlan.reduce((acc, f)=>acc + (Number(f.powder_g) || 0), 0)
-  };
-  out.meta.biomassFloors = {heteroFloor, phytoFloor, heteroHits:heteroFloorHits, phytoHits:phytoFloorHits};
   out.meta.co2FloorHits = co2FloorHits;
   if(feedAddedN_g > 0 && Math.abs(out.audit.n_balance_end - feedAddedN_g)/feedAddedN_g > 0.15){
     addWarning('Nitrogen balance drift exceeds 15% — check kinetics or timestep.');
@@ -2924,34 +2655,15 @@ function drawPlot(canvas, tArr, seriesDict, opts={}){
   // helper: band fill
   const drawBand = (lo, hi, alpha, color)=>{
     if(!lo || !hi) return;
-    const drawPath = ()=>{
-      ctx.beginPath();
-      for(let i=0;i<tArr.length;i++){
-        const x = m.l + (tArr[i]/xMax)*pw;
-        const y = m.t + ph - (hi[i]/yTop)*ph;
-        if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
-      }
-      for(let i=tArr.length-1;i>=0;i--){
-        const x = m.l + (tArr[i]/xMax)*pw;
-        const y = m.t + ph - (lo[i]/yTop)*ph;
-        ctx.lineTo(x,y);
-      }
-      ctx.closePath();
-    };
-    const bandAlpha = alpha ?? 0.16;
-    ctx.save();
-    ctx.globalAlpha = bandAlpha;
-    ctx.fillStyle = color;
-    drawPath();
-    ctx.fill();
-    if(opts.bandPattern){
+    const pattern = (()=>{
+      if(!opts.bandPattern) return null;
       const size = Math.max(6, Math.round(10 * devicePixelRatio));
       const pat = document.createElement('canvas');
       pat.width = size;
       pat.height = size;
       const pctx = pat.getContext('2d');
       pctx.strokeStyle = color;
-      pctx.globalAlpha = 0.35;
+      pctx.globalAlpha = 0.25;
       pctx.lineWidth = Math.max(1, Math.round(1 * devicePixelRatio));
       pctx.beginPath();
       pctx.moveTo(0, size);
@@ -2961,11 +2673,26 @@ function drawPlot(canvas, tArr, seriesDict, opts={}){
       pctx.moveTo(-size * 0.25, size);
       pctx.lineTo(size, -size * 0.25);
       pctx.stroke();
-      ctx.globalAlpha = Math.min(0.4, bandAlpha + 0.08);
-      ctx.fillStyle = ctx.createPattern(pat, 'repeat');
-      drawPath();
-      ctx.fill();
+      return ctx.createPattern(pat, 'repeat');
+    })();
+    ctx.save();
+    ctx.globalAlpha = alpha ?? 0.15;
+    ctx.fillStyle = pattern || color;
+    ctx.beginPath();
+    // upper
+    for(let i=0;i<tArr.length;i++){
+      const x = m.l + (tArr[i]/xMax)*pw;
+      const y = m.t + ph - (hi[i]/yTop)*ph;
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
     }
+    // lower (reverse)
+    for(let i=tArr.length-1;i>=0;i--){
+      const x = m.l + (tArr[i]/xMax)*pw;
+      const y = m.t + ph - (lo[i]/yTop)*ph;
+      ctx.lineTo(x,y);
+    }
+    ctx.closePath();
+    ctx.fill();
     ctx.restore();
   };
 
@@ -3164,45 +2891,41 @@ function drawDOPlot(canvas, sim, overlay=null){
 
   // DO band
   if(overlay && overlay.DO && overlay.DO.lo && overlay.DO.hi){
-    const drawPath = ()=>{
-      ctx.beginPath();
-      for(let i=0;i<tArr.length;i++){
-        const x = m.l + (tArr[i]/xMax)*pw;
-        const y = m.t + ph - (overlay.DO.hi[i]/yTop)*ph;
-        if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
-      }
-      for(let i=tArr.length-1;i>=0;i--){
-        const x = m.l + (tArr[i]/xMax)*pw;
-        const y = m.t + ph - (overlay.DO.lo[i]/yTop)*ph;
-        ctx.lineTo(x,y);
-      }
-      ctx.closePath();
+    const makePattern = ()=>{
+      const size = Math.max(6, Math.round(10 * devicePixelRatio));
+      const pat = document.createElement('canvas');
+      pat.width = size;
+      pat.height = size;
+      const pctx = pat.getContext('2d');
+      pctx.strokeStyle = 'rgba(118,178,255,1)';
+      pctx.globalAlpha = 0.25;
+      pctx.lineWidth = Math.max(1, Math.round(1 * devicePixelRatio));
+      pctx.beginPath();
+      pctx.moveTo(0, size);
+      pctx.lineTo(size, 0);
+      pctx.stroke();
+      pctx.beginPath();
+      pctx.moveTo(-size * 0.25, size);
+      pctx.lineTo(size, -size * 0.25);
+      pctx.stroke();
+      return ctx.createPattern(pat, 'repeat');
     };
-    const bandAlpha = overlay.DO.alpha ?? 0.16;
+    const bandPattern = makePattern();
     ctx.save();
-    ctx.globalAlpha = bandAlpha;
-    ctx.fillStyle = 'rgba(118,178,255,1)';
-    drawPath();
-    ctx.fill();
-    const size = Math.max(6, Math.round(10 * devicePixelRatio));
-    const pat = document.createElement('canvas');
-    pat.width = size;
-    pat.height = size;
-    const pctx = pat.getContext('2d');
-    pctx.strokeStyle = 'rgba(118,178,255,1)';
-    pctx.globalAlpha = 0.35;
-    pctx.lineWidth = Math.max(1, Math.round(1 * devicePixelRatio));
-    pctx.beginPath();
-    pctx.moveTo(0, size);
-    pctx.lineTo(size, 0);
-    pctx.stroke();
-    pctx.beginPath();
-    pctx.moveTo(-size * 0.25, size);
-    pctx.lineTo(size, -size * 0.25);
-    pctx.stroke();
-    ctx.globalAlpha = Math.min(0.4, bandAlpha + 0.08);
-    ctx.fillStyle = ctx.createPattern(pat, 'repeat');
-    drawPath();
+    ctx.globalAlpha = overlay.DO.alpha ?? 0.16;
+    ctx.fillStyle = bandPattern || 'rgba(118,178,255,1)';
+    ctx.beginPath();
+    for(let i=0;i<tArr.length;i++){
+      const x = m.l + (tArr[i]/xMax)*pw;
+      const y = m.t + ph - (overlay.DO.hi[i]/yTop)*ph;
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    for(let i=tArr.length-1;i>=0;i--){
+      const x = m.l + (tArr[i]/xMax)*pw;
+      const y = m.t + ph - (overlay.DO.lo[i]/yTop)*ph;
+      ctx.lineTo(x,y);
+    }
+    ctx.closePath();
     ctx.fill();
     ctx.restore();
   }
@@ -3465,9 +3188,9 @@ function buildLegendBio(){
 let EVENTS = [];
 
 function maxPelletCountFromInputs(){
-  const pelletEach_g = pelletMassEach(Number(el('pelLen')?.value || 1.0), Number(el('pelDia')?.value || 0.2), Number(el('pelRho')?.value || 0.55));
+  const mEach = pelletMassEach(Number(el('pelLen')?.value || 1.0), Number(el('pelDia')?.value || 0.2), Number(el('pelRho')?.value || 0.55));
   const totalMass = Number(el('pelMassN')?.value || 0);
-  return pelletEach_g > 0 ? totalMass / pelletEach_g : 0;
+  return mEach > 0 ? totalMass / mEach : 0;
 }
 
 function normalizeEvents(){
@@ -3601,10 +3324,9 @@ function saveState(){
     biofilmMm: Number(el('biofilmMm').value),
     kDenit: Number(el('kDenit').value),
     denitCap: Number(el('denitCap').value),
-    heteroMass: Number(el('heteroMass').value),
+    fishMass: Number(el('fishMass').value),
     photoMass: Number(el('photoMass').value),
     tempAmp: Number(el('tempAmp').value),
-    tempTauHours: 8,
     lightHour: Number(el('lightHour').value),
     kNH4Nit: Number(el('kNH4Nit').value),
     kNO2Nit: Number(el('kNO2Nit').value),
@@ -3659,12 +3381,12 @@ function loadState(){
     // environment + geometry
     ['volL','airFlow','Tnow','pH','altM','tds','ripplePct','lenCm','widCm','tankHCm','waterSurfCm','blanketGapCm','diffDepthCm',
      'heaters','sotePerM','kCalm','kRipple','tight','otrCal','doInitPct','kDoNit','kNH4Nit','kNO2Nit','nitCap','nitQ10',
-     'kDoHet','slowFrac','biofilmMm','kDenit','denitCap','heteroMass','photoMass','tempAmp','lightHour',
+     'kDoHet','slowFrac','biofilmMm','kDenit','denitCap','fishMass','photoMass','tempAmp','lightHour',
      'pelLen','pelDia','pelRho'
     ].forEach(k=>set(k, s[k]));
 
     if(!s.version || s.version < STATE_VERSION){
-      if(s.heteroMass === undefined) set('heteroMass', s.fishMass ?? 0);
+      if(s.fishMass === undefined) set('fishMass', 0);
       if(s.photoMass === undefined) set('photoMass', 0);
     }
 
@@ -4012,8 +3734,8 @@ function setFlags(sim, params, mc){
   };
 
   const estPellets = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
-  const feedPlan = params.feedSchedule || [];
-  const pelCount = feedPlan.reduce((acc, f)=>acc + (Number(f.pellets) || 0), 0);
+  const feedSchedule = params.feedSchedule || [];
+  const pelCount = feedSchedule.reduce((acc, f)=>acc + (Number(f.pellets) || 0), 0);
   const eventTotal = (params.events || []).reduce((acc, e)=>acc + (Number(e.pellets) || 0), 0);
   if(eventTotal > pelCount + 1){
     add('warn', 'Pop events exceed pellets', `Total pops (${eventTotal.toFixed(0)}) exceed estimated pellet count (${pelCount.toFixed(0)}). The model caps pops automatically, but the schedule is probably too aggressive.`);
@@ -4291,7 +4013,6 @@ function getParams(){
     feedPellets: Number(el('pelMassN').value),
     feedPowder_g: Number(el('powMassN').value),
     feedIntervalDays: Number(el('feedInterval').value),
-    feedWindowHours: 4,
     blanketPct: Number(el('blanketN').value),
     days: Number(el('daysN').value),
 
@@ -4334,7 +4055,7 @@ function getParams(){
     biofilmMm: Number(el('biofilmMm').value),
     kDenit: Number(el('kDenit').value),
     denitCap: Number(el('denitCap').value),
-    heteroMass: Number(el('heteroMass').value),
+    fishMass: Number(el('fishMass').value),
     photoMass: Number(el('photoMass').value),
     tempAmp: Number(el('tempAmp').value),
     lightHour: Number(el('lightHour').value),
@@ -4373,7 +4094,6 @@ function getParams(){
   p.mcRuns = clamp(Math.round(p.mcRuns || 0), 10, 5000);
   p.feedIntervalDays = clamp(Number.isFinite(p.feedIntervalDays) ? p.feedIntervalDays : 1, 0.25, 365);
   p.pH = clamp(Number.isFinite(p.pH) ? p.pH : 7.0, 5.0, 9.5);
-  p.tempTauHours = clamp(Number.isFinite(p.tempTauHours) ? p.tempTauHours : 8, 1, 24);
   p.nitCap = clamp(Number.isFinite(p.nitCap) ? p.nitCap : 1.0, 0, 1);
   p.denitCap = clamp(Number.isFinite(p.denitCap) ? p.denitCap : 1.0, 0, 1);
   p.lightHour = clamp(Number.isFinite(p.lightHour) ? p.lightHour : 8, 0, 23);
@@ -4437,15 +4157,15 @@ function recompute(){
 
     // Pellet derived quantities + feeding schedule
     setStage('Pellets', 'derive pellet count');
-    const pelletEach_g = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
+    const mEach = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
     const perFeedPellets = Math.max(0, Math.round(Number(params.feedPellets || 0)));
-    const perFeedMass_g = perFeedPellets * pelletEach_g;
+    const perFeedMass_g = perFeedPellets * mEach;
     setText('pelCount', `${perFeedPellets.toFixed(0)} pellets`);
-    setText('pelEach', `${pelletEach_g.toFixed(4)} g`);
-    const feedPlan = buildFeedSchedule(params, pelletEach_g);
-    params.feedSchedule = feedPlan;
-    DEBUG_STATE.lastFeedScheduleCount = feedPlan.length;
-    renderFeedingCalendar(params, feedPlan, EVENTS);
+    setText('pelEach', `${mEach.toFixed(4)} g`);
+    const feedSchedule = buildFeedSchedule(params, mEach);
+    params.feedSchedule = feedSchedule;
+    DEBUG_STATE.lastFeedScheduleCount = feedSchedule.length;
+    renderFeedingCalendar(params, feedSchedule, EVENTS);
 
     // Base sim (used for breakdown lines + UI even in uncertainty mode)
     setStage('Simulation', 'run base sim');
@@ -4466,20 +4186,10 @@ function recompute(){
       heteroEnd: baseSim.biomass?.hetero_g?.[baseSim.biomass?.hetero_g?.length - 1] ?? null,
       phytoStart: baseSim.biomass?.phyto_g?.[0] ?? null,
       phytoEnd: baseSim.biomass?.phyto_g?.[baseSim.biomass?.phyto_g?.length - 1] ?? null,
-      heteroGrowthTotal: baseSim.meta.heteroGrowthTotal ?? null,
-      heteroConsumedTotal: baseSim.meta.heteroConsumedTotal ?? null,
       phytoGrowthTotal: baseSim.meta.phytoGrowthTotal ?? null,
-      phytoConsumedTotal: baseSim.meta.phytoConsumedTotal ?? null,
       phytoDecayTotal: baseSim.meta.phytoDecayTotal ?? null,
-      tempSmoothRange: baseSim.meta.tempSmoothRange ?? null,
       co2FloorHits: baseSim.meta.co2FloorHits ?? null
     };
-    if(params.photoMass > 0 && (baseSim.meta.phytoConsumedTotal ?? 0) <= 1e-6){
-      addWarning('Phyto consumed ~0 g over the run. Check light, nutrients, and CO₂ availability.');
-    }
-    if(params.heteroMass > 0 && (baseSim.meta.heteroConsumedTotal ?? 0) <= 1e-6){
-      addWarning('Heterotroph consumed ~0 g over the run. Check feed inputs and kinetics.');
-    }
     if(baseSim.meta.chemCumInfo?.invalidCount){
       addWarning(`Chemistry cumulative series had ${baseSim.meta.chemCumInfo.invalidCount} non-finite samples; treated as 0 in the cumulative plot.`);
     }
@@ -4490,16 +4200,6 @@ function recompute(){
       const mc = runMonteCarlo(params);
       lastMC = mc;
       DEBUG_STATE.lastScalars = mc.scalars;
-      const bandDiagnostics = {
-        rateInvalid: 0,
-        rateInverted: 0,
-        chemInvalid: 0,
-        chemInverted: 0,
-        bioInvalid: 0,
-        bioInverted: 0,
-        doInvalid: 0,
-        doInverted: 0
-      };
 
       // Oxygenation meta (bands)
       setText('cStarOut', fmtBand(mc.scalars.Cstar, 'mg/L', 2));
@@ -4526,15 +4226,10 @@ function recompute(){
 
       // Plots with bands
       setStage('Plots', 'rate');
-      const rateBands = Object.fromEntries(RATE_SERIES.map(s=>{
-        const sanitized = sanitizeBand(mc.q.rateBands[s.key], baseSim.rate[s.key], `rate:${s.key}`);
-        bandDiagnostics.rateInvalid += sanitized.invalid;
-        bandDiagnostics.rateInverted += sanitized.inverted;
-        return [
-          s.key,
-          {lo:sanitized.band.lo, hi:sanitized.band.hi, mid:sanitized.band.mid, alpha:(s.key === 'total' ? 0.18 : (s.key === 'supply' ? 0.14 : 0.08))}
-        ];
-      }));
+      const rateBands = Object.fromEntries(RATE_SERIES.map(s=>[
+        s.key,
+        {lo:mc.q.rateBands[s.key].lo, hi:mc.q.rateBands[s.key].hi, mid:mc.q.rateBands[s.key].mid, alpha:(s.key === 'total' ? 0.18 : (s.key === 'supply' ? 0.14 : 0.08))}
+      ]));
       DEBUG_STATE.lastRateBandKeys = Object.keys(rateBands);
       const missingRateBands = RATE_SERIES.filter(s=>!rateBands[s.key] || !rateBands[s.key].hi).map(s=>s.key);
       if(missingRateBands.length){
@@ -4549,14 +4244,8 @@ function recompute(){
       });
 
       setStage('Plots', 'dissolved oxygen');
-      const doBand = sanitizeBand(mc.q.DO, baseSim.DO_mgL, 'DO');
-      bandDiagnostics.doInvalid += doBand.invalid;
-      bandDiagnostics.doInverted += doBand.inverted;
-      if(!mc.scalars?.Cstar || !Number.isFinite(mc.scalars.Cstar.mid)){
-        addWarning('Monte Carlo C* band invalid; using base C* for DO plot.');
-      }
       doGeom = drawDOPlot(el('doCanvas'), baseSim, {
-        DO:{lo:doBand.band.lo, hi:doBand.band.hi, mid:doBand.band.mid, alpha:0.18},
+        DO:{lo:mc.q.DO.lo, hi:mc.q.DO.hi, mid:mc.q.DO.mid, alpha:0.18},
         Cstar: mc.scalars.Cstar
       });
 
@@ -4572,97 +4261,31 @@ function recompute(){
         title:`Chemistry / Compounds (mg/L) ${chemSeries.titleSuffix}`,
         series: CHEM_SERIES,
         visible: visibleChem,
-        bands: Object.fromEntries(CHEM_SERIES.map(s=>{
-          const sanitized = sanitizeBand(chemBands[s.key], chemSeries.series[s.key], `chem:${s.key}`);
-          bandDiagnostics.chemInvalid += sanitized.invalid;
-          bandDiagnostics.chemInverted += sanitized.inverted;
-          return [s.key, {lo:sanitized.band.lo, hi:sanitized.band.hi, mid:sanitized.band.mid, alpha:0.12}];
-        })),
+        bands: Object.fromEntries(CHEM_SERIES.map(s=>[
+          s.key,
+          {lo:chemBands[s.key].lo, hi:chemBands[s.key].hi, mid:chemBands[s.key].mid, alpha:0.12}
+        ])),
         bandColors: Object.fromEntries(CHEM_SERIES.map(s=>[s.key, s.color])),
         bandPattern: true
       });
-      if(!mc.q.bioBands || !mc.q.bioPctBands){
-        addWarning('Missing biomass uncertainty bands; check Monte Carlo aggregation.');
-      }
-      DEBUG_STATE.lastBandDiagnostics = bandDiagnostics;
 
       setStage('Plots', 'biomass');
-      const bioBands = {
-        hetero_g: sanitizeBand(mc.q.bioBands?.hetero_g, baseSim.biomass.hetero_g, 'bio:hetero_g'),
-        phyto_g: sanitizeBand(mc.q.bioBands?.phyto_g, baseSim.biomass.phyto_g, 'bio:phyto_g')
-      };
-      const bioPctBands = {
-        hetero_pct: sanitizeBand(mc.q.bioPctBands?.hetero_pct, baseSim.biomass.hetero_pct, 'bio:hetero_pct'),
-        phyto_pct: sanitizeBand(mc.q.bioPctBands?.phyto_pct, baseSim.biomass.phyto_pct, 'bio:phyto_pct')
-      };
-      bandDiagnostics.bioInvalid += bioBands.hetero_g.invalid + bioBands.phyto_g.invalid + bioPctBands.hetero_pct.invalid + bioPctBands.phyto_pct.invalid;
-      bandDiagnostics.bioInverted += bioBands.hetero_g.inverted + bioBands.phyto_g.inverted + bioPctBands.hetero_pct.inverted + bioPctBands.phyto_pct.inverted;
       bioGeom = drawBiomassPlot(el('bioCanvas'), baseSim, {
-        bioBands: {
-          hetero_g: bioBands.hetero_g.band,
-          phyto_g: bioBands.phyto_g.band
-        },
-        bioPctBands: {
-          hetero_pct: bioPctBands.hetero_pct.band,
-          phyto_pct: bioPctBands.phyto_pct.band
-        }
+        bioBands: mc.q.bioBands,
+        bioPctBands: mc.q.bioPctBands
       });
       if(!mc.q.bioBands || !mc.q.bioPctBands){
         addWarning('Missing biomass uncertainty bands; check Monte Carlo aggregation.');
       }
-      DEBUG_STATE.lastBandDiagnostics = bandDiagnostics;
 
       setStage('Plots', 'biomass');
-      const bioBands = {
-        hetero_g: sanitizeBand(mc.q.bioBands?.hetero_g, baseSim.biomass.hetero_g, 'bio:hetero_g'),
-        phyto_g: sanitizeBand(mc.q.bioBands?.phyto_g, baseSim.biomass.phyto_g, 'bio:phyto_g')
-      };
-      const bioPctBands = {
-        hetero_pct: sanitizeBand(mc.q.bioPctBands?.hetero_pct, baseSim.biomass.hetero_pct, 'bio:hetero_pct'),
-        phyto_pct: sanitizeBand(mc.q.bioPctBands?.phyto_pct, baseSim.biomass.phyto_pct, 'bio:phyto_pct')
-      };
-      bandDiagnostics.bioInvalid += bioBands.hetero_g.invalid + bioBands.phyto_g.invalid + bioPctBands.hetero_pct.invalid + bioPctBands.phyto_pct.invalid;
-      bandDiagnostics.bioInverted += bioBands.hetero_g.inverted + bioBands.phyto_g.inverted + bioPctBands.hetero_pct.inverted + bioPctBands.phyto_pct.inverted;
       bioGeom = drawBiomassPlot(el('bioCanvas'), baseSim, {
-        bioBands: {
-          hetero_g: bioBands.hetero_g.band,
-          phyto_g: bioBands.phyto_g.band
-        },
-        bioPctBands: {
-          hetero_pct: bioPctBands.hetero_pct.band,
-          phyto_pct: bioPctBands.phyto_pct.band
-        }
+        bioBands: mc.q.bioBands,
+        bioPctBands: mc.q.bioPctBands
       });
       if(!mc.q.bioBands || !mc.q.bioPctBands){
         addWarning('Missing biomass uncertainty bands; check Monte Carlo aggregation.');
       }
-      DEBUG_STATE.lastBandDiagnostics = bandDiagnostics;
-
-      setStage('Plots', 'biomass');
-      const bioBandSet = {
-        hetero_g: sanitizeBand(mc.q.bioBands?.hetero_g, baseSim.biomass.hetero_g, 'bio:hetero_g'),
-        phyto_g: sanitizeBand(mc.q.bioBands?.phyto_g, baseSim.biomass.phyto_g, 'bio:phyto_g')
-      };
-      const bioPctBandSet = {
-        hetero_pct: sanitizeBand(mc.q.bioPctBands?.hetero_pct, baseSim.biomass.hetero_pct, 'bio:hetero_pct'),
-        phyto_pct: sanitizeBand(mc.q.bioPctBands?.phyto_pct, baseSim.biomass.phyto_pct, 'bio:phyto_pct')
-      };
-      bandDiagnostics.bioInvalid += bioBandSet.hetero_g.invalid + bioBandSet.phyto_g.invalid + bioPctBandSet.hetero_pct.invalid + bioPctBandSet.phyto_pct.invalid;
-      bandDiagnostics.bioInverted += bioBandSet.hetero_g.inverted + bioBandSet.phyto_g.inverted + bioPctBandSet.hetero_pct.inverted + bioPctBandSet.phyto_pct.inverted;
-      bioGeom = drawBiomassPlot(el('bioCanvas'), baseSim, {
-        bioBands: {
-          hetero_g: bioBandSet.hetero_g.band,
-          phyto_g: bioBandSet.phyto_g.band
-        },
-        bioPctBands: {
-          hetero_pct: bioPctBandSet.hetero_pct.band,
-          phyto_pct: bioPctBandSet.phyto_pct.band
-        }
-      });
-      if(!mc.q.bioBands || !mc.q.bioPctBands){
-        addWarning('Missing biomass uncertainty bands; check Monte Carlo aggregation.');
-      }
-      DEBUG_STATE.lastBandDiagnostics = bandDiagnostics;
 
       setStage('Flags', 'evaluate');
       setFlags(baseSim, params, mc);
@@ -4683,31 +4306,16 @@ function recompute(){
       dbg.push(`Base kLa inferred: ${oxy.kLa.toFixed(4)} 1/day`);
       dbg.push(`Sim dt: ${baseSim.meta.dt.toFixed(4)} days (~${(baseSim.meta.dt*24).toFixed(2)} h)`);
       dbg.push(`Feed mass: start ${baseSim.meta.feedStart.toFixed(3)} g → end ${baseSim.meta.feedEnd.toFixed(3)} g`);
-      if(baseSim.meta.feedPulse){
-        dbg.push(`Feed pulse: ${baseSim.meta.feedPulse.windowHours}h window • ${baseSim.meta.feedPulse.windowSteps} steps • ${baseSim.meta.feedPulse.totalPellets} pellets, ${baseSim.meta.feedPulse.totalPowder_g.toFixed(2)} g powder`);
-      }
       dbg.push(`Rate peaks: demand ${baseSim.meta.maxDemand.toFixed(3)} g/day • supply ${baseSim.meta.maxSupply.toFixed(3)} g/day`);
-      dbg.push('Metabolism mode: inferred heterotroph + photosynthesis (legacy denit/slow COD disabled)');
-      dbg.push(`Biofilm proxy (legacy): ${params.biofilmMm} mm • slowFrac ${params.slowFrac}`);
-      if(baseSim.meta.tempSmoothRange){
-        dbg.push(`Temp smoothing: τ=${baseSim.meta.tempTauHours}h, smooth ${baseSim.meta.tempSmoothRange.min.toFixed(2)}–${baseSim.meta.tempSmoothRange.max.toFixed(2)}°C (target ${baseSim.meta.tempSmoothRange.targetMin.toFixed(2)}–${baseSim.meta.tempSmoothRange.targetMax.toFixed(2)}°C)`);
-      }
-      if(baseSim.meta.heteroGrowthTotal != null || baseSim.meta.phytoGrowthTotal != null){
-        dbg.push(`Biomass totals: hetero +${(baseSim.meta.heteroGrowthTotal ?? 0).toFixed(2)} g (consumed ${(baseSim.meta.heteroConsumedTotal ?? 0).toFixed(2)} g), phyto +${(baseSim.meta.phytoGrowthTotal ?? 0).toFixed(2)} g (consumed ${(baseSim.meta.phytoConsumedTotal ?? 0).toFixed(2)} g)`);
-      }
-      if(baseSim.meta.biomassFloors){
-        dbg.push(`Biomass floors: hetero ${baseSim.meta.biomassFloors.heteroFloor.toFixed(2)} g (${baseSim.meta.biomassFloors.heteroHits} hits), phyto ${baseSim.meta.biomassFloors.phytoFloor.toFixed(2)} g (${baseSim.meta.biomassFloors.phytoHits} hits)`);
-      }
+      dbg.push('Metabolism mode: inferred fish + photosynthesis (legacy denit/slow COD disabled)');
+      dbg.push(`Biofilm proxy: ${params.biofilmMm} mm • slowFrac ${params.slowFrac}`);
       dbg.push(`Denit: k=${params.kDenit} 1/day • cap=${params.denitCap}`);
-      dbg.push(`Heterotroph mass: ${params.heteroMass} g (base ${FISH_MODEL.o2_mg_g_day_base} mg/g/day @ ${FISH_MODEL.refTempC}°C)`);
+      dbg.push(`Fish mass: ${params.fishMass} g (base ${FISH_MODEL.o2_mg_g_day_base} mg/g/day @ ${FISH_MODEL.refTempC}°C)`);
       dbg.push(`Photosynthetic mass: ${params.photoMass} g (peak ${PHOTO_MODEL.o2_mg_g_day_peak} mg/g/day)`);
       dbg.push(`Diurnal: tempAmp ${params.tempAmp}°C • lights @ ${params.lightHour}:00`);
       dbg.push(`Feed profile: ${FEED_PROFILE.name}`);
       dbg.push(`Chem display: ${chemMode}`);
       dbg.push(`N units: ${params.nUnits} • pH=${params.pH} • NH3 frac=${nh3Fraction(params.pH ?? 7.0, params.Tnow).toFixed(3)}`);
-      if(DEBUG_STATE.lastBandDiagnostics){
-        dbg.push(`Band sanitation: rate invalid ${DEBUG_STATE.lastBandDiagnostics.rateInvalid} (inverted ${DEBUG_STATE.lastBandDiagnostics.rateInverted}), chem invalid ${DEBUG_STATE.lastBandDiagnostics.chemInvalid} (inverted ${DEBUG_STATE.lastBandDiagnostics.chemInverted}), bio invalid ${DEBUG_STATE.lastBandDiagnostics.bioInvalid} (inverted ${DEBUG_STATE.lastBandDiagnostics.bioInverted}), DO invalid ${DEBUG_STATE.lastBandDiagnostics.doInvalid} (inverted ${DEBUG_STATE.lastBandDiagnostics.doInverted})`);
-      }
       dbg.push('');
       dbg.push('--- Snapshot ---');
       dbg.push(...buildDebugSnapshot([]));
@@ -4786,23 +4394,11 @@ function recompute(){
       dbg.push(`kLa inferred: ${oxy.kLa.toFixed(4)} 1/day`);
       dbg.push(`Sim dt: ${baseSim.meta.dt.toFixed(4)} days (~${(baseSim.meta.dt*24).toFixed(2)} h)`);
       dbg.push(`Feed mass: start ${baseSim.meta.feedStart.toFixed(3)} g → end ${baseSim.meta.feedEnd.toFixed(3)} g`);
-      if(baseSim.meta.feedPulse){
-        dbg.push(`Feed pulse: ${baseSim.meta.feedPulse.windowHours}h window • ${baseSim.meta.feedPulse.windowSteps} steps • ${baseSim.meta.feedPulse.totalPellets} pellets, ${baseSim.meta.feedPulse.totalPowder_g.toFixed(2)} g powder`);
-      }
       dbg.push(`Rate peaks: demand ${baseSim.meta.maxDemand.toFixed(3)} g/day • supply ${baseSim.meta.maxSupply.toFixed(3)} g/day`);
-      dbg.push('Metabolism mode: inferred heterotroph + photosynthesis (legacy denit/slow COD disabled)');
-      dbg.push(`Biofilm proxy (legacy): ${params.biofilmMm} mm • slowFrac ${params.slowFrac}`);
-      if(baseSim.meta.tempSmoothRange){
-        dbg.push(`Temp smoothing: τ=${baseSim.meta.tempTauHours}h, smooth ${baseSim.meta.tempSmoothRange.min.toFixed(2)}–${baseSim.meta.tempSmoothRange.max.toFixed(2)}°C (target ${baseSim.meta.tempSmoothRange.targetMin.toFixed(2)}–${baseSim.meta.tempSmoothRange.targetMax.toFixed(2)}°C)`);
-      }
-      if(baseSim.meta.heteroGrowthTotal != null || baseSim.meta.phytoGrowthTotal != null){
-        dbg.push(`Biomass totals: hetero +${(baseSim.meta.heteroGrowthTotal ?? 0).toFixed(2)} g (consumed ${(baseSim.meta.heteroConsumedTotal ?? 0).toFixed(2)} g), phyto +${(baseSim.meta.phytoGrowthTotal ?? 0).toFixed(2)} g (consumed ${(baseSim.meta.phytoConsumedTotal ?? 0).toFixed(2)} g)`);
-      }
-      if(baseSim.meta.biomassFloors){
-        dbg.push(`Biomass floors: hetero ${baseSim.meta.biomassFloors.heteroFloor.toFixed(2)} g (${baseSim.meta.biomassFloors.heteroHits} hits), phyto ${baseSim.meta.biomassFloors.phytoFloor.toFixed(2)} g (${baseSim.meta.biomassFloors.phytoHits} hits)`);
-      }
+      dbg.push('Metabolism mode: inferred fish + photosynthesis (legacy denit/slow COD disabled)');
+      dbg.push(`Biofilm proxy: ${params.biofilmMm} mm • slowFrac ${params.slowFrac}`);
       dbg.push(`Denit: k=${params.kDenit} 1/day • cap=${params.denitCap}`);
-      dbg.push(`Heterotroph mass: ${params.heteroMass} g (base ${FISH_MODEL.o2_mg_g_day_base} mg/g/day @ ${FISH_MODEL.refTempC}°C)`);
+      dbg.push(`Fish mass: ${params.fishMass} g (base ${FISH_MODEL.o2_mg_g_day_base} mg/g/day @ ${FISH_MODEL.refTempC}°C)`);
       dbg.push(`Photosynthetic mass: ${params.photoMass} g (peak ${PHOTO_MODEL.o2_mg_g_day_peak} mg/g/day)`);
       dbg.push(`Diurnal: tempAmp ${params.tempAmp}°C • lights @ ${params.lightHour}:00`);
       dbg.push(`Feed profile: ${FEED_PROFILE.name}`);
@@ -5008,7 +4604,7 @@ function init(){
     'lenCm','widCm','tankHCm','waterSurfCm','blanketGapCm','diffDepthCm','heaters',
     'sotePerM','kCalm','kRipple','tight','otrCal',
     'doInitPct','kDoNit','kNH4Nit','kNO2Nit','nitCap','nitQ10','nUnits',
-    'kDoHet','slowFrac','biofilmMm','kDenit','denitCap','heteroMass','photoMass','tempAmp','lightHour',
+    'kDoHet','slowFrac','biofilmMm','kDenit','denitCap','fishMass','photoMass','tempAmp','lightHour',
     'chemNerd','chemDisplay',
     'pelLen','pelDia','pelRho',
     'diffType','surfacePreset','tightPreset','otrPreset','initDOPreset',
