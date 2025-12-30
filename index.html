@@ -621,13 +621,6 @@
           <label>Photosynthetic mass (g wet biomass)</label>
           <input id="photoMass" type="number" step="1" min="0" value="0"/>
         </div>
-      </div>
-      <div class="small" id="modelStatusNote">No errors reported yet.</div>
-      <div class="errbox" id="errBox">
-        <b>Model error</b>
-        <div class="small" style="margin-top:6px">
-          If this repeats, open Dev / debug and copy the stack trace.
-        </div>
 
         
         <div class="row">
@@ -989,6 +982,26 @@
           <input id="lightHour" type="number" step="1" min="0" max="23" value="9"/>
         </div>
         <div class="row">
+          <label>Fish biomass (g)</label>
+          <input id="fishMass" type="number" step="1" min="0" value="0"/>
+        </div>
+        <div class="row">
+          <label>Fish respiration (mg O₂/g/day)</label>
+          <input id="fishO2" type="number" step="1" min="0" value="0"/>
+        </div>
+        <div class="row">
+          <label>Plant O₂ peak (mg/L/day)</label>
+          <input id="plantO2" type="number" step="0.1" min="0" value="0.0"/>
+        </div>
+        <div class="row">
+          <label>Diurnal temp amplitude (°C)</label>
+          <input id="tempAmp" type="number" step="0.1" min="0" value="0.6"/>
+        </div>
+        <div class="row">
+          <label>Lights on (hour 0–23)</label>
+          <input id="lightHour" type="number" step="1" min="0" max="23" value="9"/>
+        </div>
+        <div class="row">
           <label>Nitrogen display units</label>
           <select id="nUnits">
             <option value="asN" selected>as N (mg/L)</option>
@@ -1262,11 +1275,11 @@ const DEBUG_STATE = {
   lastRecomputeMs: null,
   lastFlagsCount: null,
   lastUpdateISO: null,
-  lastOxyMissingCount: 0,
-  lastMCSeriesFallbacks: null,
-  lastBiofilmMetaMissing: null,
-  debounceQueued: 0,
-  debounceMs: null,
+  dedupeReport: null,
+  recomputeBubbleState: null,
+  recomputeBubbleMeta: null,
+  recomputeBubbleUpdatedISO: null,
+  recomputeBubbleMissing: false,
   missingContainers: [],
   initReadyState: null,
   errors: [],  // newest last
@@ -1286,6 +1299,62 @@ function addWarning(message){
     stage: DEBUG_STATE.stage,
     stageExtra: DEBUG_STATE.stageExtra
   });
+}
+
+function setRecomputeBubbleState(state, meta = null){
+  const normalized = (typeof state === 'string' && state.trim()) ? state.trim() : 'idle';
+  DEBUG_STATE.recomputeBubbleState = normalized;
+  DEBUG_STATE.recomputeBubbleMeta = meta ? meta : null;
+  DEBUG_STATE.recomputeBubbleUpdatedISO = new Date().toISOString();
+
+  const bubble = el('recomputeBubble');
+  if(!bubble){
+    if(!DEBUG_STATE.recomputeBubbleMissing){
+      DEBUG_STATE.recomputeBubbleMissing = true;
+      addWarning('Missing recompute bubble element (#recomputeBubble).');
+    }
+    return;
+  }
+  bubble.dataset.state = normalized;
+  bubble.textContent = normalized === 'running' ? 'Recomputing…' : normalized === 'error' ? 'Recompute error' : 'Ready';
+}
+
+function dedupeAppNodes(){
+  const report = {removedNodes: 0, duplicateWraps: 0, duplicateCards: 0, duplicateIds: []};
+  const seenIds = new Set();
+  const withIds = Array.from(document.querySelectorAll('[id]'));
+  for(const node of withIds){
+    if(seenIds.has(node.id)){
+      report.duplicateIds.push(node.id);
+      node.remove();
+      report.removedNodes += 1;
+    }else{
+      seenIds.add(node.id);
+    }
+  }
+
+  const wraps = Array.from(document.querySelectorAll('.wrap'));
+  if(wraps.length > 1){
+    report.duplicateWraps = wraps.length - 1;
+    wraps.slice(1).forEach((node)=>{
+      node.remove();
+      report.removedNodes += 1;
+    });
+  }
+
+  const cards = Array.from(document.querySelectorAll('.wrap .card'));
+  if(cards.length > 2){
+    report.duplicateCards = cards.length - 2;
+    cards.slice(2).forEach((node)=>{
+      node.remove();
+      report.removedNodes += 1;
+    });
+  }
+
+  if(report.removedNodes > 0){
+    addWarning(`Removed ${report.removedNodes} duplicate UI node(s) (wraps=${report.duplicateWraps}, cards=${report.duplicateCards}, ids=${report.duplicateIds.length}).`);
+  }
+  DEBUG_STATE.dedupeReport = report;
 }
 
 function setDebugText(lines){
@@ -1348,6 +1417,22 @@ lines.push(`surface=${p.lenCm}×${p.widCm} cm, blanket=${p.blanketPct}%, ripple=
       }
     }catch(_){}
     lines.push(compactJSON(o, 1800));
+  }
+  if(DEBUG_STATE.dedupeReport){
+    lines.push('');
+    lines.push('--- Dedupe ---');
+    lines.push(compactJSON(DEBUG_STATE.dedupeReport, 900));
+  }
+  if(DEBUG_STATE.recomputeBubbleState){
+    lines.push('');
+    lines.push('--- Recompute bubble ---');
+    lines.push(`State: ${DEBUG_STATE.recomputeBubbleState}`);
+    if(DEBUG_STATE.recomputeBubbleUpdatedISO){
+      lines.push(`Updated: ${DEBUG_STATE.recomputeBubbleUpdatedISO}`);
+    }
+    if(DEBUG_STATE.recomputeBubbleMeta){
+      lines.push(compactJSON(DEBUG_STATE.recomputeBubbleMeta, 800));
+    }
   }
   if(DEBUG_STATE.lastSimMeta){
     lines.push('');
@@ -1968,6 +2053,8 @@ function runSimulation(params){
 
   const mEach = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
 
+  const mEach = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
+
   function blend(a,b,w){ return a*(1-w) + b*w; }
 
   function pelTotalComp(){
@@ -2194,7 +2281,6 @@ function runSimulation(params){
     const fAnox = clamp(1 - DO/(kDoHet + DO), 0, 1);
     const rDen_flux = Math.min(Bden * kDenit * fAnox * NO3, NO3/dt);
     NO3 = NO3 - rDen_flux*dt;
-    no3Denit_g += rDen_flux * dt;
     const COD_den = Math.min(COD_bio, rDen_flux * 2.5);
     COD_bio = Math.max(0, COD_bio - COD_den*dt);
     const CO2_den = COD_den;
@@ -2202,12 +2288,11 @@ function runSimulation(params){
     out.audit.no3_to_n2 += rDen_flux * dt;
     out.audit.co2_from_denit += CO2_den * dt;
 
-    const phytoResp_g_day = (PHOTO_MODEL.resp_mg_g_day * phytoMass_g / 1000) * (1 - lightFactor);
-    const demand = O2_carb + O2_prot + O2_fat + O2_endog + O2_nh4 + O2_no2 + phytoResp_g_day;
+    const demand = O2_carb + O2_prot + O2_fat + O2_endog + O2_nh4 + O2_no2;
 
     const CO2_from_ox = (O2_carb + O2_prot + O2_fat) * CHEM.CO2_per_gO2;
     const CO2_from_endog = O2_endog * CHEM.CO2_per_gO2;
-    DIC_g += (CO2_from_ox + CO2_from_endog + phytoResp_g_day * CHEM.CO2_per_gO2) * dt;
+    CO2_g += (CO2_from_ox + CO2_from_endog) * dt;
     out.audit.co2_from_ox += CO2_from_ox * dt;
     out.audit.co2_from_endog += CO2_from_endog * dt;
     const co2PartitionLate = estimateCarbonatePartitioning(tempSmooth, params.pH ?? 7.0, alkalinity_mgL, DIC_g, params.volL);
@@ -2248,15 +2333,11 @@ function runSimulation(params){
 
     // DO dynamics (Euler)
     // supply_g_day = kLa*(C* - DO)*V
-    const satDef = Math.max(0, (Cstar - DO));
-    const supply_g_day = (kLa * satDef * params.volL) / 1000;
-    const photoO2_g_day_peak = (PHOTO_MODEL.o2_mg_g_day_peak * phytoMass_g) / 1000;
-    const plant_g_day = photoO2_g_day_peak * lightFactor * satFrac;
-    if(plant_g_day < (photoO2_g_day_peak * lightFactor) && lightFactor > 0) plantLimitedSteps++;
-    const fish_g_day = (heteroMass_g * fishO2Rate) / 1000;
+    const supply_g_day = (kLa * Math.max(0, (Cstar - DO)) * params.volL) / 1000;
+    const plant_g_day = (plantO2 * lightFactor * params.volL) / 1000;
+    const fish_g_day = (fishMass * fishO2) / 1000;
     const dDO = ((supply_g_day + plant_g_day - demand - fish_g_day) * 1000 / params.volL) * dt; // mg/L
-    DO = clamp(DO + dDO, 0, Cstar);
-    if(DO >= Cstar - 1e-6) oxygenClampCount++;
+    DO = clamp(DO + dDO, 0, Cstar*1.2);
 
     // Record outputs
     out.rate.carb[i]  = O2_carb;
@@ -2283,12 +2364,15 @@ function runSimulation(params){
     const nh3AsN = out.NH4_mgL[i] * nh3Frac;
     out.NH3_mgL[i] = nh3AsN * CHEM.NH3_ion_per_N;
 
-    const co2PhotoCons_g = plant_g_day * CHEM.CO2_per_gO2 * dt;
-    DIC_g = Math.max(0, DIC_g - co2PhotoCons_g);
-    if(CO2_free_g <= 1e-9) co2ZeroHits++;
-    co2Consumed_g += co2PhotoCons_g;
-    out.CO2_mgL[i] = (CO2_free_g*1000)/params.volL;
-    out.DIC_mgL[i] = (DIC_g*1000)/params.volL;
+    CO2_g = Math.max(0, CO2_g - plant_g_day * CHEM.CO2_per_gO2 * dt);
+    out.CO2_mgL[i] = (CO2_g*1000)/params.volL;
+
+    const macroUptake_g = Math.min(macro_g, (macroUptake * params.volL / 1000) * dt);
+    const microUptake_g = Math.min(micro_g, (microUptake * params.volL / 1000) * dt);
+    macro_g = Math.max(0, macro_g - macroUptake_g);
+    micro_g = Math.max(0, micro_g - microUptake_g);
+    out.audit.macro_uptake += macroUptake_g;
+    out.audit.micro_uptake += microUptake_g;
 
     out.macro_mgL[i] = (macro_g*1000)/params.volL;
     out.micro_mgL[i] = (micro_g*1000)/params.volL;
@@ -3028,14 +3112,6 @@ function runMonteCarlo(baseParams){
     }
 
     const sim = runSimulation(p);
-    const oxyMeta = sim.meta?.oxy;
-    if(!oxyMeta){
-      if(DEBUG_STATE.lastOxyMissingCount === 0){
-        addWarning('Missing oxygenation metadata during Monte Carlo; falling back to recomputed oxygen stats.');
-      }
-      DEBUG_STATE.lastOxyMissingCount += 1;
-    }
-    const oxySafe = oxyMeta || oxygenationModel(p);
     DO_runs[r]  = sim.DO_mgL;
     tot_runs[r] = sim.rate.total;
     sup_runs[r] = sim.rate.supply;
@@ -4426,6 +4502,7 @@ function recompute(){
   DEBUG_STATE.lastMCSeriesFallbacks = null;
   DEBUG_STATE.lastBiofilmMetaMissing = null;
   const recomputeStart = performance.now();
+  setRecomputeBubbleState('running', {phase: 'start'});
 
   try{
     setStage('UI', 'apply presets');
@@ -4670,15 +4747,13 @@ function recompute(){
     setRecomputeBubbleState(false);
     setStage('recompute', 'done');
     DEBUG_STATE.lastRecomputeMs = performance.now() - recomputeStart;
+    setRecomputeBubbleState('ready', {ms: Number.isFinite(DEBUG_STATE.lastRecomputeMs) ? DEBUG_STATE.lastRecomputeMs.toFixed(1) : 'n/a'});
     if(DEBUG_STATE.lastRecomputeMs > 800){
       addWarning(`Recompute took ${DEBUG_STATE.lastRecomputeMs.toFixed(0)} ms. Consider reducing Monte Carlo runs or disabling live recompute.`);
     }
 
   }catch(err){
-    setStage('recompute', 'error');
-    setRecomputeBubbleState(false);
-    addWarning(`Recompute failed: ${err?.message || err}`);
-    console.warn('Recompute failed:', err);
+    setRecomputeBubbleState('error', {message: err && err.message ? err.message : String(err)});
     showError(err);
   }
 }
@@ -4824,6 +4899,7 @@ function updateModeUI(){
 
 function init(){
   installGlobalErrorHandlers();
+  dedupeAppNodes();
   loadState();
   try{ applyAllPresets(); }catch(_){}
 
