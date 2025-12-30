@@ -39,16 +39,40 @@
       z-index:0;
     }
     header{
-      padding:22px 20px 16px;
-      border-bottom:1px solid var(--line);
+      padding:18px 20px 14px;
+      border-bottom:1px solid rgba(122,162,255,.18);
       position:sticky;
       top:0;
-      background:linear-gradient(180deg, rgba(11,16,32,.98), rgba(11,16,32,.88));
+      background:linear-gradient(180deg, rgba(10,15,30,.98), rgba(10,15,30,.92));
       backdrop-filter: blur(12px);
       z-index:10;
     }
-    header h1{margin:0;font-size:20px;font-weight:700;letter-spacing:.3px}
-    header p{margin:8px 0 0;color:var(--muted);font-size:13px;max-width:1100px;line-height:1.45}
+    .app-title{
+      display:flex;
+      align-items:center;
+      gap:12px;
+    }
+    .app-mark{
+      width:44px;
+      height:44px;
+      border-radius:14px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background:linear-gradient(140deg, rgba(122,162,255,.28), rgba(99,230,190,.16));
+      border:1px solid rgba(122,162,255,.35);
+      box-shadow:0 10px 18px rgba(0,0,0,.3);
+      font-size:20px;
+    }
+    header h1{margin:0;font-size:18px;font-weight:700;letter-spacing:.4px}
+    .app-subtitle{
+      margin:4px 0 0;
+      color:rgba(231,236,255,.78);
+      font-size:12px;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+    }
+    header p{margin:10px 0 0;color:var(--muted);font-size:12px;max-width:960px;line-height:1.45}
     .wrap{max-width:1280px;margin:0 auto;padding:20px;display:grid;gap:16px;grid-template-columns: 480px 1fr;position:relative;z-index:1;}
     @media (max-width: 1100px){ .wrap{grid-template-columns:1fr;} header{position:static;} }
     .card{
@@ -60,6 +84,125 @@
       backdrop-filter: blur(6px);
     }
     .card h2{margin:0 0 12px;font-size:14px;color:#dfe6ff;text-transform:uppercase;letter-spacing:.12em}
+    .left-panel{
+      position:relative;
+      background:linear-gradient(180deg,rgba(15,22,44,.98),rgba(12,18,38,.97));
+    }
+    .panel-section{
+      position:relative;
+      padding:10px 12px 10px 14px;
+      border-radius:16px;
+      background:linear-gradient(180deg,rgba(12,19,39,.92),rgba(9,14,30,.92));
+      border:1px solid rgba(122,162,255,.14);
+      box-shadow:0 12px 24px rgba(0,0,0,.28);
+      display:grid;
+      gap:8px;
+      overflow:hidden;
+    }
+    .panel-section::before{
+      content:"";
+      position:absolute;
+      left:0;
+      top:0;
+      bottom:0;
+      width:4px;
+      background:linear-gradient(180deg, rgba(122,162,255,.75), rgba(99,230,190,.35));
+      opacity:.7;
+    }
+    .panel-header{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding-left:8px;
+    }
+    .panel-title{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      font-size:12px;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+      color:#dfe6ff;
+      font-weight:700;
+    }
+    .panel-title .icon{
+      width:28px;
+      height:28px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      border-radius:10px;
+      background:rgba(122,162,255,.18);
+      border:1px solid rgba(122,162,255,.25);
+      font-size:13px;
+    }
+    .panel-sub{
+      color:var(--muted);
+      font-size:11px;
+      line-height:1.45;
+      padding-left:8px;
+    }
+    .panel-badges{
+      display:flex;
+      gap:6px;
+      flex-wrap:wrap;
+    }
+    .badge{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:4px 8px;
+      border-radius:999px;
+      font-size:10px;
+      text-transform:uppercase;
+      letter-spacing:.12em;
+      border:1px solid transparent;
+      background:rgba(122,162,255,.12);
+      color:#dfe6ff;
+    }
+    .badge.warn{background:rgba(255,207,90,.18); border-color:rgba(255,207,90,.35); color:#fff3d1;}
+    .badge.ok{background:rgba(99,230,190,.16); border-color:rgba(99,230,190,.35); color:#d5fff1;}
+    .badge.note{background:rgba(122,162,255,.2); border-color:rgba(122,162,255,.35);}
+    .badge.alert{background:rgba(255,107,107,.18); border-color:rgba(255,107,107,.35); color:#ffd1d1;}
+    .panel-divider{height:1px;background:rgba(255,255,255,.08);margin:4px 0}
+    .panel-quick{
+      display:grid;
+      gap:8px;
+      padding:8px 10px;
+      border-radius:16px;
+      background:linear-gradient(140deg, rgba(122,162,255,.16), rgba(99,230,190,.08));
+      border:1px solid rgba(122,162,255,.2);
+    }
+    .panel-quick .row{margin:0}
+    .panel-drawer{
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:12px;
+      padding:6px 8px;
+      background:rgba(0,0,0,.18);
+    }
+    .panel-drawer summary{font-size:12px;color:#dfe6ff;font-weight:600}
+    .panel-drawer .drawer-text{color:var(--muted);font-size:11px;line-height:1.45;margin-top:6px}
+    .left-panel .row label{font-size:11px;letter-spacing:.03em}
+    .left-panel input[type="number"],
+    .left-panel input[type="text"],
+    .left-panel select{padding:8px 10px;font-size:12px;border-radius:10px}
+    .control-active{
+      box-shadow:0 0 0 3px rgba(122,162,255,.18), 0 0 18px rgba(122,162,255,.22);
+      border-color:rgba(122,162,255,.6);
+    }
+    .left-panel .row input[type="range"]{min-width:180px}
+    .left-panel .grid2{gap:6px}
+    .left-panel .grid3{gap:6px}
+    .left-panel .small{font-size:11px}
+    .left-panel .note{font-size:11px}
+    .panel-section.compact{
+      padding:8px 10px 8px 12px;
+      gap:6px;
+    }
+    .panel-section.compact .panel-title{font-size:11px}
+    .panel-section.compact .panel-title .icon{width:24px;height:24px;font-size:12px}
+    .panel-section.compact .panel-sub{font-size:10px}
     .grid2{display:grid;gap:10px;grid-template-columns:1fr 1fr;}
 
     .grid3{display:grid;gap:10px;grid-template-columns:1fr 1fr 1fr;}
@@ -171,6 +314,8 @@
     .btn.ghost:hover{background:rgba(255,255,255,.06)}
     details{border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:12px;background:rgba(0,0,0,.16)}
     details summary{cursor:pointer;color:#dfe6ff;font-weight:600;font-size:13px}
+    details.panel-drawer{border:1px solid rgba(255,255,255,.12);padding:8px 10px;background:rgba(0,0,0,.18)}
+    details.panel-drawer summary{font-size:12px}
     table{width:100%;border-collapse:collapse}
     th,td{padding:8px 6px;border-bottom:1px solid rgba(255,255,255,.08);font-size:12px;color:var(--muted)}
     tr:nth-child(even) td{background:rgba(255,255,255,.02)}
@@ -198,22 +343,53 @@
     .hr{height:1px;background:rgba(255,255,255,.10);margin:10px 0}
     .errbox{border:1px solid rgba(255,107,107,.35);background:rgba(255,107,107,.08);padding:10px;border-radius:12px;color:#ffd1d1;font-size:12px;display:none}
     .errbox pre{margin:8px 0 0;white-space:pre-wrap;word-break:break-word;color:#ffd1d1}
+    .copy-toast{
+      font-size:11px;
+      color:var(--ok);
+      padding:2px 8px;
+      border-radius:999px;
+      border:1px solid rgba(99,230,190,.35);
+      background:rgba(99,230,190,.12);
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+    }
+    .copy-toast.warn{
+      color:#fff3d1;
+      border-color:rgba(255,207,90,.45);
+      background:rgba(255,207,90,.16);
+    }
+    .calendar-month.expanded .cal-cell{
+      min-height:52px;
+      font-size:11px;
+      padding:6px;
+    }
   </style>
 </head>
 <body>
 <header class="app-header">
-  <h1>O₂ Demand Planner — pellets + powder + “pop” events + DO simulation</h1>
+  <div class="app-title">
+    <div class="app-mark">🫧</div>
+    <div>
+      <h1>Aquarium Oxygen Planner</h1>
+      <div class="app-subtitle">Demand modeling · Oxygenation inference · Feeding cadence</div>
+    </div>
+  </div>
   <p>
-    This sim estimates <b>oxygen demand</b> from decomposing feed and (optionally) nitrification.
-    It also simulates <b>dissolved oxygen (DO)</b> using an inferred oxygenation model:
-    <b>bubble transfer</b> (airflow + depth + diffuser efficiency) + <b>surface transfer</b> (ripples + blanket coverage + headspace ventilation).
-    The goal is inference: plausible numbers you can tune later with even one real-world measurement.
+    Estimate oxygen demand from feed decomposition and nitrification, then simulate dissolved oxygen with bubble + surface transfer.
+    Calibrate with real-world measurements to tighten uncertainty bands over time.
   </p>
 </header>
 
 <div class="wrap">
-  <div class="card">
-    <h2>Inputs</h2>
+  <div class="card left-panel">
+    <div class="panel-quick">
+      <div class="panel-header">
+        <div class="panel-title"><span class="icon">⚡</span>Quick Controls</div>
+        <div class="panel-badges">
+          <span class="badge note">Most adjusted</span>
+        </div>
+      </div>
 
     <div class="row">
       <label>Pellet mass added (as-fed, g)</label>
@@ -227,26 +403,49 @@
       <input id="powMassN" type="number" min="0" max="50" step="0.01" value="0.00"/>
     </div>
 
-    <div class="row">
-      <label>Blanket cover (%) — uncovered = chimney</label>
-      <input id="blanket" type="range" min="0" max="100" step="1" value="80"/>
-      <input id="blanketN" type="number" min="0" max="100" step="1" value="80"/>
-    </div>
-
-    <div class="row">
-      <label>Simulation time (days)</label>
-      <input id="days" type="range" min="7" max="180" step="1" value="30"/>
-      <input id="daysN" type="number" min="1" max="365" step="1" value="30"/>
-    </div>
-
-    <details id="uncModeDetails" open style="margin-top:10px">
-      <summary>Uncertainty Mode (Monte Carlo)</summary>
-      <div class="small" style="margin-top:10px">
-        Default mode: the sim runs many plausible “nearby realities” and shows a band (not a single pretend-precise line).
-        Without a real DO measurement, this is the honest way to use the model.
+      <div class="row">
+        <label>Powder mass per feeding (as-fed, g)</label>
+        <input id="powMass" type="range" min="0" max="5" step="0.01" value="0.00"/>
+        <input id="powMassN" type="number" min="0" max="50" step="0.01" value="0.00"/>
       </div>
 
-      <div class="grid2" style="margin-top:10px">
+      <div class="row">
+        <label>Feeding interval (days)</label>
+        <input id="feedInterval" type="number" min="0.25" step="0.25" value="1"/>
+      </div>
+
+      <div class="row">
+        <label>Blanket cover (%) — uncovered = chimney</label>
+        <input id="blanket" type="range" min="0" max="100" step="1" value="80"/>
+        <input id="blanketN" type="number" min="0" max="100" step="1" value="80"/>
+      </div>
+
+      <div class="row">
+        <label>Simulation time (days)</label>
+        <input id="days" type="range" min="7" max="180" step="1" value="30"/>
+        <input id="daysN" type="number" min="1" max="365" step="1" value="30"/>
+      </div>
+    </div>
+
+    <div class="panel-section" id="uncModeDetails" style="margin-top:12px">
+      <div class="panel-header">
+        <div class="panel-title"><span class="icon">🧭</span>Uncertainty Mode</div>
+        <div class="panel-badges">
+          <span class="badge warn">Uncertainty Mode</span>
+        </div>
+      </div>
+      <div class="panel-sub">
+        Runs multiple plausible realities and shows a confidence band instead of a single line.
+      </div>
+      <details class="panel-drawer">
+        <summary>What this means</summary>
+        <div class="drawer-text">
+          Default mode: the sim runs many plausible “nearby realities” and shows a band (not a single pretend-precise line).
+          Without a real DO measurement, this is the honest way to use the model.
+        </div>
+      </details>
+
+      <div class="grid2">
         <div class="row">
           <label>Run mode</label>
           <select id="runMode">
@@ -291,14 +490,14 @@
         </div>
       </div>
 
-      <div style="margin-top:10px">
+      <div>
         <button class="btn" id="recomputeBtn" style="display:none">Recompute</button>
       </div>
 
-      <div class="hr"></div>
+      <div class="panel-divider"></div>
 
       <div class="small"><b>What varies across runs:</b></div>
-      <div class="grid2" style="margin-top:8px">
+      <div class="grid2">
         <div class="row"><label><input id="uAir" type="checkbox" checked> Pump delivered airflow</label></div>
         <div class="row"><label><input id="uDiff" type="checkbox" checked> Bubble transfer efficiency</label></div>
         <div class="row"><label><input id="uSurf" type="checkbox" checked> Surface exchange (k values)</label></div>
@@ -348,13 +547,20 @@
       </table>
     </div>
 
-    <div class="hr"></div>
-    <div class="errbox" id="errBox">
-      <b>Model error</b>
-      <div class="small" style="margin-top:6px">
-        If this repeats, open Dev / debug and copy the stack trace.
+    <div class="panel-section" style="margin-top:12px">
+      <div class="panel-header">
+        <div class="panel-title"><span class="icon">📅</span>Feeding Calendar</div>
+        <div class="panel-badges">
+          <span class="badge ok">Feeding Calendar</span>
+        </div>
       </div>
-      <pre id="errText"></pre>
+      <details class="panel-drawer">
+        <summary>What this means</summary>
+        <div class="drawer-text">
+          Feeding events add pellets + powder at your chosen interval. Green = feed day, yellow = pellet pop day.
+        </div>
+      </details>
+      <div class="calendar tiles" id="feedCalendar"></div>
     </div>
 
     <details style="margin-top:12px" open>
@@ -375,12 +581,12 @@
           <input id="Tnow" type="number" step="0.1" value="22.0"/>
         </div>
         <div class="row">
-          <label>Water pH (for NH₃ fraction)</label>
-          <input id="pH" type="number" step="0.05" value="7.4"/>
+          <label>Event day</label>
+          <input id="evDay" type="number" min="0" step="0.1" value="3.0"/>
         </div>
         <div class="row">
-          <label>Altitude (m)</label>
-          <input id="altM" type="number" step="10" value="2300"/>
+          <label>Pellets to pop</label>
+          <input id="evPellets" type="number" min="0" step="1" value="10"/>
         </div>
 
         <div class="row">
@@ -434,58 +640,265 @@
             <option value="custom">Custom</option>
           </select>
         </div>
+      </details>
+    </div>
 
-        <div class="row">
-          <label>Custom bubble efficiency: SOTE per meter (%)</label>
-          <input id="sotePerM" type="number" step="0.1" value="2.5"/>
+    <div class="panel-section" style="margin-top:12px">
+      <div class="panel-header">
+        <div class="panel-title"><span class="icon">🌬️</span>Aeration & Surface Exchange</div>
+        <div class="panel-badges">
+          <span class="badge note">Advanced</span>
         </div>
-        <div class="small" style="margin-top:-6px; opacity:.85">
-          SOTE per meter is a <b>rough transfer efficiency</b> (how much O₂ in the air actually dissolves per meter of bubble travel).
-          If you’re unsure, use the preset — the uncertainty mode already widens results around it.
-        </div>
+      </div>
+      <details class="panel-drawer" open>
+        <summary>Controls</summary>
+        <div class="grid2" style="margin-top:10px">
+          <div class="row">
+            <label>Air pump delivered flow (L/min)</label>
+            <input id="airFlow" type="number" step="0.1" value="4.0"/>
+          </div>
+          <div class="row">
+            <label>Surface ripples (% of surface)</label>
+            <input id="ripplePct" type="number" step="1" value="50"/>
+          </div>
 
-        <div class="row" style="margin-top:10px">
-          <label>Surface exchange preset</label>
-          <select id="surfacePreset">
-            <option value="still">Still water (low exchange)</option>
-            <option value="typical" selected>Typical aquarium (some ripples)</option>
-            <option value="rippling">Strong ripples (good exchange)</option>
-            <option value="splashy">Splashy / fan / very agitated (very high)</option>
-            <option value="custom">Custom</option>
-          </select>
-        </div>
+          <div class="row">
+            <label>Bubble transfer preset</label>
+            <select id="diffType">
+              <option value="airstone_med" selected>Typical airstones (medium bubbles)</option>
+              <option value="airstone_fine">Fine airstone (smaller bubbles)</option>
+              <option value="microbubble">Microbubble diffuser (very fine)</option>
+              <option value="wood">Wooden airstone (very fine, higher backpressure)</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
 
-        <div class="row">
-          <label>Surface k (calm) (m/day)</label>
-          <input id="kCalm" type="number" step="0.05" value="0.30"/>
-        </div>
-        <div class="row">
-          <label>Surface k (rippling) (m/day)</label>
-          <input id="kRipple" type="number" step="0.05" value="1.00"/>
-        </div>
+          <div class="row">
+            <label>Custom bubble efficiency: SOTE per meter (%)</label>
+            <input id="sotePerM" type="number" step="0.1" value="2.5"/>
+          </div>
+          <div class="small" style="margin-top:-6px; opacity:.85">
+            SOTE per meter is a <b>rough transfer efficiency</b> (how much O₂ in the air actually dissolves per meter of bubble travel).
+            If you’re unsure, use the preset — the uncertainty mode already widens results around it.
+          </div>
 
-        <div class="row" style="margin-top:10px">
-          <label>Cover leakiness preset</label>
-          <select id="tightPreset">
-            <option value="open">No cover (open tank)</option>
-            <option value="loose_high" selected>Loose blanket (high above water)</option>
-            <option value="typical">Typical blanket (some restriction)</option>
-            <option value="near_sealed">Near-sealed lid (strong restriction)</option>
-            <option value="custom">Custom</option>
-          </select>
-        </div>
-        <div class="row">
-          <label>Leakiness number (0 drafty → 1 sealed)</label>
-          <input id="tight" type="number" step="0.05" min="0" max="1" value="0.25"/>
-        </div>
+          <div class="row" style="margin-top:10px">
+            <label>Surface exchange preset</label>
+            <select id="surfacePreset">
+              <option value="still">Still water (low exchange)</option>
+              <option value="typical" selected>Typical aquarium (some ripples)</option>
+              <option value="rippling">Strong ripples (good exchange)</option>
+              <option value="splashy">Splashy / fan / very agitated (very high)</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
 
-        <div class="row" style="margin-top:10px">
-          <label>Aeration performance preset</label>
-          <select id="otrPreset">
-            <option value="typical" selected>Typical (as expected)</option>
-            <option value="under">Underperforming (backpressure / leaks)</option>
-            <option value="over">Overperforming (very efficient)</option>
-            <option value="custom">Custom</option>
+          <div class="row">
+            <label>Surface k (calm) (m/day)</label>
+            <input id="kCalm" type="number" step="0.05" value="0.30"/>
+          </div>
+          <div class="row">
+            <label>Surface k (rippling) (m/day)</label>
+            <input id="kRipple" type="number" step="0.05" value="1.00"/>
+          </div>
+
+          <div class="row" style="margin-top:10px">
+            <label>Cover leakiness preset</label>
+            <select id="tightPreset">
+              <option value="open">No cover (open tank)</option>
+              <option value="loose_high" selected>Loose blanket (high above water)</option>
+              <option value="typical">Typical blanket (some restriction)</option>
+              <option value="near_sealed">Near-sealed lid (strong restriction)</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+          <div class="row">
+            <label>Leakiness number (0 drafty → 1 sealed)</label>
+            <input id="tight" type="number" step="0.05" min="0" max="1" value="0.25"/>
+          </div>
+
+          <div class="row" style="margin-top:10px">
+            <label>Aeration performance preset</label>
+            <select id="otrPreset">
+              <option value="typical" selected>Typical (as expected)</option>
+              <option value="under">Underperforming (backpressure / leaks)</option>
+              <option value="over">Overperforming (very efficient)</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+          <div class="row">
+            <label>Aeration performance factor</label>
+            <input id="otrCal" type="number" step="0.05" value="1.00"/>
+          </div>
+        </div>
+      </details>
+      <details class="panel-drawer">
+        <summary>What this means</summary>
+        <div class="drawer-text">
+          <b>Bubble side</b>: compute O₂ mass entering per day from the airflow (altitude affects pressure), then multiply by an efficiency fraction that scales with depth and diffuser type.
+          <br/><b>Surface side</b>: use a gas-film “speed” k (m/day) times surface area. Ripples get a higher k. Covered area gets k multiplied by a leak factor based on tightness + headspace ventilation.
+          <br/><b>OTRmax</b> combines both sides (g/day at DO≈0) and becomes an inferred <b>kLa</b> so supply increases as DO drops: supply = kLa·(C*−DO)·V.
+        </div>
+      </details>
+    </div>
+
+    <div class="panel-section" style="margin-top:12px">
+      <div class="panel-header">
+        <div class="panel-title"><span class="icon">🧬</span>Biology & Chemistry</div>
+        <div class="panel-badges">
+          <span class="badge note">Advanced</span>
+        </div>
+      </div>
+      <details class="panel-drawer" open>
+        <summary>Controls</summary>
+        <div class="grid2" style="margin-top:10px">
+          <div class="row">
+            <label>Initial DO assumption</label>
+            <select id="initDOPreset">
+              <option value="100">Near saturation (100%)</option>
+              <option value="95" selected>High (95%)</option>
+              <option value="85">Moderate (85%)</option>
+              <option value="70">Low (70%)</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+          <div class="row">
+            <label>Initial DO (% of local saturation)</label>
+            <input id="doInitPct" type="number" step="1" min="0" max="150" value="95"/>
+          </div>
+
+          <div class="row">
+            <label>Heterotroph biomass (g) — respiration inferred</label>
+            <input id="heteroMass" type="number" step="1" min="0" value="0"/>
+          </div>
+          <div class="row">
+            <label>Photosynthetic mass (g wet biomass)</label>
+            <input id="photoMass" type="number" step="1" min="0" value="0"/>
+          </div>
+          <div class="small" style="margin-top:-6px; opacity:.85">
+            Photosynthetic mass combines plants, algae, and phytoplankton. Oxygen production + nutrient uptake are inferred from this.
+          </div>
+
+          <div class="row">
+            <label>Diurnal temp amplitude (°C)</label>
+            <input id="tempAmp" type="number" step="0.1" min="0" value="0.6"/>
+          </div>
+          <div class="row">
+            <label>Lights on (hour 0–23)</label>
+            <input id="lightHour" type="number" step="1" min="0" max="23" value="9"/>
+          </div>
+
+          <div class="row">
+            <label>Enable oxygen limitation for nitrification</label>
+            <select id="o2Limit">
+              <option value="off">Off (demand not reduced when DO is low)</option>
+              <option value="on">On (nitrification slows as DO drops)</option>
+            </select>
+          </div>
+          <div class="row">
+            <label>Nitrifier DO half-saturation K (mg/L)</label>
+            <input id="kDoNit" type="number" step="0.05" value="0.50"/>
+          </div>
+          <div class="row">
+            <label>NH₄ half-saturation K (mg/L as N)</label>
+            <input id="kNH4Nit" type="number" step="0.05" value="0.40"/>
+          </div>
+          <div class="row">
+            <label>NO₂ half-saturation K (mg/L as N)</label>
+            <input id="kNO2Nit" type="number" step="0.05" value="0.25"/>
+          </div>
+          <div class="row">
+            <label>Nitrifier capacity (0–1)</label>
+            <input id="nitCap" type="number" step="0.05" min="0" max="1" value="0.80"/>
+          </div>
+          <div class="row">
+            <label>Nitrifier Q10 (temperature response)</label>
+            <input id="nitQ10" type="number" step="0.05" value="2.0"/>
+          </div>
+          <div class="row">
+            <label>Heterotroph DO half-saturation K (mg/L)</label>
+            <input id="kDoHet" type="number" step="0.05" value="0.80"/>
+          </div>
+          <div class="row">
+            <label>Refractory fraction (slow COD)</label>
+            <input id="slowFrac" type="number" step="0.05" min="0" max="0.9" value="0.25"/>
+          </div>
+          <div class="row">
+            <label>Biofilm thickness proxy (mm)</label>
+            <input id="biofilmMm" type="number" step="0.1" min="0" value="0.6"/>
+          </div>
+          <div class="row">
+            <label>Denitrification rate (1/day)</label>
+            <input id="kDenit" type="number" step="0.05" value="0.15"/>
+          </div>
+          <div class="row">
+            <label>Denitrifier capacity (0–1)</label>
+            <input id="denitCap" type="number" step="0.05" min="0" max="1" value="0.60"/>
+          </div>
+
+          <div class="row">
+            <label>Nitrogen display units</label>
+            <select id="nUnits">
+              <option value="asN" selected>as N (mg/L)</option>
+              <option value="asIon">as ion (mg/L)</option>
+            </select>
+          </div>
+          <div class="row">
+            <label>Chemistry audit (nerd mode)</label>
+            <input id="chemNerd" type="checkbox"/>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <div class="panel-section" style="margin-top:12px">
+      <div class="panel-header">
+        <div class="panel-title"><span class="icon">🔬</span>Pellet Geometry</div>
+        <div class="panel-badges">
+          <span class="badge note">Advanced</span>
+        </div>
+      </div>
+      <details class="panel-drawer" open>
+        <summary>Controls</summary>
+        <div class="grid2" style="margin-top:10px">
+          <div class="row">
+            <label>Pellet length (cm)</label>
+            <input id="pelLen" type="number" step="0.01" value="1.00" disabled title="Hardcoded: 1.00 cm"/>
+          </div>
+          <div class="row">
+            <label>Pellet diameter (cm)</label>
+            <input id="pelDia" type="number" step="0.01" value="0.20" disabled title="Hardcoded: 0.20 cm"/>
+          </div>
+          <div class="row">
+            <label>Pellet density (g/cm³)</label>
+            <input id="pelRho" type="number" step="0.01" value="0.55"/>
+          </div>
+        </div>
+      </details>
+    </div>
+
+  </div>
+
+  <div class="card">
+    <h2>Charts</h2>
+    <div class="charts">
+      <div>
+        <canvas id="rateCanvas" width="1200" height="360"></canvas>
+        <div class="small" style="margin-top:6px">Rate chart (g O₂/day). Click to add a “pop” event at that day.</div>
+      </div>
+      <div>
+        <canvas id="doCanvas" width="1200" height="360"></canvas>
+        <div class="small" style="margin-top:6px">Dissolved oxygen (mg/L). Dashed line is local saturation C*.</div>
+      </div>
+      <div>
+        <canvas id="chemCanvas" width="1200" height="360"></canvas>
+        <div class="small" style="margin-top:6px">Chemistry / compounds (mg/L). Choose net concentrations, production-only, or cumulative production; toggle NH₄/NO₂/NO₃ units in Advanced.</div>
+        <div class="row" style="margin-top:8px">
+          <label>Chemistry display mode</label>
+          <select id="chemDisplay">
+            <option value="bio" selected>Net concentrations (after consumption)</option>
+            <option value="prod">Production only (no consumption)</option>
+            <option value="cum">Cumulative production</option>
           </select>
         </div>
         <div class="row">
@@ -678,6 +1091,10 @@
   </div>
   <div class="hr"></div>
   <div class="small"><b>Last recompute diagnostics</b></div>
+  <div class="row" style="margin-top:8px; align-items:center;">
+    <button class="btn ghost" id="copyDebugBtn">Copy Debug Log</button>
+    <span class="copy-toast" id="copyDebugStatus" style="display:none"></span>
+  </div>
   <pre id="dbg" class="mono" style="white-space:pre-wrap; word-break:break-word; color:rgba(231,236,255,.82)"></pre>
 </details>
 
@@ -730,13 +1147,15 @@ const CHEM_SERIES = [
   {key:"nh3", name:"NH₃ (unionized)", color:"#ff8fab"},
   {key:"no2", name:"NO₂", color:"#a29bfe"},
   {key:"no3", name:"NO₃", color:"#63e6be"},
-  {key:"co2", name:"CO₂ (produced)", color:"#54a0ff"},
-  {key:"macro", name:"Macros (proxy)", color:"#f4d35e"},
+  {key:"co2", name:"CO₂ free", color:"#54a0ff"},
+  {key:"dic", name:"DIC (buffered)", color:"#48dbfb"},
+  {key:"store", name:"Nutrient stores", color:"#feca57"},
   {key:"micro", name:"Micros (proxy)", color:"#b8c0ff"},
 ];
 
 let visibleRate = Object.fromEntries(RATE_SERIES.map(s=>[s.key, true]));
 let visibleChem = Object.fromEntries(CHEM_SERIES.map(s=>[s.key, true]));
+let calendarExpandedKey = null;
 
 function updateChemSeriesLabels(nUnits){
   if(nUnits === 'asIon'){
@@ -797,6 +1216,7 @@ function clamp(x,a,b){ return Math.max(a, Math.min(b, x)); }
 function showError(err){
   let box = el('errBox');
   let txt = el('errText');
+  const note = el('modelStatusNote');
   const msg = (err && err.stack) ? err.stack : String(err);
 
   if(!box || !txt){
@@ -812,6 +1232,7 @@ function showError(err){
   // Visible error banner
   if(box) box.style.display = 'block';
   if(txt) txt.textContent = msg;
+  if(note) note.style.display = 'none';
 
   // Record into debug state
   try{
@@ -841,8 +1262,10 @@ function showError(err){
 function clearError(){
   const box = el('errBox');
   const text = el('errText');
+  const note = el('modelStatusNote');
   if(box) box.style.display = 'none';
   if(text) text.textContent = '';
+  if(note) note.style.display = 'block';
 }
 
 
@@ -1067,6 +1490,14 @@ lines.push(`surface=${p.lenCm}×${p.widCm} cm, blanket=${p.blanketPct}%, ripple=
     lines.push('--- Recompute timing (last) ---');
     lines.push(`Total recompute: ${DEBUG_STATE.lastRecomputeMs.toFixed(1)} ms`);
   }
+  if(Number.isFinite(DEBUG_STATE.debounceQueued) || Number.isFinite(DEBUG_STATE.debounceMs)){
+    lines.push('');
+    lines.push('--- Debounce ---');
+    lines.push(`Queued recomputes: ${Number.isFinite(DEBUG_STATE.debounceQueued) ? DEBUG_STATE.debounceQueued : 0}`);
+    if(Number.isFinite(DEBUG_STATE.debounceMs)){
+      lines.push(`Delay: ${DEBUG_STATE.debounceMs} ms`);
+    }
+  }
   if(DEBUG_STATE.initReadyState){
     lines.push('');
     lines.push('--- Init ---');
@@ -1126,6 +1557,104 @@ function linkRangeAndNumber(rangeEl, numEl, onChange){
   const sync = (src, dst)=>{ dst.value = src.value; onChange(); };
   rangeEl.addEventListener("input", ()=>sync(rangeEl, numEl));
   numEl.addEventListener("input", ()=>sync(numEl, rangeEl));
+}
+
+function wireActiveControlGlow(){
+  const inputs = Array.from(document.querySelectorAll('input, select, textarea'));
+  if(!inputs.length) return;
+  inputs.forEach((input)=>{
+    if(input.__glowBound) return;
+    input.__glowBound = true;
+    input.addEventListener('focus', ()=>{
+      if(input.matches('input[type="range"]')) return;
+      input.classList.add('control-active');
+    });
+    input.addEventListener('blur', ()=>{
+      input.classList.remove('control-active');
+    });
+    input.addEventListener('change', ()=>{
+      if(input.matches('select')){
+        input.classList.add('control-active');
+        setTimeout(()=>input.classList.remove('control-active'), 450);
+      }
+    });
+  });
+}
+
+function measurePanelOverflow(){
+  const panel = document.querySelector('.left-panel');
+  if(!panel){
+    addWarning('Left panel missing for overflow metrics.');
+    DEBUG_STATE.missingContainers.push({timeISO: new Date().toISOString(), id:'left-panel', context:'measurePanelOverflow'});
+    return;
+  }
+  const panelHeight = panel.getBoundingClientRect().height;
+  const viewportHeight = window.innerHeight || 0;
+  const limit = Math.max(140, Math.round(viewportHeight * 0.18));
+  const overflow = Math.max(0, panelHeight - (viewportHeight - 24));
+  DEBUG_STATE.panelOverflowPx = overflow;
+  DEBUG_STATE.panelOverflowLimitPx = limit;
+  DEBUG_STATE.lastPanelMeasureISO = new Date().toISOString();
+  if(overflow > limit){
+    if(!DEBUG_STATE.panelOverflowWarnedISO){
+      addWarning(`Left panel exceeds viewport by ${overflow.toFixed(0)}px; consider collapsing drawers.`);
+      DEBUG_STATE.panelOverflowWarnedISO = new Date().toISOString();
+    }
+  }else{
+    DEBUG_STATE.panelOverflowWarnedISO = null;
+  }
+}
+
+function enableDebugCopyRoutine(){
+  const btn = el('copyDebugBtn');
+  const status = el('copyDebugStatus');
+  if(!btn || !status){
+    addWarning('Copy debug controls missing (#copyDebugBtn or #copyDebugStatus).');
+    return;
+  }
+  const announce = (message, isWarn=false)=>{
+    status.textContent = message;
+    status.classList.toggle('warn', isWarn);
+    status.style.display = 'inline-flex';
+    setTimeout(()=>{ status.style.display = 'none'; }, 2400);
+  };
+  if(btn.__copyBound) return;
+  btn.__copyBound = true;
+  btn.addEventListener('click', async ()=>{
+    const dbgText = el('dbg') ? el('dbg').textContent : '';
+    if(!dbgText || !dbgText.trim()){
+      DEBUG_STATE.lastDebugCopyStatus = 'empty';
+      DEBUG_STATE.lastDebugCopyError = 'Debug log empty';
+      addWarning('Debug log copy requested but debug log is empty.');
+      announce('Nothing to copy', true);
+      return;
+    }
+    try{
+      if(navigator.clipboard?.writeText){
+        await navigator.clipboard.writeText(dbgText);
+      }else{
+        const helper = document.createElement('textarea');
+        helper.value = dbgText;
+        helper.setAttribute('readonly', '');
+        helper.style.position = 'absolute';
+        helper.style.left = '-9999px';
+        document.body.appendChild(helper);
+        helper.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(helper);
+        if(!ok) throw new Error('execCommand copy failed');
+      }
+      DEBUG_STATE.lastDebugCopyStatus = 'copied';
+      DEBUG_STATE.lastDebugCopyError = null;
+      announce('Debug log copied');
+    }catch(err){
+      const message = err?.message || String(err);
+      DEBUG_STATE.lastDebugCopyStatus = 'failed';
+      DEBUG_STATE.lastDebugCopyError = message;
+      addWarning(`Debug log copy failed: ${message}`);
+      announce('Copy failed', true);
+    }
+  });
 }
 
 window.addEventListener('error', (e)=>{ try{ showError(e.error || e.message || e); }catch(_){ }});
@@ -1333,6 +1862,36 @@ function nh3Fraction(pH, tempC){
   return clamp(frac, 0, 1);
 }
 
+function calcCO2EquilMgL(tempC){
+  const tempAdj = clamp(1 - 0.02 * (tempC - 25), 0.5, 1.4);
+  return clamp(0.6 * tempAdj, 0.2, 1.2);
+}
+
+function calcCO2SaturationMgL(tempC, altM){
+  const tempAdj = clamp(1 - 0.03 * (tempC - 20), 0.4, 1.6);
+  const pressureAdj = clamp(pressureFromAltitude_kPa(altM) / 101.325, 0.6, 1.2);
+  return clamp(2.5 * tempAdj * pressureAdj, 0.5, 6.0);
+}
+
+function estimateCarbonatePartitioning(tempC, pH, alkalinity_mgL, dic_g, volL){
+  const pKa1 = 6.35 - 0.015 * (tempC - 25);
+  const pKa2 = 10.33 - 0.018 * (tempC - 25);
+  const H = Math.pow(10, -clamp(pH, 5.5, 9.5));
+  const K1 = Math.pow(10, -pKa1);
+  const K2 = Math.pow(10, -pKa2);
+  const alpha0 = 1 / (1 + (K1 / H) + (K1 * K2) / (H * H));
+  const dic_mgL = (dic_g * 1000) / Math.max(1e-9, volL);
+  const co2Free_mgL = dic_mgL * alpha0;
+  const bufferCapacity = clamp(alkalinity_mgL / (alkalinity_mgL + dic_mgL + 1e-9), 0, 1);
+  return {
+    alpha0,
+    dic_mgL,
+    co2Free_mgL,
+    co2Free_g: (co2Free_mgL * volL) / 1000,
+    bufferCapacity
+  };
+}
+
 // crude "sinks over first few days"
 function sinkingHazard(day){
   if(day < 1) return 0;
@@ -1392,7 +1951,8 @@ function runSimulation(params){
   let NH4 = 0;     // g N
   let NO2 = 0;     // g N
   let NO3 = 0;     // g N
-  let CO2_g = 0;   // g CO2 produced
+  let DIC_g = 0;   // g total dissolved inorganic carbon
+  let CO2_free_g = 0; // g free CO2 (aqueous)
   let macro_g = 0; // g (proxy)
   let micro_g = 0; // g (proxy)
 
@@ -1457,14 +2017,18 @@ function runSimulation(params){
     NO3_mgL: new Array(n).fill(0),
     NH3_mgL: new Array(n).fill(0),
     CO2_mgL: new Array(n).fill(0),
+    DIC_mgL: new Array(n).fill(0),
     macro_mgL: new Array(n).fill(0),
     micro_mgL: new Array(n).fill(0),
+    store_mgL: new Array(n).fill(0),
     chem: {
       nh4: new Array(n).fill(0),
       nh3: new Array(n).fill(0),
       no2: new Array(n).fill(0),
       no3: new Array(n).fill(0),
       co2: new Array(n).fill(0),
+      dic: new Array(n).fill(0),
+      store: new Array(n).fill(0),
       macro: new Array(n).fill(0),
       micro: new Array(n).fill(0),
     },
@@ -1477,10 +2041,21 @@ function runSimulation(params){
       co2_from_ox:0,
       co2_from_endog:0,
       co2_from_denit:0,
+      co2_degassed:0,
+      co2_air_in:0,
+      co2_air_out:0,
+      o2_degassed:0,
       macro_release:0,
       macro_uptake:0,
       micro_release:0,
       micro_uptake:0,
+      phyto_grazed:0,
+      phyto_algae_grazed:0,
+      phyto_plankton_grazed:0,
+      biofilm_grazed:0,
+      predator_grazed:0,
+      biofilm_grazing_waste:0,
+      predator_grazing_waste:0,
       n_balance_init:0,
       n_balance_end:0,
       c_balance_init:0,
@@ -1494,6 +2069,18 @@ function runSimulation(params){
     .filter(e=>Number.isFinite(e.day) && Number.isFinite(e.pellets) && e.pellets>0)
     .sort((a,b)=>a.day-b.day);
   let evIdx = 0;
+  const feeds = [...feedSchedule]
+    .filter(e=>Number.isFinite(e.day))
+    .sort((a,b)=>a.day-b.day);
+  let feedIdx = 0;
+
+  const mEach = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
+
+  const mEach = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
+
+  const pelletEachMass = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
+
+  const pelletEachMass = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
 
   const pelletEachMass = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
 
@@ -1726,7 +2313,7 @@ function runSimulation(params){
     const COD_den = Math.min(COD_bio, rDen_flux * 2.5);
     COD_bio = Math.max(0, COD_bio - COD_den*dt);
     const CO2_den = COD_den;
-    CO2_g += CO2_den * dt;
+    DIC_g += CO2_den * dt;
     out.audit.no3_to_n2 += rDen_flux * dt;
     out.audit.co2_from_denit += CO2_den * dt;
 
@@ -1737,6 +2324,36 @@ function runSimulation(params){
     CO2_g += (CO2_from_ox + CO2_from_endog) * dt;
     out.audit.co2_from_ox += CO2_from_ox * dt;
     out.audit.co2_from_endog += CO2_from_endog * dt;
+    const co2PartitionLate = estimateCarbonatePartitioning(tempSmooth, params.pH ?? 7.0, alkalinity_mgL, DIC_g, params.volL);
+    CO2_free_g = co2PartitionLate.co2Free_g;
+    bufferCapacityMin = Math.min(bufferCapacityMin, co2PartitionLate.bufferCapacity);
+    bufferCapacityLast = co2PartitionLate.bufferCapacity;
+    co2FreeMin_mgL = Math.min(co2FreeMin_mgL, co2PartitionLate.co2Free_mgL);
+    co2FreeLast_mgL = co2PartitionLate.co2Free_mgL;
+    dicMin_mgL = Math.min(dicMin_mgL, co2PartitionLate.dic_mgL);
+    dicLast_mgL = co2PartitionLate.dic_mgL;
+    const co2Equil_mgL = co2Init_mgL;
+    const co2SatDef_mgL = co2Equil_mgL - co2PartitionLate.co2Free_mgL;
+    const kLaCO2 = oxy.kLa * 0.6;
+    const co2AirFlux_g_day = (kLaCO2 * co2SatDef_mgL * params.volL) / 1000;
+    const co2AirFlux_g = co2AirFlux_g_day * dt;
+    DIC_g += co2AirFlux_g;
+    if(co2AirFlux_g >= 0){
+      co2AirIn_g += co2AirFlux_g;
+      out.audit.co2_air_in += co2AirFlux_g;
+    }else{
+      const degas_g = Math.abs(co2AirFlux_g);
+      co2AirOut_g += degas_g;
+      out.audit.co2_air_out += degas_g;
+    }
+    if(co2PartitionLate.co2Free_g > co2Sat_g){
+      const excessFree_g = co2PartitionLate.co2Free_g - co2Sat_g;
+      const dicReduce = excessFree_g / Math.max(co2PartitionLate.alpha0, 1e-6);
+      DIC_g = Math.max(0, DIC_g - dicReduce);
+      co2DegasSteps++;
+      co2Degassed_g += excessFree_g;
+      out.audit.co2_degassed += excessFree_g;
+    }
 
     out.audit.nh4_from_pro += NH4_prod * dt;
     out.audit.nh4_from_endog += N_rel * dt;
@@ -1789,15 +2406,43 @@ function runSimulation(params){
     out.macro_mgL[i] = (macro_g*1000)/params.volL;
     out.micro_mgL[i] = (micro_g*1000)/params.volL;
 
-    const nh4Disp = params.nUnits === 'asIon' ? out.NH4_mgL[i] * CHEM.NH4_ion_per_N : out.NH4_mgL[i];
-    const no2Disp = params.nUnits === 'asIon' ? out.NO2_mgL[i] * CHEM.NO2_ion_per_N : out.NO2_mgL[i];
-    const no3Disp = params.nUnits === 'asIon' ? out.NO3_mgL[i] * CHEM.NO3_ion_per_N : out.NO3_mgL[i];
+    out.rate.carb[i] = nutrient.flows.o2_g_day;
+    out.rate.nh4[i] = nutrient.flows.o2_g_day * 0.35;
+    out.rate.no2[i] = nutrient.flows.o2_g_day * 0.15;
+    out.rate.hetero[i] = consumers.flows.o2_g_day;
+    out.rate.plant[i] = -primary.production.o2_g_day;
+    out.rate.total[i] = o2Demand - o2Prod;
+    out.rate.supply[i] = gas.o2_transfer_g_day;
+    out.meta.maxDemand = Math.max(out.meta.maxDemand, out.rate.total[i]);
+    out.meta.maxSupply = Math.max(out.meta.maxSupply, out.rate.supply[i]);
 
-    out.chem.nh4[i] = nh4Disp;
-    out.chem.no2[i] = no2Disp;
-    out.chem.no3[i] = no3Disp;
+    const nh4_mgL = (state.pools.nh4_g * 1000) / volL;
+    const no2_mgL = (state.pools.no2_g * 1000) / volL;
+    const no3_mgL = (state.pools.no3_g * 1000) / volL;
+    const po4_mgL = (state.pools.po4_g * 1000) / volL;
+    const storeTotal_g = ['algae','plankton','plants'].reduce((acc,key)=>acc + state.stores[key].n_g + state.stores[key].p_g, 0);
+    const store_mgL = (storeTotal_g * 1000) / volL;
+    storeTotal_g_last = storeTotal_g;
+
+    out.DO_mgL[i] = state.oxygen.do_mgL;
+    out.DO_pct[i] = oxy.Cstar > 0 ? (state.oxygen.do_mgL / oxy.Cstar) * 100 : 0;
+    out.NH4_mgL[i] = nh4_mgL;
+    out.NO2_mgL[i] = no2_mgL;
+    out.NO3_mgL[i] = no3_mgL;
+    out.NH3_mgL[i] = nh4_mgL * nh3Fraction(pHLast, tempC) * CHEM.NH3_ion_per_N;
+    out.CO2_mgL[i] = carbonate.co2_mgL;
+    out.DIC_mgL[i] = carbonate.dic_mgL;
+    out.macro_mgL[i] = (nh4_mgL + no2_mgL + no3_mgL);
+    out.micro_mgL[i] = po4_mgL;
+    out.store_mgL[i] = store_mgL;
+
+    out.chem.nh4[i] = nh4_mgL;
     out.chem.nh3[i] = out.NH3_mgL[i];
-    out.chem.co2[i] = out.CO2_mgL[i];
+    out.chem.no2[i] = no2_mgL;
+    out.chem.no3[i] = no3_mgL;
+    out.chem.co2[i] = carbonate.co2_mgL;
+    out.chem.dic[i] = carbonate.dic_mgL;
+    out.chem.store[i] = store_mgL;
     out.chem.macro[i] = out.macro_mgL[i];
     out.chem.micro[i] = out.micro_mgL[i];
 
@@ -1812,15 +2457,6 @@ function runSimulation(params){
     Bden = clamp(Bden + (rDen_grow*fDen*(denitCap-Bden) - dDen*Bden)*dt, 0.0, denitCap);
   }
 
-  // cumulative arrays
-  out.cum = {};
-  for(const k of Object.keys(out.rate)){
-    const arr = out.rate[k];
-    const cum = new Array(n).fill(0);
-    let s = 0;
-    for(let i=0;i<n;i++){ s += arr[i]*dt; cum[i] = s; }
-    out.cum[k] = cum;
-  }
   const chemCumResult = buildCumulativeSeries(out.chem, dt);
   out.chemCum = chemCumResult.series;
   out.meta.chemCumInfo = chemCumResult.info;
@@ -1943,6 +2579,7 @@ function runMonteCarlo(baseParams){
   const co2pk = new Array(runs);
   const macroPk = new Array(runs);
   const microPk = new Array(runs);
+  const storeMin = new Array(runs);
   const otrMax = new Array(runs);
   const kLa = new Array(runs);
   const Cstar = new Array(runs);
@@ -2019,6 +2656,7 @@ function runMonteCarlo(baseParams){
     deficitArea[r] = defA;
 
     let nh = 0, n2 = 0, n3 = 0, nh3 = 0, co2 = 0, mA = 0, mI = 0;
+    let storeFloor = Infinity;
     for(let i=0;i<sim.NH4_mgL.length;i++) if(sim.NH4_mgL[i] > nh) nh = sim.NH4_mgL[i];
     for(let i=0;i<sim.NO2_mgL.length;i++) if(sim.NO2_mgL[i] > n2) n2 = sim.NO2_mgL[i];
     for(let i=0;i<sim.NO3_mgL.length;i++) if(sim.NO3_mgL[i] > n3) n3 = sim.NO3_mgL[i];
@@ -2026,6 +2664,7 @@ function runMonteCarlo(baseParams){
     for(let i=0;i<sim.CO2_mgL.length;i++) if(sim.CO2_mgL[i] > co2) co2 = sim.CO2_mgL[i];
     for(let i=0;i<sim.macro_mgL.length;i++) if(sim.macro_mgL[i] > mA) mA = sim.macro_mgL[i];
     for(let i=0;i<sim.micro_mgL.length;i++) if(sim.micro_mgL[i] > mI) mI = sim.micro_mgL[i];
+    for(let i=0;i<sim.store_mgL.length;i++) if(sim.store_mgL[i] < storeFloor) storeFloor = sim.store_mgL[i];
     nh4pk[r] = nh;
     no2pk[r] = n2;
     no3pk[r] = n3;
@@ -2033,10 +2672,11 @@ function runMonteCarlo(baseParams){
     co2pk[r] = co2;
     macroPk[r] = mA;
     microPk[r] = mI;
+    storeMin[r] = Number.isFinite(storeFloor) ? storeFloor : 0;
 
-    otrMax[r] = sim.meta.oxy.OTR_max;
-    kLa[r] = sim.meta.oxy.kLa;
-    Cstar[r] = sim.meta.oxy.Cstar;
+    otrMax[r] = oxySafe.OTR_max;
+    kLa[r] = oxySafe.kLa;
+    Cstar[r] = oxySafe.Cstar;
   }
 
   // Quantile arrays (time series)
@@ -2047,10 +2687,29 @@ function runMonteCarlo(baseParams){
   const qChem = Object.fromEntries(CHEM_SERIES.map(s=>[s.key, {lo:new Float32Array(n), mid:new Float32Array(n), hi:new Float32Array(n)}]));
 
   const tmp = new Array(runs);
+  let mcMissingRows = 0;
+  let mcMissingValues = 0;
+  const mcSeriesFallbacks = new Set();
 
-  function fillQ(srcRuns, out){
+  function fillQ(srcRuns, out, fallbackSeries, label){
     for(let i=0;i<n;i++){
-      for(let r=0;r<runs;r++) tmp[r] = srcRuns[r][i];
+      for(let r=0;r<runs;r++){
+        const row = srcRuns[r];
+        if(!row || !Array.isArray(row)){
+          mcMissingRows += 1;
+          if(label) mcSeriesFallbacks.add(label);
+          tmp[r] = fallbackSeries ? fallbackSeries[i] : 0;
+          continue;
+        }
+        const value = row[i];
+        if(!Number.isFinite(value)){
+          mcMissingValues += 1;
+          if(label) mcSeriesFallbacks.add(label);
+          tmp[r] = fallbackSeries ? fallbackSeries[i] : 0;
+          continue;
+        }
+        tmp[r] = value;
+      }
       tmp.sort((a,b)=>a-b);
       out.lo[i]  = quantileFromSorted(tmp, qLo);
       out.mid[i] = quantileFromSorted(tmp, 0.5);
@@ -2077,6 +2736,7 @@ function runMonteCarlo(baseParams){
   const sCO2   = scalarStats(co2pk, qLo, qHi);
   const sMacro = scalarStats(macroPk, qLo, qHi);
   const sMicro = scalarStats(microPk, qLo, qHi);
+  const sStoreMin = scalarStats(storeMin, qLo, qHi);
   const sOTR   = scalarStats(otrMax, qLo, qHi);
   const sKLA   = scalarStats(kLa, qLo, qHi);
   const sCstar = scalarStats(Cstar, qLo, qHi);
@@ -2103,6 +2763,7 @@ function runMonteCarlo(baseParams){
       co2pk:sCO2,
       macroPk:sMacro,
       microPk:sMicro,
+      storeMin:sStoreMin,
       otrMax:sOTR,
       kLa:sKLA,
       Cstar:sCstar,
@@ -2529,7 +3190,7 @@ function drawDOPlot(canvas, sim, overlay=null){
     ctx.restore();
   }
 
-  return {m, pw, ph, xMax, yTop, tArr, sim, overlay};
+  return {m, pw, ph, xMax, yTop, tArr, seriesDict, opts};
 }
 
 /* =========================================================
@@ -3168,7 +3829,7 @@ function setFlags(sim, params, mc){
 
   const co2Class = classify('max', co2Peak, 15, 30);
   addTag({
-    label:'CO₂ (produced)',
+    label:'CO₂ free',
     tone: co2Class.tone,
     status: co2Class.label,
     summary:`peak ${fmtVal(co2Peak, 'mg/L')}`,
@@ -3179,12 +3840,12 @@ function setFlags(sim, params, mc){
     ]
   });
 
-  const macroClass = classify('max', macroPeak, 1.5, 3.0);
+  const storeClass = classify('min', storeMin, 1.0, 0.4);
   addTag({
-    label:'Macros (proxy)',
-    tone: macroClass.tone,
-    status: macroClass.label,
-    summary:`peak ${fmtVal(macroPeak, 'mg/L')}`,
+    label:'Nutrient stores',
+    tone: storeClass.tone,
+    status: storeClass.label,
+    summary:`min ${fmtVal(storeMin, 'mg/L')}`,
     details:[
       `Modeled ${isMC ? 'median peak' : 'peak'}: ${fmtVal(macroPeak, 'mg/L')}.`,
       fmtBandLine('max', 1.5, 3.0, 'mg/L'),
@@ -3346,8 +4007,17 @@ function fmtPct(p){
 
 function recompute(){
   clearError();
+  if(debounceTimerId !== null){
+    clearTimeout(debounceTimerId);
+    debounceTimerId = null;
+  }
+  DEBUG_STATE.debounceQueued = 0;
+  setRecomputeBubbleState(true);
   setStage('recompute', 'start');
   DEBUG_STATE.warnings = [];
+  DEBUG_STATE.lastOxyMissingCount = 0;
+  DEBUG_STATE.lastMCSeriesFallbacks = null;
+  DEBUG_STATE.lastBiofilmMetaMissing = null;
   const recomputeStart = performance.now();
   setRecomputeBubbleState('running', {phase: 'start'});
 
@@ -3591,6 +4261,7 @@ function recompute(){
     setStage('Interactions', 'init canvases');
     initCanvasInteractions();
 
+    setRecomputeBubbleState(false);
     setStage('recompute', 'done');
     DEBUG_STATE.lastRecomputeMs = performance.now() - recomputeStart;
     setRecomputeBubbleState('ready', {ms: Number.isFinite(DEBUG_STATE.lastRecomputeMs) ? DEBUG_STATE.lastRecomputeMs.toFixed(1) : 'n/a'});
@@ -3712,16 +4383,28 @@ function applyAllPresets(){
 /* =========================================================
    Init
 ========================================================= */
-let recomputeTimer = null;
+let debounceTimerId = null;
 function scheduleRecompute(){
   const mode = el('liveRecompute') ? el('liveRecompute').value : 'on';
   if(mode === 'off'){
     if(el('recomputeBtn')) el('recomputeBtn').style.display = 'inline-block';
+    DEBUG_STATE.debounceQueued = 0;
+    DEBUG_STATE.debounceMs = null;
     return;
   }
   if(el('recomputeBtn')) el('recomputeBtn').style.display = 'none';
-  clearTimeout(recomputeTimer);
-  recomputeTimer = setTimeout(()=>recompute(), 150);
+  const debounceDelayMs = 1000;
+  DEBUG_STATE.debounceMs = debounceDelayMs;
+  if(debounceTimerId !== null){
+    DEBUG_STATE.debounceQueued = (DEBUG_STATE.debounceQueued || 0) + 1;
+  }else{
+    DEBUG_STATE.debounceQueued = 1;
+  }
+  clearTimeout(debounceTimerId);
+  debounceTimerId = setTimeout(()=>{
+    DEBUG_STATE.debounceQueued = 0;
+    recompute();
+  }, debounceDelayMs);
 }
 
 function updateModeUI(){
@@ -3739,6 +4422,13 @@ function init(){
 
   updateModeUI();
   setDebugText(buildDebugSnapshot(['Init: handlers ready, awaiting recompute.']));
+  wireActiveControlGlow();
+  enableDebugCopyRoutine();
+  measurePanelOverflow();
+  if(!window.__panelOverflowBound){
+    window.__panelOverflowBound = true;
+    window.addEventListener('resize', ()=>measurePanelOverflow());
+  }
 
   // Link sliders
   linkRangeAndNumber(el('pelMass'), el('pelMassN'), ()=>{ scheduleRecompute(); });
