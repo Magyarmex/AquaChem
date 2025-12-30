@@ -404,12 +404,6 @@
     </div>
 
       <div class="row">
-        <label>Powder mass per feeding (as-fed, g)</label>
-        <input id="powMass" type="range" min="0" max="5" step="0.01" value="0.00"/>
-        <input id="powMassN" type="number" min="0" max="50" step="0.01" value="0.00"/>
-      </div>
-
-      <div class="row">
         <label>Feeding interval (days)</label>
         <input id="feedInterval" type="number" min="0.25" step="0.25" value="1"/>
       </div>
@@ -572,30 +566,21 @@
           <input id="volL" type="number" step="0.1" value="65.0"/>
         </div>
         <div class="row">
-          <label>Air pump delivered flow (L/min)</label>
-          <input id="airFlow" type="number" step="0.1" value="4.0"/>
-        </div>
-
-        <div class="row">
           <label>Water temp (°C) at current blanket setting</label>
           <input id="Tnow" type="number" step="0.1" value="22.0"/>
         </div>
         <div class="row">
-          <label>Event day</label>
-          <input id="evDay" type="number" min="0" step="0.1" value="3.0"/>
+          <label>Water pH</label>
+          <input id="pH" type="number" step="0.05" min="5" max="9.5" value="7.2"/>
         </div>
         <div class="row">
-          <label>Pellets to pop</label>
-          <input id="evPellets" type="number" min="0" step="1" value="10"/>
+          <label>Altitude (m)</label>
+          <input id="altM" type="number" step="1" min="0" value="0"/>
         </div>
 
         <div class="row">
           <label>TDS (mg/L)</label>
           <input id="tds" type="number" step="10" value="660"/>
-        </div>
-        <div class="row">
-          <label>Surface ripples (% of surface)</label>
-          <input id="ripplePct" type="number" step="1" value="50"/>
         </div>
 
         <div class="row">
@@ -630,16 +615,6 @@
         </div>
 
         
-        <div class="row">
-          <label>Bubble transfer preset</label>
-          <select id="diffType">
-            <option value="airstone_med" selected>Typical airstones (medium bubbles)</option>
-            <option value="airstone_fine">Fine airstone (smaller bubbles)</option>
-            <option value="microbubble">Microbubble diffuser (very fine)</option>
-            <option value="wood">Wooden airstone (very fine, higher backpressure)</option>
-            <option value="custom">Custom</option>
-          </select>
-        </div>
       </details>
     </div>
 
@@ -876,169 +851,6 @@
         </div>
       </details>
     </div>
-
-  </div>
-
-  <div class="card">
-    <h2>Charts</h2>
-    <div class="charts">
-      <div>
-        <canvas id="rateCanvas" width="1200" height="360"></canvas>
-        <div class="small" style="margin-top:6px">Rate chart (g O₂/day). Click to add a “pop” event at that day.</div>
-      </div>
-      <div>
-        <canvas id="doCanvas" width="1200" height="360"></canvas>
-        <div class="small" style="margin-top:6px">Dissolved oxygen (mg/L). Dashed line is local saturation C*.</div>
-      </div>
-      <div>
-        <canvas id="chemCanvas" width="1200" height="360"></canvas>
-        <div class="small" style="margin-top:6px">Chemistry / compounds (mg/L). Choose net concentrations, production-only, or cumulative production; toggle NH₄/NO₂/NO₃ units in Advanced.</div>
-        <div class="row" style="margin-top:8px">
-          <label>Chemistry display mode</label>
-          <select id="chemDisplay">
-            <option value="bio" selected>Net concentrations (after consumption)</option>
-            <option value="prod">Production only (no consumption)</option>
-            <option value="cum">Cumulative production</option>
-          </select>
-        </div>
-        <div class="row">
-          <label>Aeration performance factor</label>
-          <input id="otrCal" type="number" step="0.05" value="1.00"/>
-        </div>
-
-        <div class="row" style="margin-top:10px">
-          <label>Initial DO assumption</label>
-          <select id="initDOPreset">
-            <option value="100">Near saturation (100%)</option>
-            <option value="95" selected>High (95%)</option>
-            <option value="85">Moderate (85%)</option>
-            <option value="70">Low (70%)</option>
-            <option value="custom">Custom</option>
-          </select>
-        </div>
-        <div class="row">
-          <label>Initial DO (% of local saturation)</label>
-          <input id="doInitPct" type="number" step="1" min="0" max="150" value="95"/>
-        </div>
-        <div class="row">
-          <label>Enable oxygen limitation for nitrification</label>
-          <select id="o2Limit">
-            <option value="off">Off (demand not reduced when DO is low)</option>
-            <option value="on">On (nitrification slows as DO drops)</option>
-          </select>
-        </div>
-
-        <div class="row">
-          <label>Nitrifier DO half-saturation K (mg/L)</label>
-          <input id="kDoNit" type="number" step="0.05" value="0.50"/>
-        </div>
-        <div class="row">
-          <label>NH₄ half-saturation K (mg/L as N)</label>
-          <input id="kNH4Nit" type="number" step="0.05" value="0.40"/>
-        </div>
-        <div class="row">
-          <label>NO₂ half-saturation K (mg/L as N)</label>
-          <input id="kNO2Nit" type="number" step="0.05" value="0.25"/>
-        </div>
-        <div class="row">
-          <label>Nitrifier capacity (0–1)</label>
-          <input id="nitCap" type="number" step="0.05" min="0" max="1" value="0.80"/>
-        </div>
-        <div class="row">
-          <label>Nitrifier Q10 (temperature response)</label>
-          <input id="nitQ10" type="number" step="0.05" value="2.0"/>
-        </div>
-        <div class="row">
-          <label>Heterotroph DO half-saturation K (mg/L)</label>
-          <input id="kDoHet" type="number" step="0.05" value="0.80"/>
-        </div>
-        <div class="row">
-          <label>Refractory fraction (slow COD)</label>
-          <input id="slowFrac" type="number" step="0.05" min="0" max="0.9" value="0.25"/>
-        </div>
-        <div class="row">
-          <label>Biofilm thickness proxy (mm)</label>
-          <input id="biofilmMm" type="number" step="0.1" min="0" value="0.6"/>
-        </div>
-        <div class="row">
-          <label>Denitrification rate (1/day)</label>
-          <input id="kDenit" type="number" step="0.05" value="0.15"/>
-        </div>
-        <div class="row">
-          <label>Denitrifier capacity (0–1)</label>
-          <input id="denitCap" type="number" step="0.05" min="0" max="1" value="0.60"/>
-        </div>
-        <div class="row">
-          <label>Fish biomass (g)</label>
-          <input id="fishMass" type="number" step="1" min="0" value="0"/>
-        </div>
-        <div class="row">
-          <label>Fish respiration (mg O₂/g/day)</label>
-          <input id="fishO2" type="number" step="1" min="0" value="0"/>
-        </div>
-        <div class="row">
-          <label>Plant O₂ peak (mg/L/day)</label>
-          <input id="plantO2" type="number" step="0.1" min="0" value="0.0"/>
-        </div>
-        <div class="row">
-          <label>Diurnal temp amplitude (°C)</label>
-          <input id="tempAmp" type="number" step="0.1" min="0" value="0.6"/>
-        </div>
-        <div class="row">
-          <label>Lights on (hour 0–23)</label>
-          <input id="lightHour" type="number" step="1" min="0" max="23" value="9"/>
-        </div>
-        <div class="row">
-          <label>Nitrogen display units</label>
-          <select id="nUnits">
-            <option value="asN" selected>as N (mg/L)</option>
-            <option value="asIon">as ion (mg/L)</option>
-          </select>
-        </div>
-        <div class="row">
-          <label>Chemistry audit (nerd mode)</label>
-          <input id="chemNerd" type="checkbox"/>
-        </div>
-        <div class="row">
-          <label>Macro nutrients released (mg/L per g food)</label>
-          <input id="macroRelease" type="number" step="0.1" value="8.0"/>
-        </div>
-        <div class="row">
-          <label>Micro nutrients released (mg/L per g food)</label>
-          <input id="microRelease" type="number" step="0.1" value="1.2"/>
-        </div>
-        <div class="row">
-          <label>Macro uptake (mg/L per day)</label>
-          <input id="macroUptake" type="number" step="0.05" value="0.35"/>
-        </div>
-        <div class="row">
-          <label>Micro uptake (mg/L per day)</label>
-          <input id="microUptake" type="number" step="0.02" value="0.08"/>
-        </div>
-
-        <div class="row">
-          <label>Pellet length (cm)</label>
-          <input id="pelLen" type="number" step="0.01" value="1.00" disabled title="Hardcoded: 1.00 cm"/>
-        </div>
-        <div class="row">
-          <label>Pellet diameter (cm)</label>
-          <input id="pelDia" type="number" step="0.01" value="0.20" disabled title="Hardcoded: 0.20 cm"/>
-        </div>
-        <div class="row">
-          <label>Pellet density (g/cm³)</label>
-          <input id="pelRho" type="number" step="0.01" value="0.55"/>
-        </div>
-      </div>
-
-      <div class="footer">
-        <b>How the oxygenation estimate works</b> (in plain talk):
-        <ul style="margin:6px 0 0 18px; padding:0; color:var(--muted)">
-          <li><b>Bubble side</b>: compute O₂ mass entering per day from the airflow (altitude affects pressure), then multiply by an efficiency fraction that scales with depth and diffuser type.</li>
-          <li><b>Surface side</b>: use a gas-film “speed” k (m/day) times surface area. Ripples get a higher k. Covered area gets k multiplied by a leak factor based on tightness + headspace ventilation.</li>
-          <li>Combine both into an <b>OTRmax</b> (g/day at DO≈0). Convert that into an inferred <b>kLa</b> so supply increases as DO drops: supply = kLa·(C*−DO)·V.</li>
-        </ul>
-      </div>
-    </details>
 
   </div>
 
@@ -1293,6 +1105,8 @@ const DEBUG_STATE = {
   recomputeBubbleUpdatedISO: null,
   recomputeBubbleMissing: false,
   missingContainers: [],
+  missingInputs: [],
+  lastMissingInputsCount: null,
   initReadyState: null,
   errors: [],  // newest last
   warnings: []
@@ -1311,6 +1125,17 @@ function addWarning(message){
     stage: DEBUG_STATE.stage,
     stageExtra: DEBUG_STATE.stageExtra
   });
+}
+
+function logMissingInput(id, context){
+  const entry = {
+    timeISO: new Date().toISOString(),
+    id,
+    context: context || 'unknown'
+  };
+  DEBUG_STATE.missingInputs.push(entry);
+  DEBUG_STATE.lastMissingInputsCount = DEBUG_STATE.missingInputs.length;
+  addWarning(`Missing input #${id} (${entry.context}).`);
 }
 
 if(DEBUG_STATE.bootScriptTagCount > 1){
@@ -1487,6 +1312,14 @@ lines.push(`surface=${p.lenCm}×${p.widCm} cm, blanket=${p.blanketPct}%, ripple=
       lines.push(`#${DEBUG_STATE.missingContainers.length - recent.length + i + 1} ${m.timeISO} — ${m.id} (${m.context})`);
     });
   }
+  if(DEBUG_STATE.missingInputs.length){
+    lines.push('');
+    lines.push('--- Missing inputs (recent) ---');
+    const recent = DEBUG_STATE.missingInputs.slice(-3);
+    recent.forEach((m, i)=>{
+      lines.push(`#${DEBUG_STATE.missingInputs.length - recent.length + i + 1} ${m.timeISO} — ${m.id} (${m.context})`);
+    });
+  }
   if(Number.isFinite(DEBUG_STATE.lastRecomputeMs)){
     lines.push('');
     lines.push('--- Recompute timing (last) ---');
@@ -1540,6 +1373,38 @@ lines.push(`surface=${p.lenCm}×${p.widCm} cm, blanket=${p.blanketPct}%, ripple=
 function assertFinite(name, v){
   if(!Number.isFinite(v)) throw new Error(`Non-finite value for ${name}: ${v}`);
   return v;
+}
+
+function grabNumField(id, fallback, context){
+  const node = el(id);
+  if(!node){
+    logMissingInput(id, context || 'number');
+    return fallback;
+  }
+  const value = Number(node.value);
+  if(!Number.isFinite(value)){
+    addWarning(`Non-finite numeric input #${id}: ${node.value}`);
+    return fallback;
+  }
+  return value;
+}
+
+function grabSelectField(id, fallback, context){
+  const node = el(id);
+  if(!node){
+    logMissingInput(id, context || 'select');
+    return fallback;
+  }
+  return node.value ?? fallback;
+}
+
+function grabCheckField(id, fallback, context){
+  const node = el(id);
+  if(!node){
+    logMissingInput(id, context || 'checkbox');
+    return fallback;
+  }
+  return !!node.checked;
 }
 
 function installGlobalErrorHandlers(){
@@ -2075,16 +1940,6 @@ function runSimulation(params){
     .filter(e=>Number.isFinite(e.day))
     .sort((a,b)=>a.day-b.day);
   let feedIdx = 0;
-
-  const mEach = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
-
-  const mEach = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
-
-  const pelletEachMass = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
-
-  const pelletEachMass = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
-
-  const pelletEachMass = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
 
   const pelletEachMass = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
 
@@ -3324,89 +3179,89 @@ function saveState(){
   const s = {
     version: STATE_VERSION,
     // main sliders
-    pelMass: Number(el('pelMassN').value),
-    powMass: Number(el('powMassN').value),
-    blanket: Number(el('blanketN').value),
-    days: Number(el('daysN').value),
+    pelMass: grabNumField('pelMassN', 0, 'saveState'),
+    powMass: grabNumField('powMassN', 0, 'saveState'),
+    blanket: grabNumField('blanketN', 0, 'saveState'),
+    days: grabNumField('daysN', 30, 'saveState'),
 
     // environment
-    volL: Number(el('volL').value),
-    airFlow: Number(el('airFlow').value),
-    Tnow: Number(el('Tnow').value),
-    pH: Number(el('pH').value),
-    altM: Number(el('altM').value),
-    tds: Number(el('tds').value),
+    volL: grabNumField('volL', 65, 'saveState'),
+    airFlow: grabNumField('airFlow', 4, 'saveState'),
+    Tnow: grabNumField('Tnow', 22, 'saveState'),
+    pH: grabNumField('pH', 7.2, 'saveState'),
+    altM: grabNumField('altM', 0, 'saveState'),
+    tds: grabNumField('tds', 0, 'saveState'),
 
     // geometry + exchange
-    ripplePct: Number(el('ripplePct').value),
-    lenCm: Number(el('lenCm').value),
-    widCm: Number(el('widCm').value),
-    tankHCm: Number(el('tankHCm').value),
-    waterSurfCm: Number(el('waterSurfCm').value),
-    blanketGapCm: Number(el('blanketGapCm').value),
-    diffDepthCm: Number(el('diffDepthCm').value),
-    heaters: Number(el('heaters').value),
+    ripplePct: grabNumField('ripplePct', 50, 'saveState'),
+    lenCm: grabNumField('lenCm', 78, 'saveState'),
+    widCm: grabNumField('widCm', 31, 'saveState'),
+    tankHCm: grabNumField('tankHCm', 48, 'saveState'),
+    waterSurfCm: grabNumField('waterSurfCm', 22, 'saveState'),
+    blanketGapCm: grabNumField('blanketGapCm', 0, 'saveState'),
+    diffDepthCm: grabNumField('diffDepthCm', 17, 'saveState'),
+    heaters: grabNumField('heaters', 0, 'saveState'),
 
     // presets + numbers
-    diffType: el('diffType').value,
-    sotePerM: Number(el('sotePerM').value),
+    diffType: grabSelectField('diffType', 'airstone_med', 'saveState'),
+    sotePerM: grabNumField('sotePerM', 2.5, 'saveState'),
 
-    surfacePreset: el('surfacePreset') ? el('surfacePreset').value : 'typical',
-    kCalm: Number(el('kCalm').value),
-    kRipple: Number(el('kRipple').value),
+    surfacePreset: grabSelectField('surfacePreset', 'typical', 'saveState'),
+    kCalm: grabNumField('kCalm', 0.3, 'saveState'),
+    kRipple: grabNumField('kRipple', 1.0, 'saveState'),
 
-    tightPreset: el('tightPreset') ? el('tightPreset').value : 'loose_high',
-    tight: Number(el('tight').value),
+    tightPreset: grabSelectField('tightPreset', 'loose_high', 'saveState'),
+    tight: grabNumField('tight', 0.25, 'saveState'),
 
-    otrPreset: el('otrPreset') ? el('otrPreset').value : 'typical',
-    otrCal: Number(el('otrCal').value),
+    otrPreset: grabSelectField('otrPreset', 'typical', 'saveState'),
+    otrCal: grabNumField('otrCal', 1.0, 'saveState'),
 
-    initDOPreset: el('initDOPreset') ? el('initDOPreset').value : '95',
-    doInitPct: Number(el('doInitPct').value),
+    initDOPreset: grabSelectField('initDOPreset', '95', 'saveState'),
+    doInitPct: grabNumField('doInitPct', 95, 'saveState'),
 
     // kinetics options
-    o2Limit: el('o2Limit').value,
-    kDoNit: Number(el('kDoNit').value),
-    kDoHet: Number(el('kDoHet').value),
-    slowFrac: Number(el('slowFrac').value),
-    biofilmMm: Number(el('biofilmMm').value),
-    kDenit: Number(el('kDenit').value),
-    denitCap: Number(el('denitCap').value),
-    fishMass: Number(el('fishMass').value),
-    fishO2: Number(el('fishO2').value),
-    plantO2: Number(el('plantO2').value),
-    tempAmp: Number(el('tempAmp').value),
-    lightHour: Number(el('lightHour').value),
-    kNH4Nit: Number(el('kNH4Nit').value),
-    kNO2Nit: Number(el('kNO2Nit').value),
-    nitCap: Number(el('nitCap').value),
-    nitQ10: Number(el('nitQ10').value),
-    nUnits: el('nUnits').value,
-    chemNerd: !!el('chemNerd').checked,
-    macroRelease: Number(el('macroRelease').value),
-    microRelease: Number(el('microRelease').value),
-    macroUptake: Number(el('macroUptake').value),
-    microUptake: Number(el('microUptake').value),
+    o2Limit: grabSelectField('o2Limit', 'off', 'saveState'),
+    kDoNit: grabNumField('kDoNit', 0.5, 'saveState'),
+    kDoHet: grabNumField('kDoHet', 0.8, 'saveState'),
+    slowFrac: grabNumField('slowFrac', 0.25, 'saveState'),
+    biofilmMm: grabNumField('biofilmMm', 0.6, 'saveState'),
+    kDenit: grabNumField('kDenit', 0.15, 'saveState'),
+    denitCap: grabNumField('denitCap', 0.6, 'saveState'),
+    fishMass: grabNumField('fishMass', 0, 'saveState'),
+    fishO2: grabNumField('fishO2', 0, 'saveState'),
+    plantO2: grabNumField('plantO2', 0, 'saveState'),
+    tempAmp: grabNumField('tempAmp', 0.6, 'saveState'),
+    lightHour: grabNumField('lightHour', 9, 'saveState'),
+    kNH4Nit: grabNumField('kNH4Nit', 0.4, 'saveState'),
+    kNO2Nit: grabNumField('kNO2Nit', 0.25, 'saveState'),
+    nitCap: grabNumField('nitCap', 0.8, 'saveState'),
+    nitQ10: grabNumField('nitQ10', 2.0, 'saveState'),
+    nUnits: grabSelectField('nUnits', 'asN', 'saveState'),
+    chemNerd: grabCheckField('chemNerd', false, 'saveState'),
+    macroRelease: grabNumField('macroRelease', 8.0, 'saveState'),
+    microRelease: grabNumField('microRelease', 1.2, 'saveState'),
+    macroUptake: grabNumField('macroUptake', 0.35, 'saveState'),
+    microUptake: grabNumField('microUptake', 0.08, 'saveState'),
 
     // pellet geometry
     pelLen: 1.00, // hardcoded
     pelDia: 0.20, // hardcoded
-    pelRho: Number(el('pelRho').value),
+    pelRho: grabNumField('pelRho', 0.55, 'saveState'),
 
     // uncertainty mode
-    runMode: el('runMode') ? el('runMode').value : 'uncertainty',
-    uncLevel: el('uncLevel') ? el('uncLevel').value : 'typical',
-    mcRuns: el('mcRuns') ? Number(el('mcRuns').value) : 200,
-    bandPreset: el('bandPreset') ? el('bandPreset').value : '10-90',
-    seed: el('seed') ? Number(el('seed').value) : 12345,
-    liveRecompute: el('liveRecompute') ? el('liveRecompute').value : 'on',
-    uAir: el('uAir') ? !!el('uAir').checked : true,
-    uDiff: el('uDiff') ? !!el('uDiff').checked : true,
-    uSurf: el('uSurf') ? !!el('uSurf').checked : true,
-    uTight: el('uTight') ? !!el('uTight').checked : true,
-    uBio: el('uBio') ? !!el('uBio').checked : true,
-    uTemp: el('uTemp') ? !!el('uTemp').checked : true,
-    uInitDO: el('uInitDO') ? !!el('uInitDO').checked : true,
+    runMode: grabSelectField('runMode', 'uncertainty', 'saveState'),
+    uncLevel: grabSelectField('uncLevel', 'typical', 'saveState'),
+    mcRuns: grabNumField('mcRuns', 200, 'saveState'),
+    bandPreset: grabSelectField('bandPreset', '10-90', 'saveState'),
+    seed: grabNumField('seed', 12345, 'saveState'),
+    liveRecompute: grabSelectField('liveRecompute', 'on', 'saveState'),
+    uAir: grabCheckField('uAir', true, 'saveState'),
+    uDiff: grabCheckField('uDiff', true, 'saveState'),
+    uSurf: grabCheckField('uSurf', true, 'saveState'),
+    uTight: grabCheckField('uTight', true, 'saveState'),
+    uBio: grabCheckField('uBio', true, 'saveState'),
+    uTemp: grabCheckField('uTemp', true, 'saveState'),
+    uInitDO: grabCheckField('uInitDO', true, 'saveState'),
 
     events: EVENTS
   };
@@ -3424,10 +3279,10 @@ function loadState(){
     const setCheck = (id, v)=>{ if(el(id) && v !== undefined && v !== null) el(id).checked = !!v; };
 
     // sliders (range+number pairs)
-    if(s.pelMass !== undefined){ el('pelMass').value = s.pelMass; el('pelMassN').value = s.pelMass; }
-    if(s.powMass !== undefined){ el('powMass').value = s.powMass; el('powMassN').value = s.powMass; }
-    if(s.blanket !== undefined){ el('blanket').value = s.blanket; el('blanketN').value = s.blanket; }
-    if(s.days !== undefined){ el('days').value = s.days; el('daysN').value = s.days; }
+    if(s.pelMass !== undefined && el('pelMass') && el('pelMassN')){ el('pelMass').value = s.pelMass; el('pelMassN').value = s.pelMass; }
+    if(s.powMass !== undefined && el('powMass') && el('powMassN')){ el('powMass').value = s.powMass; el('powMassN').value = s.powMass; }
+    if(s.blanket !== undefined && el('blanket') && el('blanketN')){ el('blanket').value = s.blanket; el('blanketN').value = s.blanket; }
+    if(s.days !== undefined && el('days') && el('daysN')){ el('days').value = s.days; el('daysN').value = s.days; }
 
     // environment + geometry
     ['volL','airFlow','Tnow','pH','altM','tds','ripplePct','lenCm','widCm','tankHCm','waterSurfCm','blanketGapCm','diffDepthCm',
@@ -3442,13 +3297,13 @@ function loadState(){
       if(s.plantO2 === undefined) set('plantO2', 0);
     }
 
-    if(s.diffType !== undefined) el('diffType').value = s.diffType;
+    if(s.diffType !== undefined && el('diffType')) el('diffType').value = s.diffType;
     if(s.surfacePreset !== undefined && el('surfacePreset')) el('surfacePreset').value = s.surfacePreset;
     if(s.tightPreset !== undefined && el('tightPreset')) el('tightPreset').value = s.tightPreset;
     if(s.otrPreset !== undefined && el('otrPreset')) el('otrPreset').value = s.otrPreset;
     if(s.initDOPreset !== undefined && el('initDOPreset')) el('initDOPreset').value = s.initDOPreset;
 
-    if(s.o2Limit !== undefined) el('o2Limit').value = s.o2Limit;
+    if(s.o2Limit !== undefined && el('o2Limit')) el('o2Limit').value = s.o2Limit;
     if(s.nUnits !== undefined && el('nUnits')) el('nUnits').value = s.nUnits;
     setCheck('chemNerd', s.chemNerd);
 
@@ -3886,85 +3741,85 @@ function getParams(){
   }catch(_){}
 
   const p = {
-    pelletMass_g: Number(el('pelMassN').value),
-    powderMass_g: Number(el('powMassN').value),
-    blanketPct: Number(el('blanketN').value),
-    days: Number(el('daysN').value),
+    pelletMass_g: grabNumField('pelMassN', 0, 'params'),
+    powderMass_g: grabNumField('powMassN', 0, 'params'),
+    blanketPct: grabNumField('blanketN', 0, 'params'),
+    days: grabNumField('daysN', 30, 'params'),
 
-    volL: Number(el('volL').value),
-    airFlow: Number(el('airFlow').value),
-    Tnow: Number(el('Tnow').value),
-    pH: Number(el('pH').value),
-    altM: Number(el('altM').value),
-    tds: Number(el('tds').value),
+    volL: grabNumField('volL', 65, 'params'),
+    airFlow: grabNumField('airFlow', 4, 'params'),
+    Tnow: grabNumField('Tnow', 22, 'params'),
+    pH: grabNumField('pH', 7.2, 'params'),
+    altM: grabNumField('altM', 0, 'params'),
+    tds: grabNumField('tds', 0, 'params'),
 
-    ripplePct: Number(el('ripplePct').value),
+    ripplePct: grabNumField('ripplePct', 50, 'params'),
 
-    lenCm: Number(el('lenCm').value),
-    widCm: Number(el('widCm').value),
-    tankHCm: Number(el('tankHCm').value),
-    waterSurfCm: Number(el('waterSurfCm').value),
-    blanketGapCm: Number(el('blanketGapCm').value),
-    diffDepthCm: Number(el('diffDepthCm').value),
-    heaters: Number(el('heaters').value),
+    lenCm: grabNumField('lenCm', 78, 'params'),
+    widCm: grabNumField('widCm', 31, 'params'),
+    tankHCm: grabNumField('tankHCm', 48, 'params'),
+    waterSurfCm: grabNumField('waterSurfCm', 22, 'params'),
+    blanketGapCm: grabNumField('blanketGapCm', 0, 'params'),
+    diffDepthCm: grabNumField('diffDepthCm', 17, 'params'),
+    heaters: grabNumField('heaters', 0, 'params'),
 
-    diffType: el('diffType').value,
-    sotePerM: Number(el('sotePerM').value),
-    surfacePreset: el('surfacePreset') ? el('surfacePreset').value : 'typical',
-    kCalm: Number(el('kCalm').value),
-    kRipple: Number(el('kRipple').value),
+    diffType: grabSelectField('diffType', 'airstone_med', 'params'),
+    sotePerM: grabNumField('sotePerM', 2.5, 'params'),
+    surfacePreset: grabSelectField('surfacePreset', 'typical', 'params'),
+    kCalm: grabNumField('kCalm', 0.3, 'params'),
+    kRipple: grabNumField('kRipple', 1.0, 'params'),
 
-    tightPreset: el('tightPreset') ? el('tightPreset').value : 'loose_high',
-    tight: Number(el('tight').value),
+    tightPreset: grabSelectField('tightPreset', 'loose_high', 'params'),
+    tight: grabNumField('tight', 0.25, 'params'),
 
-    otrPreset: el('otrPreset') ? el('otrPreset').value : 'typical',
-    otrCal: Number(el('otrCal').value),
+    otrPreset: grabSelectField('otrPreset', 'typical', 'params'),
+    otrCal: grabNumField('otrCal', 1.0, 'params'),
 
-    initDOPreset: el('initDOPreset') ? el('initDOPreset').value : '95',
-    doInitPct: Number(el('doInitPct').value),
+    initDOPreset: grabSelectField('initDOPreset', '95', 'params'),
+    doInitPct: grabNumField('doInitPct', 95, 'params'),
 
-    o2Limit: el('o2Limit').value,
-    kDoNit: Number(el('kDoNit').value),
-    kDoHet: Number(el('kDoHet').value),
-    slowFrac: Number(el('slowFrac').value),
-    biofilmMm: Number(el('biofilmMm').value),
-    kDenit: Number(el('kDenit').value),
-    denitCap: Number(el('denitCap').value),
-    fishMass: Number(el('fishMass').value),
-    fishO2: Number(el('fishO2').value),
-    plantO2: Number(el('plantO2').value),
-    tempAmp: Number(el('tempAmp').value),
-    lightHour: Number(el('lightHour').value),
-    kNH4Nit: Number(el('kNH4Nit').value),
-    kNO2Nit: Number(el('kNO2Nit').value),
-    nitCap: Number(el('nitCap').value),
-    nitQ10: Number(el('nitQ10').value),
-    nUnits: el('nUnits').value,
-    chemNerd: !!el('chemNerd').checked,
-    macroRelease: Number(el('macroRelease').value),
-    microRelease: Number(el('microRelease').value),
-    macroUptake: Number(el('macroUptake').value),
-    microUptake: Number(el('microUptake').value),
+    o2Limit: grabSelectField('o2Limit', 'off', 'params'),
+    kDoNit: grabNumField('kDoNit', 0.5, 'params'),
+    kDoHet: grabNumField('kDoHet', 0.8, 'params'),
+    slowFrac: grabNumField('slowFrac', 0.25, 'params'),
+    biofilmMm: grabNumField('biofilmMm', 0.6, 'params'),
+    kDenit: grabNumField('kDenit', 0.15, 'params'),
+    denitCap: grabNumField('denitCap', 0.6, 'params'),
+    fishMass: grabNumField('fishMass', 0, 'params'),
+    fishO2: grabNumField('fishO2', 0, 'params'),
+    plantO2: grabNumField('plantO2', 0, 'params'),
+    tempAmp: grabNumField('tempAmp', 0.6, 'params'),
+    lightHour: grabNumField('lightHour', 9, 'params'),
+    kNH4Nit: grabNumField('kNH4Nit', 0.4, 'params'),
+    kNO2Nit: grabNumField('kNO2Nit', 0.25, 'params'),
+    nitCap: grabNumField('nitCap', 0.8, 'params'),
+    nitQ10: grabNumField('nitQ10', 2.0, 'params'),
+    nUnits: grabSelectField('nUnits', 'asN', 'params'),
+    chemNerd: grabCheckField('chemNerd', false, 'params'),
+    macroRelease: grabNumField('macroRelease', 8.0, 'params'),
+    microRelease: grabNumField('microRelease', 1.2, 'params'),
+    macroUptake: grabNumField('macroUptake', 0.35, 'params'),
+    microUptake: grabNumField('microUptake', 0.08, 'params'),
 
-    pelLen: Number(el('pelLen').value),
-    pelDia: Number(el('pelDia').value),
-    pelRho: Number(el('pelRho').value),
+    pelLen: grabNumField('pelLen', 1.0, 'params'),
+    pelDia: grabNumField('pelDia', 0.2, 'params'),
+    pelRho: grabNumField('pelRho', 0.55, 'params'),
 
     // Uncertainty mode controls
-    runMode: el('runMode') ? el('runMode').value : 'uncertainty',
-    uncLevel: el('uncLevel') ? el('uncLevel').value : 'typical',
-    mcRuns: el('mcRuns') ? Number(el('mcRuns').value) : 200,
-    bandPreset: el('bandPreset') ? el('bandPreset').value : '10-90',
-    seed: el('seed') ? Number(el('seed').value) : 12345,
-    liveRecompute: el('liveRecompute') ? el('liveRecompute').value : 'on',
+    runMode: grabSelectField('runMode', 'uncertainty', 'params'),
+    uncLevel: grabSelectField('uncLevel', 'typical', 'params'),
+    mcRuns: grabNumField('mcRuns', 200, 'params'),
+    bandPreset: grabSelectField('bandPreset', '10-90', 'params'),
+    seed: grabNumField('seed', 12345, 'params'),
+    liveRecompute: grabSelectField('liveRecompute', 'on', 'params'),
     u: {
-      air: el('uAir') ? el('uAir').checked : true,
-      diff: el('uDiff') ? el('uDiff').checked : true,
-      surf: el('uSurf') ? el('uSurf').checked : true,
-      tight: el('uTight') ? el('uTight').checked : true,
-      bio: el('uBio') ? el('uBio').checked : true,
-      temp: el('uTemp') ? el('uTemp').checked : true,
-      initDO: el('uInitDO') ? el('uInitDO').checked : true,
+      air: grabCheckField('uAir', true, 'params'),
+      diff: grabCheckField('uDiff', true, 'params'),
+      surf: grabCheckField('uSurf', true, 'params'),
+      tight: grabCheckField('uTight', true, 'params'),
+      bio: grabCheckField('uBio', true, 'params'),
+      temp: grabCheckField('uTemp', true, 'params'),
+      initDO: grabCheckField('uInitDO', true, 'params'),
     },
 
     events: EVENTS
@@ -4022,6 +3877,8 @@ function recompute(){
   DEBUG_STATE.lastOxyMissingCount = 0;
   DEBUG_STATE.lastMCSeriesFallbacks = null;
   DEBUG_STATE.lastBiofilmMetaMissing = null;
+  DEBUG_STATE.missingInputs = [];
+  DEBUG_STATE.lastMissingInputsCount = 0;
   const recomputeStart = performance.now();
   setRecomputeBubbleState('running', {phase: 'start'});
 
