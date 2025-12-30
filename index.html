@@ -3179,89 +3179,89 @@ function saveState(){
   const s = {
     version: STATE_VERSION,
     // main sliders
-    pelMass: Number(el('pelMassN').value),
-    powMass: Number(el('powMassN').value),
-    blanket: Number(el('blanketN').value),
-    days: Number(el('daysN').value),
+    pelMass: grabNumField('pelMassN', 0, 'saveState'),
+    powMass: grabNumField('powMassN', 0, 'saveState'),
+    blanket: grabNumField('blanketN', 0, 'saveState'),
+    days: grabNumField('daysN', 30, 'saveState'),
 
     // environment
-    volL: Number(el('volL').value),
-    airFlow: Number(el('airFlow').value),
-    Tnow: Number(el('Tnow').value),
-    pH: Number(el('pH').value),
-    altM: Number(el('altM').value),
-    tds: Number(el('tds').value),
+    volL: grabNumField('volL', 65, 'saveState'),
+    airFlow: grabNumField('airFlow', 4, 'saveState'),
+    Tnow: grabNumField('Tnow', 22, 'saveState'),
+    pH: grabNumField('pH', 7.2, 'saveState'),
+    altM: grabNumField('altM', 0, 'saveState'),
+    tds: grabNumField('tds', 0, 'saveState'),
 
     // geometry + exchange
-    ripplePct: Number(el('ripplePct').value),
-    lenCm: Number(el('lenCm').value),
-    widCm: Number(el('widCm').value),
-    tankHCm: Number(el('tankHCm').value),
-    waterSurfCm: Number(el('waterSurfCm').value),
-    blanketGapCm: Number(el('blanketGapCm').value),
-    diffDepthCm: Number(el('diffDepthCm').value),
-    heaters: Number(el('heaters').value),
+    ripplePct: grabNumField('ripplePct', 50, 'saveState'),
+    lenCm: grabNumField('lenCm', 78, 'saveState'),
+    widCm: grabNumField('widCm', 31, 'saveState'),
+    tankHCm: grabNumField('tankHCm', 48, 'saveState'),
+    waterSurfCm: grabNumField('waterSurfCm', 22, 'saveState'),
+    blanketGapCm: grabNumField('blanketGapCm', 0, 'saveState'),
+    diffDepthCm: grabNumField('diffDepthCm', 17, 'saveState'),
+    heaters: grabNumField('heaters', 0, 'saveState'),
 
     // presets + numbers
-    diffType: el('diffType').value,
-    sotePerM: Number(el('sotePerM').value),
+    diffType: grabSelectField('diffType', 'airstone_med', 'saveState'),
+    sotePerM: grabNumField('sotePerM', 2.5, 'saveState'),
 
-    surfacePreset: el('surfacePreset') ? el('surfacePreset').value : 'typical',
-    kCalm: Number(el('kCalm').value),
-    kRipple: Number(el('kRipple').value),
+    surfacePreset: grabSelectField('surfacePreset', 'typical', 'saveState'),
+    kCalm: grabNumField('kCalm', 0.3, 'saveState'),
+    kRipple: grabNumField('kRipple', 1.0, 'saveState'),
 
-    tightPreset: el('tightPreset') ? el('tightPreset').value : 'loose_high',
-    tight: Number(el('tight').value),
+    tightPreset: grabSelectField('tightPreset', 'loose_high', 'saveState'),
+    tight: grabNumField('tight', 0.25, 'saveState'),
 
-    otrPreset: el('otrPreset') ? el('otrPreset').value : 'typical',
-    otrCal: Number(el('otrCal').value),
+    otrPreset: grabSelectField('otrPreset', 'typical', 'saveState'),
+    otrCal: grabNumField('otrCal', 1.0, 'saveState'),
 
-    initDOPreset: el('initDOPreset') ? el('initDOPreset').value : '95',
-    doInitPct: Number(el('doInitPct').value),
+    initDOPreset: grabSelectField('initDOPreset', '95', 'saveState'),
+    doInitPct: grabNumField('doInitPct', 95, 'saveState'),
 
     // kinetics options
-    o2Limit: el('o2Limit').value,
-    kDoNit: Number(el('kDoNit').value),
-    kDoHet: Number(el('kDoHet').value),
-    slowFrac: Number(el('slowFrac').value),
-    biofilmMm: Number(el('biofilmMm').value),
-    kDenit: Number(el('kDenit').value),
-    denitCap: Number(el('denitCap').value),
-    fishMass: Number(el('fishMass').value),
-    fishO2: Number(el('fishO2').value),
-    plantO2: Number(el('plantO2').value),
-    tempAmp: Number(el('tempAmp').value),
-    lightHour: Number(el('lightHour').value),
-    kNH4Nit: Number(el('kNH4Nit').value),
-    kNO2Nit: Number(el('kNO2Nit').value),
-    nitCap: Number(el('nitCap').value),
-    nitQ10: Number(el('nitQ10').value),
-    nUnits: el('nUnits').value,
-    chemNerd: !!el('chemNerd').checked,
-    macroRelease: Number(el('macroRelease').value),
-    microRelease: Number(el('microRelease').value),
-    macroUptake: Number(el('macroUptake').value),
-    microUptake: Number(el('microUptake').value),
+    o2Limit: grabSelectField('o2Limit', 'off', 'saveState'),
+    kDoNit: grabNumField('kDoNit', 0.5, 'saveState'),
+    kDoHet: grabNumField('kDoHet', 0.8, 'saveState'),
+    slowFrac: grabNumField('slowFrac', 0.25, 'saveState'),
+    biofilmMm: grabNumField('biofilmMm', 0.6, 'saveState'),
+    kDenit: grabNumField('kDenit', 0.15, 'saveState'),
+    denitCap: grabNumField('denitCap', 0.6, 'saveState'),
+    fishMass: grabNumField('fishMass', 0, 'saveState'),
+    fishO2: grabNumField('fishO2', 0, 'saveState'),
+    plantO2: grabNumField('plantO2', 0, 'saveState'),
+    tempAmp: grabNumField('tempAmp', 0.6, 'saveState'),
+    lightHour: grabNumField('lightHour', 9, 'saveState'),
+    kNH4Nit: grabNumField('kNH4Nit', 0.4, 'saveState'),
+    kNO2Nit: grabNumField('kNO2Nit', 0.25, 'saveState'),
+    nitCap: grabNumField('nitCap', 0.8, 'saveState'),
+    nitQ10: grabNumField('nitQ10', 2.0, 'saveState'),
+    nUnits: grabSelectField('nUnits', 'asN', 'saveState'),
+    chemNerd: grabCheckField('chemNerd', false, 'saveState'),
+    macroRelease: grabNumField('macroRelease', 8.0, 'saveState'),
+    microRelease: grabNumField('microRelease', 1.2, 'saveState'),
+    macroUptake: grabNumField('macroUptake', 0.35, 'saveState'),
+    microUptake: grabNumField('microUptake', 0.08, 'saveState'),
 
     // pellet geometry
     pelLen: 1.00, // hardcoded
     pelDia: 0.20, // hardcoded
-    pelRho: Number(el('pelRho').value),
+    pelRho: grabNumField('pelRho', 0.55, 'saveState'),
 
     // uncertainty mode
-    runMode: el('runMode') ? el('runMode').value : 'uncertainty',
-    uncLevel: el('uncLevel') ? el('uncLevel').value : 'typical',
-    mcRuns: el('mcRuns') ? Number(el('mcRuns').value) : 200,
-    bandPreset: el('bandPreset') ? el('bandPreset').value : '10-90',
-    seed: el('seed') ? Number(el('seed').value) : 12345,
-    liveRecompute: el('liveRecompute') ? el('liveRecompute').value : 'on',
-    uAir: el('uAir') ? !!el('uAir').checked : true,
-    uDiff: el('uDiff') ? !!el('uDiff').checked : true,
-    uSurf: el('uSurf') ? !!el('uSurf').checked : true,
-    uTight: el('uTight') ? !!el('uTight').checked : true,
-    uBio: el('uBio') ? !!el('uBio').checked : true,
-    uTemp: el('uTemp') ? !!el('uTemp').checked : true,
-    uInitDO: el('uInitDO') ? !!el('uInitDO').checked : true,
+    runMode: grabSelectField('runMode', 'uncertainty', 'saveState'),
+    uncLevel: grabSelectField('uncLevel', 'typical', 'saveState'),
+    mcRuns: grabNumField('mcRuns', 200, 'saveState'),
+    bandPreset: grabSelectField('bandPreset', '10-90', 'saveState'),
+    seed: grabNumField('seed', 12345, 'saveState'),
+    liveRecompute: grabSelectField('liveRecompute', 'on', 'saveState'),
+    uAir: grabCheckField('uAir', true, 'saveState'),
+    uDiff: grabCheckField('uDiff', true, 'saveState'),
+    uSurf: grabCheckField('uSurf', true, 'saveState'),
+    uTight: grabCheckField('uTight', true, 'saveState'),
+    uBio: grabCheckField('uBio', true, 'saveState'),
+    uTemp: grabCheckField('uTemp', true, 'saveState'),
+    uInitDO: grabCheckField('uInitDO', true, 'saveState'),
 
     events: EVENTS
   };
@@ -3279,10 +3279,10 @@ function loadState(){
     const setCheck = (id, v)=>{ if(el(id) && v !== undefined && v !== null) el(id).checked = !!v; };
 
     // sliders (range+number pairs)
-    if(s.pelMass !== undefined){ el('pelMass').value = s.pelMass; el('pelMassN').value = s.pelMass; }
-    if(s.powMass !== undefined){ el('powMass').value = s.powMass; el('powMassN').value = s.powMass; }
-    if(s.blanket !== undefined){ el('blanket').value = s.blanket; el('blanketN').value = s.blanket; }
-    if(s.days !== undefined){ el('days').value = s.days; el('daysN').value = s.days; }
+    if(s.pelMass !== undefined && el('pelMass') && el('pelMassN')){ el('pelMass').value = s.pelMass; el('pelMassN').value = s.pelMass; }
+    if(s.powMass !== undefined && el('powMass') && el('powMassN')){ el('powMass').value = s.powMass; el('powMassN').value = s.powMass; }
+    if(s.blanket !== undefined && el('blanket') && el('blanketN')){ el('blanket').value = s.blanket; el('blanketN').value = s.blanket; }
+    if(s.days !== undefined && el('days') && el('daysN')){ el('days').value = s.days; el('daysN').value = s.days; }
 
     // environment + geometry
     ['volL','airFlow','Tnow','pH','altM','tds','ripplePct','lenCm','widCm','tankHCm','waterSurfCm','blanketGapCm','diffDepthCm',
@@ -3297,13 +3297,13 @@ function loadState(){
       if(s.plantO2 === undefined) set('plantO2', 0);
     }
 
-    if(s.diffType !== undefined) el('diffType').value = s.diffType;
+    if(s.diffType !== undefined && el('diffType')) el('diffType').value = s.diffType;
     if(s.surfacePreset !== undefined && el('surfacePreset')) el('surfacePreset').value = s.surfacePreset;
     if(s.tightPreset !== undefined && el('tightPreset')) el('tightPreset').value = s.tightPreset;
     if(s.otrPreset !== undefined && el('otrPreset')) el('otrPreset').value = s.otrPreset;
     if(s.initDOPreset !== undefined && el('initDOPreset')) el('initDOPreset').value = s.initDOPreset;
 
-    if(s.o2Limit !== undefined) el('o2Limit').value = s.o2Limit;
+    if(s.o2Limit !== undefined && el('o2Limit')) el('o2Limit').value = s.o2Limit;
     if(s.nUnits !== undefined && el('nUnits')) el('nUnits').value = s.nUnits;
     setCheck('chemNerd', s.chemNerd);
 
