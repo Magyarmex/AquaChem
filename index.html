@@ -1102,6 +1102,22 @@
 <div class="tooltip" id="tip"></div>
 
 <script>
+(() => {
+  const bootToken = 'aquachem-inline-v3';
+  const bootKey = '__AQUACHEM_BOOT__';
+  const existingBoot = window[bootKey];
+  if(existingBoot){
+    existingBoot.count = (existingBoot.count || 1) + 1;
+    existingBoot.lastSeenISO = new Date().toISOString();
+    console.warn('AquaChem inline script already initialized.', existingBoot);
+    return;
+  }
+  window[bootKey] = {
+    token: bootToken,
+    count: 1,
+    firstSeenISO: new Date().toISOString(),
+    lastSeenISO: null
+  };
 
 /* =========================================================
    Series registry (rate + chemistry charts)
@@ -1259,6 +1275,9 @@ const DEBUG_STATE = {
   lastRecomputeMs: null,
   lastFlagsCount: null,
   lastUpdateISO: null,
+  bootToken: bootToken,
+  bootLoadedISO: window[bootKey].firstSeenISO,
+  bootDuplicateCount: window[bootKey].count,
   dedupeReport: null,
   recomputeBubbleState: null,
   recomputeBubbleMeta: null,
@@ -1401,6 +1420,13 @@ lines.push(`surface=${p.lenCm}×${p.widCm} cm, blanket=${p.blanketPct}%, ripple=
       }
     }catch(_){}
     lines.push(compactJSON(o, 1800));
+  }
+  if(DEBUG_STATE.bootToken){
+    lines.push('');
+    lines.push('--- Boot ---');
+    lines.push(`Token: ${DEBUG_STATE.bootToken}`);
+    lines.push(`Loaded: ${DEBUG_STATE.bootLoadedISO}`);
+    lines.push(`Duplicate loads: ${DEBUG_STATE.bootDuplicateCount}`);
   }
   if(DEBUG_STATE.dedupeReport){
     lines.push('');
@@ -2038,6 +2064,8 @@ function runSimulation(params){
   const mEach = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
 
   const mEach = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
+
+  const pelletEachMass = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
 
   const pelletEachMass = pelletMassEach(params.pelLen, params.pelDia, params.pelRho);
 
@@ -4485,7 +4513,7 @@ function boot(){
 }
 
 boot();
-
+})();
 </script>
 </body>
 </html>
