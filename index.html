@@ -4978,40 +4978,23 @@ function runMonteCarlo(baseParams){
   const tmp = new Array(runs);
   let mcMissingRows = 0;
   let mcMissingValues = 0;
-  let mcMissingSeries = 0;
   const mcSeriesFallbacks = new Set();
-  const mcSeriesMissing = new Set();
-  const isSeriesArray = value => Array.isArray(value) || ArrayBuffer.isView(value);
 
   function fillQ(srcRuns, out, fallbackSeries, label){
-    if(!isSeriesArray(srcRuns)){
-      mcMissingSeries += 1;
-      if(label) mcSeriesMissing.add(label);
-      for(let i=0;i<n;i++){
-        for(let r=0;r<runs;r++){
-          tmp[r] = fallbackSeries?.[i] ?? 0;
-        }
-        tmp.sort((a,b)=>a-b);
-        out.lo[i]  = quantileFromSorted(tmp, qLo);
-        out.mid[i] = quantileFromSorted(tmp, 0.5);
-        out.hi[i]  = quantileFromSorted(tmp, qHi);
-      }
-      return;
-    }
     for(let i=0;i<n;i++){
       for(let r=0;r<runs;r++){
         const row = srcRuns[r];
-        if(!row || !isSeriesArray(row)){
+        if(!row || !Array.isArray(row)){
           mcMissingRows += 1;
           if(label) mcSeriesFallbacks.add(label);
-          tmp[r] = fallbackSeries?.[i] ?? 0;
+          tmp[r] = fallbackSeries ? fallbackSeries[i] : 0;
           continue;
         }
         const value = row[i];
         if(!Number.isFinite(value)){
           mcMissingValues += 1;
           if(label) mcSeriesFallbacks.add(label);
-          tmp[r] = fallbackSeries?.[i] ?? 0;
+          tmp[r] = fallbackSeries ? fallbackSeries[i] : 0;
           continue;
         }
         tmp[r] = value;
@@ -5038,20 +5021,13 @@ function runMonteCarlo(baseParams){
   fillQ(bio_runs.hetero_pct, qBioPct.hetero_pct, baseSim.biomass.hetero_pct, 'bio:hetero_pct');
   fillQ(bio_runs.phyto_pct, qBioPct.phyto_pct, baseSim.biomass.phyto_pct, 'bio:phyto_pct');
 
-  if(mcMissingRows > 0 || mcMissingValues > 0 || mcMissingSeries > 0){
+  if(mcMissingRows > 0 || mcMissingValues > 0){
     DEBUG_STATE.lastMCSeriesFallbacks = {
       rows: mcMissingRows,
       values: mcMissingValues,
-      missingSeries: mcMissingSeries,
-      series: Array.from(mcSeriesFallbacks),
-      missing: Array.from(mcSeriesMissing)
+      series: Array.from(mcSeriesFallbacks)
     };
-    const parts = [
-      mcMissingSeries > 0 ? `${mcMissingSeries} missing series` : null,
-      mcMissingRows > 0 ? `${mcMissingRows} missing rows` : null,
-      mcMissingValues > 0 ? `${mcMissingValues} missing values` : null
-    ].filter(Boolean).join(', ');
-    addWarning(`Monte Carlo series fallback used for ${parts}; check series outputs.`);
+    addWarning(`Monte Carlo series fallback used for ${mcMissingRows} rows and ${mcMissingValues} values; check series outputs.`);
   }else{
     DEBUG_STATE.lastMCSeriesFallbacks = null;
   }
