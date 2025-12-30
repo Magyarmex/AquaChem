@@ -2666,9 +2666,9 @@ function runSimulation(params){
     const heteroAvailable = S_tot + nutrientPool;
     const heteroRequired = heteroGrowthRaw / heteroYield;
     const heteroConsumed = Math.min(heteroRequired, heteroAvailable);
-    const heteroGrowth = heteroConsumed * heteroYield;
+    const heteroGrowth_g = heteroConsumed * heteroYield;
     const heteroDecay = heteroMass_g * HET_MODEL.decay_per_day * (1 - foodIndex) * dt;
-    heteroMass_g = Math.max(heteroFloor, heteroMass_g + heteroGrowth - heteroDecay);
+    heteroMass_g = Math.max(heteroFloor, heteroMass_g + heteroGrowth_g - heteroDecay);
     if(heteroMass_g <= heteroFloor + 1e-9 && heteroFloor > 0) heteroFloorHits++;
     if(!Number.isFinite(heteroMass_g)){
       addWarning('Heterotroph mass became non-finite; resetting to 0.');
@@ -2691,29 +2691,38 @@ function runSimulation(params){
       }
     }
 
-    const heteroGrowth = heteroMass_g * HET_MODEL.growth_per_day * foodIndex * tempF * dt;
-    const heteroDecay = heteroMass_g * HET_MODEL.decay_per_day * (1 - foodIndex) * dt;
-    heteroMass_g = Math.max(0, heteroMass_g + heteroGrowth - heteroDecay);
-
-    const phytoGrowth = phytoMass_g * PHOTO_MODEL.growth_per_day * lightFactor * phytoNutrientIndex * co2Index * dt;
+    const phytoGrowthRaw = phytoMass_g * PHOTO_MODEL.growth_per_day * lightFactor * phytoNutrientIndex * co2Index * dt;
+    const phytoYield = 0.55;
+    const phytoAvailable = nutrientPool + inorgN_g * 0.6;
+    const phytoRequired = phytoGrowthRaw / phytoYield;
+    const phytoConsumed = Math.min(phytoRequired, phytoAvailable);
+    const phytoGrowth = phytoConsumed * phytoYield;
     const phytoDecay = phytoMass_g * PHOTO_MODEL.decay_per_day * (1 - lightFactor) * (1 - phytoNutrientIndex * 0.5) * dt;
-    phytoMass_g = Math.max(0, phytoMass_g + phytoGrowth - phytoDecay);
+    phytoMass_g = Math.max(phytoFloor, phytoMass_g + phytoGrowth - phytoDecay);
+    if(phytoMass_g <= phytoFloor + 1e-9 && phytoFloor > 0) phytoFloorHits++;
     phytoGrowthTotal += phytoGrowth;
     phytoDecayTotal += phytoDecay;
-
-    if(!Number.isFinite(biofilm_g)){
-      addWarning('Biofilm mass became non-finite; resetting to 0.');
-      biomassNonFiniteHits++;
-      biofilmNonFiniteHits++;
-      biofilm_g = 0;
+    if(!Number.isFinite(phytoMass_g)){
+      addWarning('Phyto mass became non-finite; resetting to 0.');
+      phytoMass_g = 0;
     }
-    if(!Number.isFinite(predator_g)){
-      addWarning('Predator mass became non-finite; resetting to 0.');
-      biomassNonFiniteHits++;
-      predatorNonFiniteHits++;
-      predator_g = 0;
+    if(phytoConsumed > 0){
+      const shareNutr = nutrientPool > 0 ? (nutrientPool / phytoAvailable) : 0;
+      const takeNutr = phytoConsumed * shareNutr;
+      const takeInorg = phytoConsumed - takeNutr;
+      if(takeNutr > 0){
+        const nTot = nutrientPool || 1;
+        macro_g = Math.max(0, macro_g - takeNutr * (macro_g / nTot));
+        micro_g = Math.max(0, micro_g - takeNutr * (micro_g / nTot));
+      }
+      if(takeInorg > 0){
+        const inTot = inorgN_g || 1;
+        const takeNH4 = Math.min(NH4, takeInorg * (NH4 / inTot));
+        const takeNO3 = Math.min(NO3, takeInorg * (NO3 / inTot));
+        NH4 = Math.max(0, NH4 - takeNH4);
+        NO3 = Math.max(0, NO3 - takeNO3);
+      }
     }
-    heteroMass_g = biofilm_g + predator_g;
 
     const decayMass = heteroDecay + phytoDecay;
     if(decayMass > 0){
