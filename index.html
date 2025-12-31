@@ -1094,6 +1094,8 @@ const DEBUG_STATE = {
   lastRecomputeMs: null,
   lastFlagsCount: null,
   lastUpdateISO: null,
+  lastFeedSchedule: null,
+  lastFeedScheduleCount: null,
   bootToken: bootToken,
   bootLoadedISO: window[bootKey].firstSeenISO,
   bootDuplicateCount: window[bootKey].count,
@@ -1244,6 +1246,7 @@ function buildDebugSnapshot(extraLines=[]){
 lines.push(`surface=${p.lenCm}×${p.widCm} cm, blanket=${p.blanketPct}%, ripple=${p.ripplePct}%`);
     lines.push(`diffuser=${p.diffType || 'n/a'}, depth=${p.diffDepthCm} cm, tight=${p.tight}`);
     lines.push(`pH=${p.pH}, heaters=${p.heaters}, nitCap=${p.nitCap}, nUnits=${p.nUnits}`);
+    lines.push(`feedInterval=${p.feedInterval ?? 'n/a'} days, feedSchedule=${Array.isArray(p.feedSchedule) ? p.feedSchedule.length : 0} event(s)`);
     lines.push('');
     lines.push(compactJSON(p, 1600));
   }
@@ -1926,7 +1929,8 @@ function runSimulation(params){
       n_balance_init:0,
       n_balance_end:0,
       c_balance_init:0,
-      c_balance_end:0
+      c_balance_end:0,
+      feed_added:0
     },
     meta: { dt, oxy, kLa, nitCap, denitCap, feedStart:0, feedEnd:0, maxDemand:0, maxSupply:0 }
   };
@@ -1936,7 +1940,8 @@ function runSimulation(params){
     .filter(e=>Number.isFinite(e.day) && Number.isFinite(e.pellets) && e.pellets>0)
     .sort((a,b)=>a.day-b.day);
   let evIdx = 0;
-  const feeds = [...feedSchedule]
+  const feedSchedule = params.feedSchedule ?? [];
+  const feeds = [...(feedSchedule ?? [])]
     .filter(e=>Number.isFinite(e.day))
     .sort((a,b)=>a.day-b.day);
   let feedIdx = 0;
@@ -2021,6 +2026,25 @@ function runSimulation(params){
         addToPowder(capped);
       }
       evIdx++;
+    }
+
+    // Apply scheduled feeding events (pellet + powder mass)
+    while(feedIdx < feeds.length && feeds[feedIdx].day <= day + dt/2){
+      const feed = feeds[feedIdx];
+      const pelAdd = Math.max(0, Number(feed.pelletMass_g ?? 0));
+      const powAdd = Math.max(0, Number(feed.powderMass_g ?? 0));
+      if(pelAdd > 0){
+        pelFloat.carb += pelAdd * FRACTIONS.carb;
+        pelFloat.prot += pelAdd * FRACTIONS.protein;
+        pelFloat.fat  += pelAdd * FRACTIONS.fat;
+      }
+      if(powAdd > 0){
+        powBot.carb += powAdd * FRACTIONS.carb;
+        powBot.prot += powAdd * FRACTIONS.protein;
+        powBot.fat  += powAdd * FRACTIONS.fat;
+      }
+      out.audit.feed_added += pelAdd + powAdd;
+      feedIdx++;
     }
 
     // Sinking
@@ -3091,6 +3115,28 @@ function buildLegendChem(){
 
 let EVENTS = [];
 
+function buildFeedSchedule(intervalDays, totalDays, pelletMass, powderMass){
+  const interval = Number(intervalDays);
+  const span = Number(totalDays);
+  const pelMass = Math.max(0, Number(pelletMass ?? 0));
+  const powMass = Math.max(0, Number(powderMass ?? 0));
+  if(!Number.isFinite(interval) || interval <= 0) return [];
+  if(!Number.isFinite(span) || span <= 0) return [];
+  if(pelMass <= 0 && powMass <= 0) return [];
+
+  const schedule = [];
+  const eps = 1e-9;
+  for(let day = interval; day <= span + eps; day += interval){
+    schedule.push({
+      day,
+      pelletMass_g: pelMass,
+      powderMass_g: powMass,
+      source: 'interval'
+    });
+  }
+  return schedule;
+}
+
 function maxPelletCountFromInputs(){
   const pelletEachInputMass = pelletMassEach(Number(el('pelLen')?.value || 1.0), Number(el('pelDia')?.value || 0.2), Number(el('pelRho')?.value || 0.55));
   const totalMass = Number(el('pelMassN')?.value || 0);
@@ -3173,7 +3219,7 @@ function renderEvents(){
 /* =========================================================
    State persistence
 ========================================================= */
-const STATE_VERSION = 4;
+const STATE_VERSION = 5;
 
 function saveState(){
   const s = {
@@ -3183,6 +3229,7 @@ function saveState(){
     powMass: grabNumField('powMassN', 0, 'saveState'),
     blanket: grabNumField('blanketN', 0, 'saveState'),
     days: grabNumField('daysN', 30, 'saveState'),
+    feedInterval: grabNumField('feedInterval', 1, 'saveState'),
 
     // environment
     volL: grabNumField('volL', 65, 'saveState'),
@@ -3283,6 +3330,7 @@ function loadState(){
     if(s.powMass !== undefined && el('powMass') && el('powMassN')){ el('powMass').value = s.powMass; el('powMassN').value = s.powMass; }
     if(s.blanket !== undefined && el('blanket') && el('blanketN')){ el('blanket').value = s.blanket; el('blanketN').value = s.blanket; }
     if(s.days !== undefined && el('days') && el('daysN')){ el('days').value = s.days; el('daysN').value = s.days; }
+    if(s.feedInterval !== undefined && el('feedInterval')){ el('feedInterval').value = s.feedInterval; }
 
     // environment + geometry
     ['volL','airFlow','Tnow','pH','altM','tds','ripplePct','lenCm','widCm','tankHCm','waterSurfCm','blanketGapCm','diffDepthCm',
@@ -3745,6 +3793,7 @@ function getParams(){
     powderMass_g: grabNumField('powMassN', 0, 'params'),
     blanketPct: grabNumField('blanketN', 0, 'params'),
     days: grabNumField('daysN', 30, 'params'),
+    feedInterval: grabNumField('feedInterval', 1, 'params'),
 
     volL: grabNumField('volL', 65, 'params'),
     airFlow: grabNumField('airFlow', 4, 'params'),
@@ -3831,6 +3880,8 @@ function getParams(){
   p.nitCap = clamp(Number.isFinite(p.nitCap) ? p.nitCap : 1.0, 0, 1);
   p.denitCap = clamp(Number.isFinite(p.denitCap) ? p.denitCap : 1.0, 0, 1);
   p.lightHour = clamp(Number.isFinite(p.lightHour) ? p.lightHour : 8, 0, 23);
+  p.feedInterval = clamp(Number.isFinite(p.feedInterval) ? p.feedInterval : 0, 0, p.days);
+  p.feedSchedule = buildFeedSchedule(p.feedInterval, p.days, p.pelletMass_g, p.powderMass_g);
   return p;
 }
 
@@ -3889,6 +3940,8 @@ function recompute(){
     setStage('UI', 'read params');
     const params = getParams();
     DEBUG_STATE.lastParams = params;
+    DEBUG_STATE.lastFeedSchedule = Array.isArray(params.feedSchedule) ? params.feedSchedule : [];
+    DEBUG_STATE.lastFeedScheduleCount = DEBUG_STATE.lastFeedSchedule.length;
     DEBUG_STATE.lastMode = params.runMode;
     DEBUG_STATE.lastUpdateISO = new Date().toISOString();
 
