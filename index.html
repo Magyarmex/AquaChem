@@ -1847,15 +1847,16 @@ function runSimulation(params){
   const denitCap = clamp(Number(params.denitCap ?? 1), 0, 1);
   const kNH4_g = (Number(params.kNH4Nit ?? 0) * params.volL) / 1000;
   const kNO2_g = (Number(params.kNO2Nit ?? 0) * params.volL) / 1000;
-  const kDoHet = 0; // legacy metabolism: disable heterotroph O2 limitation
-  const slowFrac = 0; // legacy metabolism: no refractory split
-  const biofilmMult = 1; // legacy metabolism: no biofilm diffusion penalty
-  const kDenit = 0; // legacy metabolism: denitrification off
-  const fishMass = 0; // legacy metabolism: ignore fish respiration
-  const fishO2 = 0;
-  const plantO2 = 0; // legacy metabolism: ignore plant O2
-  const tempAmp = 0; // legacy metabolism: no diurnal temperature swing
-  const lightHour = 0;
+  const kDoHet = clamp(Number.isFinite(params.kDoHet) ? params.kDoHet : 0.8, 0, 10);
+  const slowFrac = clamp(Number.isFinite(params.slowFrac) ? params.slowFrac : 0.25, 0, 0.9);
+  const biofilmMm = clamp(Number.isFinite(params.biofilmMm) ? params.biofilmMm : 0.6, 0, 6);
+  const biofilmMult = clamp(1 / (1 + biofilmMm / 0.6), 0.35, 1.0);
+  const kDenit = clamp(Number.isFinite(params.kDenit) ? params.kDenit : 0.15, 0, 2.5);
+  const fishMass = clamp(Number.isFinite(params.fishMass) ? params.fishMass : 0, 0, 50000);
+  const fishO2 = clamp(Number.isFinite(params.fishO2) ? params.fishO2 : 0, 0, 200);
+  const plantO2 = clamp(Number.isFinite(params.plantO2) ? params.plantO2 : 0, 0, 50);
+  const tempAmp = clamp(Number.isFinite(params.tempAmp) ? params.tempAmp : 0.6, 0, 12);
+  const lightHour = clamp(Number.isFinite(params.lightHour) ? params.lightHour : 9, 0, 23);
   const macroRelease = Number(params.macroRelease ?? 0);
   const microRelease = Number(params.microRelease ?? 0);
   const macroUptake = Number(params.macroUptake ?? 0);
@@ -2123,7 +2124,8 @@ function runSimulation(params){
     for(const k of ["carb","prot","fat"]){
       const Ks_sub = 0.02;
       const fS = S[k] / (Ks_sub + S[k]);
-      const fO2 = DO / (kDoHet + DO);
+      const o2Denom = kDoHet + DO;
+      const fO2 = o2Denom > 0 ? DO / o2Denom : 1;
       const flux = k_ox[k] * Bhet * mixMult * fS * fO2 * S[k];
       ox[k] = Math.min(flux, S[k]/dt);
       S[k] -= ox[k]*dt;
@@ -2166,7 +2168,8 @@ function runSimulation(params){
     const O2_nh4 = r1 * CHEM.O2_per_gN_NH4_to_NO2;
     const O2_no2 = r2 * CHEM.O2_per_gN_NO2_to_NO3;
 
-    const fAnox = clamp(1 - DO/(kDoHet + DO), 0, 1);
+    const anoxDenom = kDoHet + DO;
+    const fAnox = anoxDenom > 0 ? clamp(1 - DO/anoxDenom, 0, 1) : 0;
     const rDen_flux = Math.min(Bden * kDenit * fAnox * NO3, NO3/dt);
     NO3 = NO3 - rDen_flux*dt;
     const COD_den = Math.min(COD_bio, rDen_flux * 2.5);
