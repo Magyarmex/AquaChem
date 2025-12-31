@@ -2265,43 +2265,16 @@ function runSimulation(params){
     out.macro_mgL[i] = (macro_g*1000)/params.volL;
     out.micro_mgL[i] = (micro_g*1000)/params.volL;
 
-    out.rate.carb[i] = nutrient.flows.o2_g_day;
-    out.rate.nh4[i] = nutrient.flows.o2_g_day * 0.35;
-    out.rate.no2[i] = nutrient.flows.o2_g_day * 0.15;
-    out.rate.hetero[i] = consumers.flows.o2_g_day;
-    out.rate.plant[i] = -primary.production.o2_g_day;
-    out.rate.total[i] = o2Demand - o2Prod;
-    out.rate.supply[i] = gas.o2_transfer_g_day;
-    out.meta.maxDemand = Math.max(out.meta.maxDemand, out.rate.total[i]);
-    out.meta.maxSupply = Math.max(out.meta.maxSupply, out.rate.supply[i]);
+    out.DIC_mgL[i] = (DIC_g*1000)/params.volL;
+    out.store_mgL[i] = 0;
 
-    const nh4_mgL = (state.pools.nh4_g * 1000) / volL;
-    const no2_mgL = (state.pools.no2_g * 1000) / volL;
-    const no3_mgL = (state.pools.no3_g * 1000) / volL;
-    const po4_mgL = (state.pools.po4_g * 1000) / volL;
-    const storeTotal_g = ['algae','plankton','plants'].reduce((acc,key)=>acc + state.stores[key].n_g + state.stores[key].p_g, 0);
-    const store_mgL = (storeTotal_g * 1000) / volL;
-    storeTotal_g_last = storeTotal_g;
-
-    out.DO_mgL[i] = state.oxygen.do_mgL;
-    out.DO_pct[i] = oxy.Cstar > 0 ? (state.oxygen.do_mgL / oxy.Cstar) * 100 : 0;
-    out.NH4_mgL[i] = nh4_mgL;
-    out.NO2_mgL[i] = no2_mgL;
-    out.NO3_mgL[i] = no3_mgL;
-    out.NH3_mgL[i] = nh4_mgL * nh3Fraction(pHLast, tempC) * CHEM.NH3_ion_per_N;
-    out.CO2_mgL[i] = carbonate.co2_mgL;
-    out.DIC_mgL[i] = carbonate.dic_mgL;
-    out.macro_mgL[i] = (nh4_mgL + no2_mgL + no3_mgL);
-    out.micro_mgL[i] = po4_mgL;
-    out.store_mgL[i] = store_mgL;
-
-    out.chem.nh4[i] = nh4_mgL;
+    out.chem.nh4[i] = out.NH4_mgL[i];
     out.chem.nh3[i] = out.NH3_mgL[i];
-    out.chem.no2[i] = no2_mgL;
-    out.chem.no3[i] = no3_mgL;
-    out.chem.co2[i] = carbonate.co2_mgL;
-    out.chem.dic[i] = carbonate.dic_mgL;
-    out.chem.store[i] = store_mgL;
+    out.chem.no2[i] = out.NO2_mgL[i];
+    out.chem.no3[i] = out.NO3_mgL[i];
+    out.chem.co2[i] = out.CO2_mgL[i];
+    out.chem.dic[i] = out.DIC_mgL[i];
+    out.chem.store[i] = out.store_mgL[i];
     out.chem.macro[i] = out.macro_mgL[i];
     out.chem.micro[i] = out.micro_mgL[i];
 
